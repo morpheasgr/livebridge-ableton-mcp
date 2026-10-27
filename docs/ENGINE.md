@@ -19,6 +19,9 @@ automation, and plays follow actions on tracks and scenes.
 | `live_engine_unmodulate` | Stop one modulation (or `all=true`); the parameter goes back to its value |
 | `live_engine_follow` | Follow actions: every N bars pick the next clip of a track or the next scene — next, previous, first, last, any, other, again, stop, jump:N with weights, a chance, a seed, optionally only some slots |
 | `live_engine_unfollow` | Stop a track's or the scenes' rule (or `all=true`); what plays keeps playing |
+| `live_sound_check` | Every track: silent / quiet / ok, a patch strangled by its filter, cutoffs below the role's floor, the chain's usual silent causes (works without the device too, with less) |
+| `live_mix_balance` | Faders to role (or genre) levels by measurement, settled over passes, trimmed for master headroom; each band problem placed on the master or on the 1-2 tracks that own it |
+| `live_master_auto` | EQ Eight -> Glue -> Limiter before the master's Engine, limiter gain raised step by step to a loudness target; stops when the crest factor collapses or the drop/breakdown contrast shrinks |
 
 Everything else in LiveBridge works without the device; without it these tools say how to
 add it.

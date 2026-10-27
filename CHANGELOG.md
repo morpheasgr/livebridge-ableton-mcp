@@ -52,6 +52,21 @@ the MCP server package and the installer have their own version numbers. `live_s
   (`livebridge://omnisphere`). The codec, preset tree, VST3 container, packing and both guides
   are ported from kasperikaivola's fork of ableton-mcp-pro (MIT, commit 6ac32c8); new `serum`
   extra (cbor2, zstandard), installed by default.
+- **Mixing and mastering by measurement** (`live_sound_check`, `live_mix_balance`,
+  `live_master_auto`; Engines on the tracks and the master): a sound check for silent parts,
+  filter-strangled patches and cutoffs below a role's working floor; faders set to role levels
+  (or a genre's) in real dB over measured passes, trimmed for master headroom, with each
+  spectral problem placed on the master (shared by 3+ tracks) or on the tracks that own it; an
+  EQ Eight -> Glue -> Limiter chain driven to a destination loudness (streaming -14, Apple -16,
+  club -8 ...) with crest-factor and drop-vs-breakdown guardrails. Roles come from track names
+  or the sound. `live_audio_analyze(genre=...)` compares a bounce with one of 18 genre
+  balances. Ideas and data from HighVoltSound's ableton-auto-mix-mcp and hellyee (both MIT).
+- **Melody check** (`live_theory_melody`): the craft checklist for a lead or hook — off-grid
+  starts, note lengths, rests, velocity arc, one climax, recovered leaps, resolved tension
+  notes, a developed motif, question/answer — and, with `mood=`, contour, velocity and density
+  against the mood. New guides: melody craft and mood-to-notes (`PRODUCTION.md` §11-12),
+  transitions per genre, the sound check and balancing/mastering (`WORKFLOWS.md` §18-20), the
+  silent-failure list in `SKILL.md`; adapted from hellyee (MIT).
 - **More guidance from the same fork** (MIT): `SERUM.md` §6 lists every Serum 2 control
   (oscillator modes incl. granular and spectral, routing, matrix, FX racks, performance) with a
   new-patch recipe and fixes for a bland patch; `WORKFLOWS.md` §16 adds one section to an

@@ -234,6 +234,7 @@ SAMPLE_ARGS = {
                                         {"cmd": "tracks.get", "args": {"track": "Bass"}}]},
     "live_dialog_press": {"button": 0, "expect": "Save"},
     "live_log": {"message": "consistency test"},
+    "live_theory_melody": {"track": "Bass", "slot": 0},
     "live_theory_analyze": {"clips": [{"track": "Bass", "slot": 0},
                                       {"track": "Drums", "slot": 0}]},
     "live_tracks_get": {"track": "Bass"},

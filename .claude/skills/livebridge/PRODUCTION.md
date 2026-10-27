@@ -234,3 +234,92 @@ decay, width) so nothing is static.
    width, energy shape.
 7. Tell the user what to listen for ("the build into bar 33: filter + snare roll, the kick
    drops out for the last bar") and ask for their ears — then iterate.
+
+## 11. Melody craft (lead, hook, topline, melodic bass)
+
+Adapted from hellyee's melody-craft skill (MIT, `THIRD_PARTY_NOTICES.md`). §6 says which notes
+fit; this is how a phrase becomes a melody instead of a scale exercise.
+
+**The seven traps** — a generated melody sounds simple when it has these. Never hand over one
+that fails more than one, unless it is a stated choice:
+1. **Grid marching**: every note on a beat or an 8th. Start off the beat, anticipate the bar,
+   arrive late.
+2. **Uniform lengths**: all 0.5 or 1.0 beats. Use 3+ lengths: ornaments 0.25, motion 0.5-0.75,
+   anchors 1.5-2, an arrival 2.5-4.
+3. **Scale-walking**: up the scale, down the scale. Steps are filler; a leap of a 6th says more
+   than six steps.
+4. **No rests**: wall-to-wall notes. At least one beat of silence every 4 bars; end phrases a
+   beat early.
+5. **Flat velocity**: everything 90-100. Span 25+, shaped toward the climax (62 -> 74 -> 88 ->
+   106), ornaments -20, syncopated accents +10.
+6. **Only chord tones**: every note safe. The emotion is in notes that don't belong and then
+   resolve by step.
+7. **Pasted repeats**: bar 1 four times. Repeat the shape, change the detail.
+
+**Build it**
+- **Motif first**: 3-6 notes with one distinctive thing (a leap, a rhythm, a tension). Develop
+  it: sequence (a step higher), inversion (rise becomes fall), augmentation/diminution
+  (durations doubled/halved), fragmentation (repeat the tail, tightening), octave
+  displacement. A strong 8 bars: motif (1-2), its sequence (3-4), fragment and build (5-6),
+  climax and resolution (7-8).
+- **Question and answer**: the first half ends away from the tonic (2nd, 5th, 7th), the second
+  lands on the tonic or third. For longing, deny the answer once — repeat the question a third
+  higher, then resolve.
+- **Tension notes**, each resolved by step: appoggiatura (leap to a non-chord note on a strong
+  beat, fall a step: grief, longing), suspension (hold over the chord change, resolve down:
+  ache), passing and neighbour tones (flow, hesitation), anticipation (the next chord's note
+  early: urgency), b2 oscillation (phrygian rocking: menace), raised 7th (harmonic minor:
+  drama). About one per bar in calm material, 2-3 at the peak.
+- **Leaps**: after a 5th or more, move stepwise the other way. Put the biggest leap right before
+  the climax.
+- **One climax**: the highest note once, 60-75% through the phrase, with the highest velocity
+  and often the longest note; two climaxes are no climax.
+
+**Check it**: `live_theory_melody(track="Lead", slot=0, harmony=[{"track": "Pad", "slot": 0}])`
+measures the checklist (`checks` with `ok` and the numbers, `suggestions` per failed check).
+
+**Feedback means a minimal edit, not a new melody** — keep the motif and change only what the
+words name (read with `live_clip_get_notes`, write with `live_clip_add_notes(replace=true)`,
+then say in one sentence what changed):
+
+| User says | Do |
+|---|---|
+| "too simple" | tension notes, off-grid starts, a real leap (traps 1, 3, 6) |
+| "not emotional" | appoggiaturas on strong beats, a wider velocity arc, slower harmony under the climax |
+| "complex but soulless" | *remove* notes: keep the contour, add rests |
+| "monotonous" | develop the motif (sequence, inversion); change bars 5-6 |
+| "too busy" | halve the notes; keep the climax and the anchors |
+| "not catchy" | a motif of 5 notes or fewer, repeated more; simplify the first bar's rhythm |
+| "should rise" | each repeat of the sequence higher; climax later and higher |
+| "needs air" | rests; end phrases a beat early |
+| "darker" | an octave lower, b2/tritone touches, lower velocity ceiling |
+| "robotic" | off-grid starts, varied lengths, ±8 velocity, detached repeated notes (0.4 in a 0.5 slot) |
+
+## 12. From a mood to notes
+
+Adapted from hellyee's emotion-to-notes skill (MIT). When the user names a feeling instead of
+(or next to) musical terms, place it on two axes — pleasant/unpleasant and calm/energetic —
+and pick the nearest row:
+
+| Mood | Scale | Tempo | Contour | Velocity | Density |
+|---|---|---|---|---|---|
+| Melancholy | minor, dorian | 60-85 | falling, wide leaps down | soft, 40-75 | sparse, long notes |
+| Anger | phrygian, harmonic minor | 130-155 | jagged, short repeated motifs | hard, 95-127 | dense, off-grid accents |
+| Calm | major, lydian | 65-90 | stepwise, gentle arcs | 50-85, even | sparse, legato |
+| Euphoria | mixolydian, major (pentatonic) | 122-145 | rising leaps, wide range | punchy, 90-122 | dense, syncopated |
+| Tension | phrygian, tritones, whole-tone touches | any | hovering, then a sudden leap | swelling | irregular |
+| Nostalgia | dorian, major with a borrowed b7 | 70-95 | falling, then resolving up | 55-80, breathy | moderate, loose swing |
+| Hope | lydian, major | 90-115 | rising, open intervals | building | building |
+| Loneliness | minor, sparse harmony | 55-75 | isolated single lines | very soft, wide gaps | very sparse |
+| Triumph | major, mixolydian | 100-130 | strong upward leaps, arrival on the tonic | 95-127 | strong downbeats |
+
+- **The user's explicit key and tempo win**: the mood then shapes contour, velocity and
+  density inside them. Never swap the key or tempo for an "emotionally better" one — say so.
+- Genre bends it: "dark" in techno is minor/phrygian, sparse and hard-hitting, not slow.
+- **Arcs** ("from nostalgic to euphoric"): give each section a row and change one or two
+  dimensions between neighbours (keep the scale, raise density and velocity), filters opening
+  as energy rises. Grief to hope: rotate the same chords so the progression starts on the major
+  chord (Am-F-C-G -> C-G-Am-F) rather than changing key.
+- **Verify, don't assert**: `live_theory_melody(..., mood="melancholy")` compares contour (ups
+  vs downs), notes per bar, velocity and scale with the row; report it plainly ("dorian,
+  falling contour, mean velocity 58 — matches melancholy").

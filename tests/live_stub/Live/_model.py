@@ -899,8 +899,38 @@ def _build_native_device(name, class_name, device_type, host):
     if class_name == "OriginalSimpler":
         return SimplerDevice(name, class_name, device_type, (), host)
     return Device(name, class_name, device_type,
-                  ({"name": "Param 1", "value": 0.5}, {"name": "Param 2", "value": 0.5}),
+                  _NATIVE_PARAMETERS.get(class_name, (
+                      {"name": "Param 1", "value": 0.5}, {"name": "Param 2", "value": 0.5})),
                   host)
+
+
+#: realistic parameters of a few native devices (the rest get two placeholders)
+_NATIVE_PARAMETERS = {
+    "Limiter": (
+        {"name": "Gain", "value": 0.0, "min": 0.0, "max": 24.0, "unit": "dB"},
+        {"name": "Ceiling", "value": 0.0, "min": -24.0, "max": 0.0, "unit": "dB"},
+        {"name": "Release", "value": 300.0, "min": 1.0, "max": 3000.0, "unit": "ms"},
+    ),
+    "GlueCompressor": (
+        {"name": "Threshold", "value": 0.0, "min": -40.0, "max": 0.0, "unit": "dB"},
+        {"name": "Ratio", "value": 0.0, "min": 0.0, "max": 2.0, "is_quantized": True,
+         "value_items": ("2", "4", "10")},
+        {"name": "Attack", "value": 3.0, "min": 0.0, "max": 6.0, "is_quantized": True,
+         "value_items": ("0.01", "0.1", "0.3", "1", "3", "10", "30")},
+        {"name": "Release", "value": 6.0, "min": 0.0, "max": 6.0, "is_quantized": True,
+         "value_items": ("0.1", "0.2", "0.4", "0.6", "0.8", "1.2", "Auto")},
+        {"name": "Makeup", "value": 0.0, "min": 0.0, "max": 20.0, "unit": "dB"},
+    ),
+    "Eq8": (
+        {"name": "1 Filter On A", "value": 0.0, "min": 0.0, "max": 1.0, "is_quantized": True,
+         "value_items": ("Off", "On")},
+        {"name": "1 Filter Type A", "value": 3.0, "min": 0.0, "max": 7.0, "is_quantized": True,
+         "value_items": ("Low Cut 48", "Low Cut 12", "Low Shelf", "Bell", "Notch",
+                         "High Shelf", "High Cut 12", "High Cut 48")},
+        {"name": "1 Frequency A", "value": 100.0, "min": 10.0, "max": 22000.0, "unit": "Hz"},
+        {"name": "1 Gain A", "value": 0.0, "min": -15.0, "max": 15.0, "unit": "dB"},
+    ),
+}
 
 
 def _clone_device(source, host):
