@@ -314,10 +314,11 @@ TOOLSETS: dict[str, tuple[str, ...]] = {
     # Everyday session work: transport, tracks, clips + notes, devices, mixer, scenes, browser.
     "core": _CORE,
     # core + arrangement, automation, racks, plug-ins, samples/Splice, recording, routing,
-    # the theory/audio analysis, generative notes, the sound library and session memory.
+    # the theory/audio analysis, sample search, generative notes, the sound library and
+    # session memory.
     "production": _CORE + ("arrangement", "automation", "racks", "plugins", "plugin_racks",
-                           "samples", "splice", "record", "routing", "analysis", "generate",
-                           "sounds", "memory"),
+                           "samples", "sample_search", "splice", "record", "routing",
+                           "analysis", "generate", "sounds", "memory"),
 }
 
 _ALL_NAMES = ("all", "full", "*")

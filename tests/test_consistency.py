@@ -260,6 +260,8 @@ def test_every_tool_runs_end_to_end(name, tcp_bridge, song, tmp_path, monkeypatc
         pytest.skip(SKIP[name])
     # sound library and session memory: never the user's real ~/.livebridge
     monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    # sample search: never a real Live database on a developer's machine
+    monkeypatch.setenv("LIVEBRIDGE_LIVE_DATABASE", str(tmp_path / "no Live database"))
     app = _APP
     token = ""
     if name in NEEDS_TOKEN:

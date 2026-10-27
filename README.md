@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
-  180 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
+  183 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
   macOS and Windows · every Live 12 edition · no Max for Live · MIT licensed
 </p>
@@ -79,7 +79,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 
 ## Why LiveBridge
 
-- **All of Live that its API allows**, not just transport and notes: 180 tools backed by 200
+- **All of Live that its API allows**, not just transport and notes: 183 tools backed by 200
   commands, plus direct access to the Live Object Model for anything else.
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
@@ -105,7 +105,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
  ┌───────────────────────────┐   TCP JSON lines :9880    ┌──────────────────────────────────┐
  │ livebridge-mcp            │ ────────────────────────▶ │ Ableton Live 12                  │
  │ MCP server (Python ≥3.10) │ ◀──────────────────────── │  └ LiveBridge Remote Script      │
- │ 180 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
+ │ 183 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
  │ client, LAN discovery     │ ◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │     runs every command on Live's │
  └───────────────────────────┘                           │     main thread, 1 undo step each)│
                                                          └──────────────────────────────────┘
@@ -234,7 +234,7 @@ Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and 
 
 ## Tools
 
-180 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
+183 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
 full reference (every tool with its arguments and defaults, and every bridge command with the tool
 that runs it) is [docs/TOOLS.md](docs/TOOLS.md), generated from the code by
 `installers/gen_tools_doc.py`; Claude reads the full docstrings at runtime.
@@ -256,6 +256,7 @@ colours are a palette index, `"#RRGGBB"`, `[r, g, b]` or a name.
 | Devices & racks | `live_device_insert/set_parameter/set_parameters/randomize`, `live_rack_macros`, `live_drumrack_overview`, `live_simpler_*` | Any parameter by name/display text ("-12 dB", "1/8"), macros, drum pads, Simpler |
 | Plug-ins | `live_plugin_expose/param_map/preset_files`, `live_plugin_list/presets/set/parameters` | Serum 2 / any VST3 fully controllable without Configure; presets and exposed parameters |
 | Browser | `live_browser_search/load/hotswap/preview` | Load anything from Live's browser by name (`category="instrument"`, `"drum_kit"`, `"plugin"` …) |
+| Sample search | `live_sample_search`, `live_sample_tags`, `live_sample_index` | Everything Live's browser shows under Library > Samples (Core Library, packs, User Library, your added folders) by words and Live's browser tags ("Drums\|Kick", "Character\|Punchy"), with absolute paths — [details](docs/SAMPLE_SEARCH.md) |
 | Samples & Splice | `live_sample_import/upload/list`, `live_drumrack_set_pad/convert`, `live_splice_import_downloaded` | Files from disk (or from Claude's machine in LAN mode) into slots, the arrangement, Simpler or drum pads |
 | Automation | `live_automation_write/shape/get/copy/clear/state`, `live_automation_record` | Envelopes and LFO shapes in session clips; arrangement automation recorded in real time |
 | Analysis | `live_theory_analyze`, `live_audio_analyze`, `live_audio_masking`, `live_audio_compare` | Key, chords, clashes between MIDI parts; LUFS, spectral balance, stereo, tempo, key and energy curve of audio (optional `audio` extra), compared with a reference track; which parts mask each other in which bands; before/after checks of a change |

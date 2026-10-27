@@ -13,6 +13,13 @@ the MCP server package and the installer have their own version numbers. `live_s
   co-writing, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit,
   vocal chain). Adapted in part from the MIT-licensed ableton-mcp-pro and glincker/ableton-skills
   (`THIRD_PARTY_NOTICES.md`).
+- **Sample search with Live's browser tags** (`live_sample_search`, `live_sample_tags`,
+  `live_sample_index`): everything Live's browser lists under Library > Samples — Core
+  Library, packs, User Library and every folder added to Places, not only what Live's API
+  returns — searchable by words and tags ("Drums|Kick", "Character|Punchy"), with absolute
+  paths ready for `live_drumrack_set_pad` / `live_sample_import`. Built in the MCP server from
+  a temporary copy of Live's browser database (database + -wal; the original is never opened),
+  refreshed when it changes. See `docs/SAMPLE_SEARCH.md`.
 - `tests/test_skill_docs.py` checks that every tool and argument the skill files name exists.
 - **12 new tools (180 in total)**, written for LiveBridge from a list of features other Ableton
   MCP servers offer (no code taken from them):

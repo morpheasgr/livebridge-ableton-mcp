@@ -1,0 +1,256 @@
+"""Sample search over everything Live's browser shows under Library > Samples, with Live's
+browser tags: `live_sample_search` finds samples by words and tags ("a punchy kick" ->
+tags=["Drums|Kick", "Character|Punchy"], kind="one_shot") and returns absolute file paths for
+`live_drumrack_set_pad(file_path=...)` / `live_sample_import`; `live_sample_tags` lists the tag
+vocabulary; `live_sample_index` shows or refreshes the index.
+
+The engine (:mod:`livebridge_mcp.sample_db`) reads a temporary copy of Live's browser database
+in this process — never Live's file itself and never inside Live — and keeps a local index in
+``~/.livebridge/sample_index.sqlite``.
+
+Settings (``~/.livebridge/config.json``, all optional)::
+
+    "sample_index": {
+        "roots": {"Samples": "D:\\\\Samples"},   # place name -> folder, when not found
+        "database": "...",                       # Live-files-<N>.db or its folder
+        "auto_refresh_seconds": 300              # 0 = refresh only on request
+    }
+
+``LIVEBRIDGE_LIVE_DATABASE`` overrides ``database``.
+"""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+import time
+from typing import Any
+
+from . import bridge_call, tool_error
+from .. import library, sample_db
+from ..client import BridgeClient
+from ..config import read_config_file
+
+_KINDS = ("one_shot", "loop")
+_ORDERS = ("relevance", "name", "newest", "random")
+_ACTIONS = ("status", "refresh")
+_DEFAULT_AUTO_REFRESH = 300.0
+_INDEX_NAME = "sample_index.sqlite"
+
+
+def _is_error(value: Any) -> bool:
+    return isinstance(value, dict) and "error" in value and "type" in value
+
+
+def _settings() -> dict[str, Any]:
+    section = read_config_file().get("sample_index")
+    return section if isinstance(section, dict) else {}
+
+
+def _index_path():
+    return library.library_dir() / _INDEX_NAME
+
+
+def _list(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return [value]
+    return [str(v) for v in value]
+
+
+def register(mcp: Any, bridge: BridgeClient) -> None:
+    """Register the sample search tools on the MCP app."""
+
+    def ensure(refresh: bool, cmd: str) -> dict[str, Any]:
+        """Build or refresh the index when needed. Returns ``{"index": {...}}`` info or an
+        error dict."""
+        settings = _settings()
+        overrides = settings.get("roots") if isinstance(settings.get("roots"), dict) else {}
+        override_db = os.environ.get("LIVEBRIDGE_LIVE_DATABASE") or settings.get("database")
+        database = sample_db.find_live_database(override_db)
+        if database is None:
+            where = override_db or " or ".join(str(d) for d in sample_db.database_dirs())
+            return tool_error(
+                f"Live's browser database (Live-files-<N>.db) was not found in {where}. It "
+                "exists on the computer that runs Live once Live has indexed its browser; in "
+                "LAN mode the MCP server's computer has no copy (set sample_index.database in "
+                "~/.livebridge/config.json to a copied file).", type="not_found", cmd=cmd)
+        index_path = _index_path()
+        meta = sample_db.read_meta(index_path)
+        signature = sample_db.source_signature(database)
+        stale = bool(meta) and meta.get("signature") != signature
+        rebuild = refresh or not meta or meta.get("schema") != sample_db.SCHEMA_VERSION \
+            or meta.get("source_db") != str(database) or meta.get("overrides") != overrides
+        if stale and not rebuild:
+            try:
+                auto = float(settings.get("auto_refresh_seconds", _DEFAULT_AUTO_REFRESH))
+            except (TypeError, ValueError):
+                auto = _DEFAULT_AUTO_REFRESH
+            rebuild = auto > 0 and time.time() - float(meta.get("built_at", 0)) >= auto
+        info: dict[str, Any] = {}
+        if rebuild:
+            hints = bridge_call(bridge, "samples.locations")
+            if _is_error(hints) or not isinstance(hints, dict):
+                hints = {}
+                info["live_reachable"] = False
+            try:
+                status = sample_db.build_index(index_path, database, overrides, hints)
+            except sample_db.SampleIndexError as exc:
+                return tool_error(str(exc), type="invalid_state", cmd=cmd)
+            except (OSError, sqlite3.DatabaseError) as exc:
+                return tool_error(f"building the sample index failed: {exc}",
+                                  type="invalid_state", cmd=cmd)
+            info.update(refreshed=True, samples=status.get("samples"),
+                        build_seconds=status.get("build_seconds"))
+            if status.get("unresolved"):
+                info["unresolved_places"] = status["unresolved"]
+        elif stale:
+            info["stale"] = True
+        return {"index": info}
+
+    @mcp.tool()
+    def live_sample_search(
+        query: str | None = None,
+        tags: list[str] | None = None,
+        any_tags: list[str] | None = None,
+        exclude_tags: list[str] | None = None,
+        kind: str | None = None,
+        place: str | list[str] | None = None,
+        extensions: str | None = None,
+        order: str = "relevance",
+        seed: int | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        refresh: bool = False,
+    ) -> Any:
+        """Search every sample Live's browser knows (Library > Samples: Core Library, packs,
+        User Library and all folders added to Places — tens of thousands of files, far more
+        than the Live API lists) by words and Live's browser tags, with the absolute file
+        path of each result. Load a result with `live_drumrack_set_pad(note=..., file_path=
+        <path>)`, `live_sample_import(file_path=<path>, ...)` or `live_simpler_action(
+        "replace_sample", file_path=<path>)`. Read-only.
+
+        Args:
+            query: Words that must all appear in the file name, its folders or its place
+                ("909 kick", "vinyl crackle", "amen 170").
+            tags: Tags that must ALL be present: "Group|Tag" ("Drums|Kick", "Character|
+                Punchy", "Sounds|Bass"), just "Tag" (any group: "Punchy"), or "Group|*" (any
+                tag of that group). Case-insensitive. `live_sample_tags` lists what exists.
+            any_tags: At least one of these tags (same forms).
+            exclude_tags: None of these tags.
+            kind: "one_shot" or "loop" (from the Type tag, else guessed from the path).
+            place: Only these places ("Core Library", "Samples", "User Library", a pack name).
+            extensions: Only these file types, like `live_sample_list`: "wav,aif".
+            order: "relevance" (default: query words in the file name first, short names
+                first), "name", "newest" (file date) or "random" (variety; same `seed` =
+                same order).
+            seed: Seed for order="random".
+            offset, limit: Paging (limit 1..200, default 20).
+            refresh: Rebuild the index from Live's database first (otherwise automatic when
+                Live's database changed and the index is older than 5 minutes).
+
+        Returns:
+            `{total, offset, count, samples:[{name, path (absolute; null when the place's
+            folder is unknown), place, rel_path, tags, kind, size?, exists}], next_offset?,
+            index:{refreshed?, stale?, unresolved_places?}}`.
+
+        Gotchas: the first call builds the index (copies Live's database, a few seconds;
+        nothing in Live is touched). `exists: false` means the file moved since Live indexed
+        it. A null `path` means the place's folder is unknown — see `live_sample_index`. Tags
+        are Live's own browser tags; files Live has not analysed yet have none.
+        """
+        cmd = "sample_index.search"
+        if kind is not None and kind not in _KINDS:
+            return tool_error(f"kind must be one of {', '.join(_KINDS)}", cmd=cmd)
+        if order not in _ORDERS:
+            return tool_error(f"order must be one of {', '.join(_ORDERS)}", cmd=cmd)
+        if offset < 0 or not 1 <= limit <= 200:
+            return tool_error("offset must be >= 0 and limit 1..200", cmd=cmd)
+        for label, value in (("tags", tags), ("any_tags", any_tags),
+                             ("exclude_tags", exclude_tags)):
+            if value is not None and any(not str(v).strip() for v in value):
+                return tool_error(f"{label} must not contain empty tags", cmd=cmd)
+        state = ensure(refresh, cmd)
+        if _is_error(state):
+            return state
+        try:
+            result = sample_db.search(
+                _index_path(), query=query, tags=tags, any_tags=any_tags,
+                exclude_tags=exclude_tags, kind=kind, places=_list(place),
+                extensions=[e.strip() for e in extensions.split(",") if e.strip()]
+                if extensions else None, order=order, seed=seed, offset=offset, limit=limit)
+        except sample_db.SampleIndexError as exc:
+            return tool_error(str(exc), type="not_found", cmd=cmd)
+        except sqlite3.DatabaseError as exc:
+            return tool_error(f"the sample index is unreadable ({exc}) — rebuild it with "
+                              "live_sample_index(action='refresh')", type="invalid_state",
+                              cmd=cmd)
+        if state["index"]:
+            result["index"] = state["index"]
+        return result
+
+    @mcp.tool()
+    def live_sample_tags(group: str | None = None, filter: str | None = None,
+                         limit: int = 100) -> Any:
+        """The tag vocabulary of Live's browser (as used in `live_sample_search`), with how many
+        samples carry each tag — to turn "punchy", "dusty", "808" into real tags. Read-only.
+
+        Args:
+            group: One group's tags ("Drums", "Character", "Sounds", "Type", "Genres", "Key").
+                Omitted: every group with its most used tags.
+            filter: Only tags containing this text ("punch", "kick").
+            limit: Max entries (1..500).
+
+        Returns:
+            `{groups:[{group, files, top:[{tag, files}]}]}` or `{tags:[{tag, files}]}`.
+        """
+        cmd = "sample_index.tags"
+        if not 1 <= limit <= 500:
+            return tool_error("limit must be 1..500", cmd=cmd)
+        state = ensure(False, cmd)
+        if _is_error(state):
+            return state
+        try:
+            return sample_db.tag_counts(_index_path(), group=group, filter=filter, limit=limit)
+        except (sample_db.SampleIndexError, sqlite3.DatabaseError) as exc:
+            return tool_error(str(exc), type="invalid_state", cmd=cmd)
+
+    @mcp.tool()
+    def live_sample_index(action: str = "status") -> Any:
+        """Show or rebuild the sample search index (`live_sample_search`). Use "refresh" after
+        adding folders or samples to Live's browser or re-tagging them, or when paths are
+        missing. Nothing in Live is touched: the index is built from a temporary copy of
+        Live's browser database.
+
+        Args:
+            action: "status" (default) or "refresh".
+
+        Returns:
+            `{built, index, source_db, built_at, build_seconds, samples, tagged, with_path,
+            places:[{name, root, source ("config"|"database"|"live"|"guess"), verified,
+            samples}], unresolved:[place names without a folder], stale?, refreshed?}`.
+
+        Gotchas: a place is "unresolved" when its folder could not be found and checked; add
+        it to ~/.livebridge/config.json — `"sample_index": {"roots": {"<place name>":
+        "<folder>"}}` — then refresh. Run "refresh" with Live open so Live can report the
+        Core Library and User Library folders.
+        """
+        cmd = "sample_index.status"
+        if action not in _ACTIONS:
+            return tool_error(f"action must be one of {', '.join(_ACTIONS)}", cmd=cmd)
+        state = ensure(action == "refresh", cmd)
+        if _is_error(state):
+            return state
+        settings = _settings()
+        override_db = os.environ.get("LIVEBRIDGE_LIVE_DATABASE") or settings.get("database")
+        database = sample_db.find_live_database(override_db)
+        status = sample_db.index_status(
+            _index_path(), sample_db.source_signature(database) if database else None)
+        status.update({k: v for k, v in state["index"].items()
+                       if k in ("refreshed", "live_reachable")})
+        if status.get("unresolved"):
+            status["hint"] = ('add the folders to ~/.livebridge/config.json: "sample_index": '
+                              '{"roots": {"<place name>": "<folder>"}}, then '
+                              "live_sample_index(action='refresh')")
+        return status

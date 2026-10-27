@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~180 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~183 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -217,6 +217,15 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   plugin_format="vst3", editor_open=false)`.
 - Racks: `live_rack_macros` (read + set macros), `live_drumrack_overview`, `live_drumrack_set_pad`,
   `live_drumrack_convert` (pad <-> track), `live_simpler_action("to_drum_rack")` (slices to pads).
+- **Find samples** the way Live's browser does (Library > Samples: Core Library, packs, User
+  Library and the user's own folders, with Live's browser tags):
+  `live_sample_search(tags=["Drums|Kick", "Character|Punchy"], kind="one_shot")` -> each result
+  has an absolute `path` to load. Words go in `query` ("909 kick", "vinyl"); a bare tag
+  ("Punchy") matches any group; `live_sample_tags(filter="punch")` shows which tags exist.
+  Offer a few results (`order="random"` for variety) unless the user said "any". A null `path`
+  or `exists: false` -> `live_sample_index()` explains which folder is unknown.
+  "Load a punchy kick onto C1": search, then `live_drumrack_set_pad(note="C1", track=...,
+  file_path=<path>)`.
 - Samples on disk: `live_sample_import(file_path, track, mode="session"|"arrangement"|"simpler")`,
   onto a pad with `note="C1"` (or `live_drumrack_set_pad(note, file_path=...)`); `.mid` files
   import as MIDI clips the same way. Paths are on the machine running Live; in LAN mode a file
