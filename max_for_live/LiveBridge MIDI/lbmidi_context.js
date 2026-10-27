@@ -16,7 +16,8 @@
 // 1 1 ..." (one per scene), and "call fire|stop_all_clips <path...>" launches or stops.
 //
 // For the fast automation recording: "call begin_gesture|end_gesture <path...>" and
-// "setvalue <value> <path...>" (the parameter objects are kept between calls).
+// "setvalue <value> <path...>" (the parameter objects are kept between calls); for sampling
+// "getvalues <id> <path|path|...>" answers "values <id> <value per path...>".
 
 autowatch = 0;
 inlets = 1;
@@ -168,6 +169,16 @@ function call() {
     if (api && api.id != 0) {
         api.call(method);
     }
+}
+
+function getvalues(id, joined) {
+    var paths = String(joined).split("|");
+    var result = ["values", id];
+    for (var i = 0; i < paths.length; i++) {
+        var api = parameterAt(paths[i]);
+        result.push(api && api.id != 0 ? Number(api.get("value")) : 0);
+    }
+    outlet(0, result);
 }
 
 function trackOf() {

@@ -130,6 +130,13 @@ beats; the tempo is restored after) and the Engine writes the curve 50 times a s
 time at the Remote Script's resolution. Not for the tempo itself or a song with tempo
 automation, which would override the raised tempo.
 
+The arranging tools build on this: `live_arrangement_from_scenes`, `live_arrangement_duplicate_clip`
+and `live_arrangement_copy_range` (`automation=true` by default) record the clip envelopes Live
+does not copy, and a copied range's lanes, in background passes of several parameters each
+(`automation.record lanes=...`; a copy first plays the source range with `action="sample"` and
+reads the values — the Engine's `sample` command, `getvalues` through `context.js`). See
+`mcp_server/livebridge_mcp/arrange_automation.py`.
+
 # LiveBridge MIDI (Max for Live)
 
 A MIDI effect for MIDI tracks (before the instrument). It passes MIDI through unchanged, keeps

@@ -40,6 +40,19 @@ the MCP server package and the installer have their own version numbers. `live_s
   5x faster at 120 BPM at today's ~0.2 beat resolution); without one the Remote Script writes
   at ~300 BPM (0.5 beat, still exact for ramps). Refused for the tempo itself and when the song
   has tempo automation. `automation.record` gains `tempo` and `writer="external"`.
+- **Arrangement automation by default** (`automation=true` on `live_arrangement_from_scenes`,
+  `live_arrangement_duplicate_clip`, `live_arrangement_copy_range`): Live's API drops clip
+  envelopes from arrangement copies (device parameters always, mixer ones on tracks with an
+  instrument or audio effect — probe in `integration_check.py --scenario envelopes`, results in
+  LIVE_API_VERIFIED §19.5) and cannot read lanes. The lost envelopes now become the tracks'
+  automation lanes (one curve per parameter over the arrangement, the parameter's value between
+  sections), and a copied range takes its lanes along (played and sampled, then recorded at
+  the destination) — fast background passes in the MCP server, reported by
+  `live_automation_record(action="status")`, cancelled with `action="stop"`.
+  `automation.record` records several parameters in one pass (`lanes=`) and samples
+  (`action="sample"`); the Engine (1.5.0) writes and reads lanes 50 times a second. Fixed:
+  recording passes now also set Live's start marker, where playback actually starts (they
+  played from the old start marker before reaching the range).
 - **LiveBridge MIDI, a Max for Live MIDI effect** (`live_midi_played`, `live_midi_play`,
   `live_midi_stop`): passes MIDI through and remembers the last 10 minutes of notes and
   controllers with Live's song position — `live_midi_played` returns what you just played as

@@ -355,7 +355,8 @@ def test_tool_duplicate_delete_move(mcp):
     fake.set_result("arrangement.duplicate_clip", {"path": "p"})
     call_tool(app, "live_arrangement_duplicate_clip", {"track": 0, "slot": "Intro", "time": 1,
                                                        "unit": "bars"})
-    assert last(fake)["args"] == {"track": 0, "slot": "Intro", "time": 1.0, "unit": "bars"}
+    assert last(fake)["args"] == {"track": 0, "slot": "Intro", "time": 1.0, "unit": "bars",
+                                  "automation": True}
     fake.set_result("arrangement.delete_clip", {"deleted": "p"})
     call_tool(app, "live_arrangement_delete_clip", {"track": "Drums", "at": 16})
     assert last(fake)["args"] == {"track": "Drums", "at": 16.0, "unit": "beats"}
@@ -539,7 +540,7 @@ def test_new_arrangement_tools(mcp):
                                                        "unit": "bars", "length": 8,
                                                        "replace": False})
     assert last(fake)["args"] == {"track": 0, "slot": 0, "time": 5.0, "unit": "bars",
-                                  "length": 8.0, "replace": False}
+                                  "length": 8.0, "replace": False, "automation": True}
     call_tool(app, "live_arrangement_resize_clip", {"track": "Bass", "index": 0,
                                                     "length": "8.0.0"})
     assert last(fake)["args"] == {"track": "Bass", "index": 0, "length": "8.0.0",
@@ -548,11 +549,12 @@ def test_new_arrangement_tools(mcp):
     call_tool(app, "live_arrangement_from_scenes", {"sections": sections, "start": 5,
                                                     "unit": "bars", "tracks": ["Bass"]})
     assert last(fake)["args"] == {"sections": sections, "start": 5.0, "unit": "bars",
-                                  "tracks": ["Bass"]}
+                                  "tracks": ["Bass"], "automation": True}
     call_tool(app, "live_arrangement_copy_range", {"start": "9.1.1", "end": "17.1.1",
                                                    "destination": "33.1.1"})
     assert last(fake)["args"] == {"start": "9.1.1", "end": "17.1.1",
-                                  "destination": "33.1.1", "unit": "beats"}
+                                  "destination": "33.1.1", "unit": "beats",
+                                  "automation": True}
     count = len(fake.requests)
     checks = [
         ("live_arrangement_duplicate_clip", {"track": 0, "slot": 0, "time": 0, "length": 0}),
@@ -620,5 +622,83 @@ def test_envelopes_survive_on_a_track_without_devices(bridge, song):
         placed = run(bridge, "arrangement.duplicate_clip", track="Empty", slot=0, time=8)
         assert placed["envelopes"] == {"source": True, "copied": True} and "note" not in placed
         assert track["name"] == "Empty"
+    finally:
+        uninstall()
+
+
+# --------------------------------------------------------------------------
+# automation=true: lost clip envelopes as lanes for automation.record
+# --------------------------------------------------------------------------
+
+def _value(points, time):
+    """A lane's value at ``time`` (linear; the later of two breakpoints at one time wins)."""
+    from LiveBridge.handlers.automation import _curve_value
+    return _curve_value([tuple(p) for p in points], time, "linear")
+
+
+def test_from_scenes_returns_lanes_for_lost_envelopes(bridge, song):
+    import Live
+    from live_stub_ext import arrangement_live
+    uninstall = arrangement_live.install(Live, copy_envelopes="without_devices")
+    try:
+        freq = song.tracks[0].devices[0].parameters[2]
+        base = freq.value
+        run(bridge, "automation.write", track="Bass", slot=0, parameter="Filter Freq",
+            points=[[0, 100], [2, 1000]], mode="linear")
+        built = run(bridge, "arrangement.from_scenes", automation=True,
+                    sections=[{"scene": 1, "bars": 1}, {"scene": 0, "bars": 2}], tracks=["Bass"])
+        lanes = built["automation"]["lanes"]
+        assert built["automation"]["range"] == [0.0, 12.0]
+        (lane,) = [l for l in lanes if l["name"] == "Filter Freq"]
+        assert lane["track"] == "Bass" and lane["parameter"].endswith("parameters[2]")
+        points = lane["points"]
+        # section 1 (scene 1's clip has no envelope): the parameter's own value
+        assert _value(points, 0.0) == pytest.approx(base) and _value(points, 3.5) == \
+            pytest.approx(base)
+        # section 2 at beat 4: the 4-beat clip loop twice, 100 -> 1000 over its first 2 beats
+        for offset in (4.0, 8.0):
+            assert _value(points, offset + 0.001) == pytest.approx(100.0, abs=1.0)
+            assert _value(points, offset + 1.0) == pytest.approx(550.0, abs=5.0)
+            assert _value(points, offset + 3.0) == pytest.approx(1000.0, abs=5.0)
+        assert all(a[0] <= b[0] for a, b in zip(points, points[1:]))
+        # kept envelopes need no lane: a track without devices keeps Track Volume
+        run(bridge, "tracks.create", type="midi", name="Plain")
+        run(bridge, "clips.create", track="Plain", slot=0, length=4)
+        run(bridge, "automation.write", track="Plain", slot=0, parameter="Volume",
+            points=[[0, 0.3], [2, 0.9]])
+        plain = run(bridge, "arrangement.duplicate_clip", track="Plain", slot=0, time=64,
+                    automation=True)
+        assert plain["envelopes"]["copied"] is True and plain["automation"]["lanes"] == []
+        lost = run(bridge, "arrangement.duplicate_clip", track="Bass", slot=0, time=64,
+                   length=8, automation=True)
+        assert [l["name"] for l in lost["automation"]["lanes"]] == ["Filter Freq"]
+        assert lost["automation"]["range"] == [64.0, 72.0]
+    finally:
+        uninstall()
+
+
+def test_copy_range_names_the_parameters_to_sample(bridge, song):
+    import Live
+    from live_stub_ext import arrangement_live
+    uninstall = arrangement_live.install(Live, copy_envelopes=True)
+    try:
+        run(bridge, "arrangement.duplicate_clip", track="Bass", slot=0, time=0)
+        resonance = song.tracks[0].devices[0].parameters[3]
+        resonance._automation_state = 1                 # an arrangement lane plays it
+        run(bridge, "automation.write", track="Bass", slot=0, parameter="Filter Freq",
+            points=[[0, 100], [2, 1000]], mode="linear")
+        run(bridge, "arrangement.duplicate_clip", track="Bass", slot=0, time=8)
+        copied = run(bridge, "arrangement.copy_range", start=8, end=12, destination=32,
+                     tracks=["Bass"], automation=True)
+        sample = copied["automation"]["sample"]
+        assert sample["range"] == [8.0, 12.0] and sample["destination"] == 32.0
+        names = sorted(l["parameter"] for l in sample["lanes"])
+        assert any(n.endswith("parameters[3]") for n in names)       # the lane
+        assert any(n.endswith("parameters[2]") for n in names)       # the clip envelope
+        # the copy's own Filter Freq envelope was cleared: the recorded lane replaces it
+        clip = song.tracks[0].arrangement_clips[-1]
+        assert clip.start_time == 32.0
+        from LiveBridge.handlers.automation import get_envelope
+        assert get_envelope(clip, song.tracks[0].devices[0].parameters[2]) is None
     finally:
         uninstall()

@@ -255,9 +255,11 @@ def engine_patcher() -> dict:
         _box("obj-thisdevice", "live.thisdevice", [440.0, 220.0, 90.0, 22.0], 1, 3,
              ["bang", "int", "int"]),
         _box("obj-context", "js context.js", [440.0, 260.0, 90.0, 22.0], 1, 1),
-        _box("obj-route", "route status log context capture resolve mod query call setvalue",
-             [120.0, 340.0, 460.0, 22.0], 1, 10),
+        _box("obj-route",
+             "route status log context capture resolve mod query call setvalue getvalues",
+             [120.0, 340.0, 520.0, 22.0], 1, 11),
         _box("obj-setvalue", "prepend setvalue", [760.0, 180.0, 100.0, 22.0], 1, 1),
+        _box("obj-getvalues", "prepend getvalues", [880.0, 180.0, 110.0, 22.0], 1, 1),
         # follow actions: "query <id> <kind> <path...>" and "call <method> <path...>"
         _box("obj-query", "prepend query", [560.0, 180.0, 90.0, 22.0], 1, 1),
         _box("obj-call", "prepend call", [660.0, 180.0, 80.0, 22.0], 1, 1),
@@ -291,7 +293,8 @@ def engine_patcher() -> dict:
         _line("obj-route", 4, "obj-resolve", 0), _line("obj-resolve", 0, "obj-context", 0),
         _line("obj-route", 5, "obj-modslot", 0), _line("obj-route", 6, "obj-query", 0),
         _line("obj-route", 7, "obj-call", 0), _line("obj-route", 8, "obj-setvalue", 0),
-        _line("obj-setvalue", 0, "obj-context", 0), _line("obj-route", 9, "obj-print", 0),
+        _line("obj-setvalue", 0, "obj-context", 0), _line("obj-route", 9, "obj-getvalues", 0),
+        _line("obj-getvalues", 0, "obj-context", 0), _line("obj-route", 10, "obj-print", 0),
         _line("obj-query", 0, "obj-context", 0), _line("obj-call", 0, "obj-context", 0),
         _line("obj-plugin", 0, "obj-sfrecord", 0), _line("obj-plugin", 1, "obj-sfrecord", 1),
     ]

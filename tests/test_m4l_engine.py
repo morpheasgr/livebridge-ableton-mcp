@@ -248,6 +248,12 @@ module.exports = {
       setImmediate(() => global.__maxHandlers.info(args[1], playing, -1, ...flags));
       return;
     }
+    if (args[0] === "getvalues") {
+      // like context.js reading the parameters: 0.5 each
+      const count = String(args[2]).split("|").length;
+      setImmediate(() => global.__maxHandlers.values(args[1], ...Array(count).fill(0.5)));
+      return;
+    }
     if (args[0] === "call" && args[1] === "fire" && args.indexOf("clip_slots") > 0) {
       recorder.playing = args[args.length - 1];
       return;
@@ -906,3 +912,68 @@ def test_fast_automation_recording_without_the_engine(tcp_bridge, song, tmp_path
         "track": "master", "parameter": "tempo", "points": [[0, 120], [4, 130]],
         "speed": "fast"})
     assert refused["type"] == "bad_args" and "tempo itself" in refused["error"]
+
+
+
+def test_arrangement_automation_jobs_through_the_engine(engines, tcp_bridge, song):
+    """copy_range with an Engine: it samples the lane (stand-in: 0.5) while the source range
+    plays and writes it at the destination, at 600 BPM."""
+    from live_stub_ext import arrangement_live
+    import Live
+    from test_arrangement_automation import SongClock
+
+    _process, send, outlets = engines()
+    send("context", "master", "Main")
+    _wait_roles(1)
+
+    class EngineClock(SongClock):
+        def _run(self):
+            last = time.time()
+            told = 0.0
+            while self.running:
+                time.sleep(0.005)
+                now = time.time()
+                if self.song.is_playing:
+                    self.song.current_song_time += self.song.tempo / 60.0 * (now - last)
+                if now - told > 0.02:                   # what context.js reports
+                    send("transport", self.song.current_song_time, self.song.tempo,
+                         1 if self.song.is_playing else 0)
+                    told = now
+                last = now
+
+    uninstall = arrangement_live.install(Live, copy_envelopes="without_devices")
+    clock = EngineClock(song, [])
+    clock.start()
+    bridge = BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0)
+    app = create_app(bridge)
+    try:
+        resonance = song.tracks[0].devices[0].parameters[3]
+        resonance._automation_state = 1
+        call_tool(app, "live_arrangement_duplicate_clip", {"track": "Bass", "slot": 0,
+                                                           "time": 8, "automation": False})
+        copied = call_tool(app, "live_arrangement_copy_range", {
+            "start": 8, "end": 12, "destination": 32, "tracks": ["Bass"]})
+        assert copied["automation"]["kind"] == "copy"
+        end = time.time() + 30
+        while time.time() < end:
+            status = call_tool(app, "live_automation_record", {"action": "status"})
+            jobs = status.get("arrangement_jobs") or []
+            if jobs and all(j["finished"] for j in jobs):
+                break
+            time.sleep(0.1)
+    finally:
+        clock.stop()
+        uninstall()
+        from livebridge_mcp import arrange_automation
+        arrange_automation.runner_for(None, id(bridge)).cancel()
+    (job,) = status["arrangement_jobs"]
+    assert job["phase"] == "done", job
+    assert [(p["mode"], p["writer"], p["tempo_during_pass"]) for p in job["passes"]] == [
+        ("sample", "LiveBridge Engine", 600.0), ("record", "LiveBridge Engine", 600.0)]
+    log = [json.loads(line) for line in outlets.read_text(encoding="utf-8").splitlines()]
+    path = ["live_set", "tracks", 0, "devices", 0, "parameters", 3]
+    assert any(m[0] == "getvalues" for m in log)
+    written = [m[1] for m in log if m[0] == "setvalue" and m[2:] == path]
+    assert written and all(v == 0.5 for v in written)
+    assert ["call", "begin_gesture", *path] in log and ["call", "end_gesture", *path] in log
+    assert song.tempo == 124.0

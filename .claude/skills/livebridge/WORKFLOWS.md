@@ -47,6 +47,12 @@ outro"*.
      end=..., destination=..., unit="bars")` repeats a section (all tracks or some),
      `live_arrangement_duplicate_clip(length=...)` stretches one part,
      `live_arrangement_move_clip` / `live_arrangement_delete_clip` remove parts per section.
+   - **Automation comes along by default** (`automation=true` on all three): the scenes' clip
+     envelopes become the tracks' automation lanes, and a copied range takes its lanes along.
+     It is recorded in the background (fast Arrangement Record passes, transport stopped
+     first): say so in one line, poll `live_automation_record(action="status")` until
+     `finished`, and do not start playback or another recording before. Pass
+     `automation=false` only when the user asks for clips alone.
 5. **Vary every repeat.** No section is an exact copy (`PRODUCTION.md` §7): in the copy, change
    the bass ending, add or drop a percussion part, open a filter, transpose the hook an octave
    (`live_clip_transform_notes(transpose=12)` on a duplicate clip). New material that must fit:

@@ -182,6 +182,7 @@ Copy a session clip (or any clip) onto the arrangement timeline — once, repeat
 | `length` | float \| str \| null | `null` |
 | `count` | int \| null | `null` |
 | `replace` | bool | `true` |
+| `automation` | bool | `true` |
 
 Bridge: `arrangement.duplicate_clip`
 
@@ -212,6 +213,7 @@ Build a song structure in ONE call: lay session scenes out one after another on 
 | `unit` | str | `"beats"` |
 | `tracks` | list[int \| str] \| null | `null` |
 | `replace` | bool | `true` |
+| `automation` | bool | `true` |
 
 Bridge: `arrangement.from_scenes`
 
@@ -227,6 +229,7 @@ Copy a section of the arrangement to another position — all tracks or some ("c
 | `unit` | str | `"beats"` |
 | `tracks` | list[int \| str] \| null | `null` |
 | `replace` | bool | `true` |
+| `automation` | bool | `true` |
 
 Bridge: `arrangement.copy_range`
 
@@ -3144,12 +3147,12 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | Command | M | Parameters | MCP tool | Description |
 |---|---|---|---|---|
 | `arrangement.back_to_arranger` |  | track=null | `live_transport_set` (back_to_arranger=false) | Press 'Back to Arrangement': session clips stop overriding the timeline |
-| `arrangement.copy_range` | M | start, end, destination, unit="beats", tracks=null, replace=true | `live_arrangement_copy_range` | Copy a time range of the arrangement (all or some tracks) to another position |
+| `arrangement.copy_range` | M | start, end, destination, unit="beats", tracks=null, replace=true, automation=false | `live_arrangement_copy_range` | Copy a time range of the arrangement (all or some tracks) to another position |
 | `arrangement.create_audio_clip` | M | track, file_path, start=0.0, unit="beats", name=null, color_index=null | `live_arrangement_create_clip` | Place an audio file on the arrangement timeline |
 | `arrangement.create_midi_clip` | M | track, start, length=null, unit="beats", name=null, color_index=null, looping=null | `live_arrangement_create_clip` | Create an empty MIDI clip on the arrangement timeline |
 | `arrangement.delete_clip` | M | track=null, index=null, at=null, clip=null, unit="beats" | `live_arrangement_delete_clip` | Delete an arrangement clip |
-| `arrangement.duplicate_clip` | M | time, track=null, slot=null, clip=null, target_track=null, unit="beats", length=null, count=null, replace=true | `live_arrangement_duplicate_clip` | Copy a session clip (or any clip) onto the arrangement timeline — once, repeated, or stretched to fill a length |
-| `arrangement.from_scenes` | M | sections, start=null, unit="beats", tracks=null, replace=true | `live_arrangement_from_scenes` | Build a song: lay scenes out one after another on the timeline (one call for every track and section) |
+| `arrangement.duplicate_clip` | M | time, track=null, slot=null, clip=null, target_track=null, unit="beats", length=null, count=null, replace=true, automation=false | `live_arrangement_duplicate_clip` | Copy a session clip (or any clip) onto the arrangement timeline — once, repeated, or stretched to fill a length |
+| `arrangement.from_scenes` | M | sections, start=null, unit="beats", tracks=null, replace=true, automation=false | `live_arrangement_from_scenes` | Build a song: lay scenes out one after another on the timeline (one call for every track and section) |
 | `arrangement.list` |  | track=null, start=null, end=null, unit="beats", detail="minimal", include_take_lanes=false, offset=0, limit=200 | `live_arrangement_clips` | List arrangement clips (start/end/name) per track |
 | `arrangement.loop` | M | enabled=null, start=null, end=null, length=null, unit="beats" | `live_transport_set_loop` (same loop brace) | Read or set the arrangement loop region |
 | `arrangement.move_clip` | M | start, track=null, index=null, at=null, clip=null, target_track=null, unit="beats" | `live_arrangement_move_clip` | Move an arrangement clip to a new time (and optionally another track) |
@@ -3162,7 +3165,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `automation.list` |  | track=null, slot=null, clip=null, sample=0, include_available=false, filter=null, limit=200 | `live_automation_list` | Which parameters have envelopes in a clip (+ what could be automated) |
 | `automation.overview` |  | track, include_empty=false | `live_automation_overview` | One-call automation overview of a track: envelopes per clip, automated parameters, re-enable state |
 | `automation.re_enable` | M | track=null, parameter=null, device=null | `live_automation_state` | Re-enable overridden automation for a parameter, a track or the whole song |
-| `automation.record` | M | parameter=null, track=null, device=null, points=null, shape=null, start=null, end=null, low=0.0, high=1.0, normalized=null, period=null, cycles=null, phase=0.0, duty=0.5, curve=1.0, seed=null, mode="linear", preroll=1.0, action="start", tempo=null, writer="live" | `live_automation_record` | Record ARRANGEMENT track automation: play the song through a range while moving a parameter (Arrangement Record + Automation Arm) |
+| `automation.record` | M | parameter=null, track=null, device=null, points=null, shape=null, start=null, end=null, low=0.0, high=1.0, normalized=null, period=null, cycles=null, phase=0.0, duty=0.5, curve=1.0, seed=null, mode="linear", preroll=1.0, action="start", tempo=null, writer="live", lanes=null | `live_automation_record` | Record ARRANGEMENT track automation: play the song through a range while moving a parameter (Arrangement Record + Automation Arm) |
 | `automation.record_status` |  |  | `live_automation_record` | Progress / result of the running or last automation.record pass |
 | `automation.shape` | M | parameter, shape="sine", track=null, slot=null, clip=null, device=null, start=null, end=null, low=0.0, high=1.0, normalized=true, period=null, cycles=null, phase=0.0, step=null, duty=0.5, curve=1.0, seed=null, clear=false, mode="step", slots=null, extend_clip=false | `live_automation_shape` | Write a shape (ramp, sine/triangle/saw LFO, square, seeded random) into a clip envelope, or one continuous shape across several clips |
 | `automation.state` |  | track=null, parameter=null, device=null, include_all=false | `live_automation_state` | Automation state (none/playing/overridden) of a parameter, a track or the whole set |

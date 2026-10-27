@@ -22,10 +22,12 @@
 // boundary, so Live's launch quantization lands it on the grid. Live's Python API has no follow
 // actions; these run here and are not saved with the set.
 //
-// Finally it is the fast writer of LiveBridge's arrangement automation recording ("automate"):
-// while the Remote Script runs the pass (Arrangement Record, playback, often at a raised
-// tempo), it moves the parameter along the curve 50 times a second — five times the Remote
-// Script's tick — with begin/end gesture, so Live records one touch.
+// Finally it is the fast writer and reader of LiveBridge's arrangement automation passes:
+// "automate" — while the Remote Script runs a recording pass (Arrangement Record, playback,
+// often at a raised tempo) it moves each lane's parameter along its curve 50 times a second,
+// five times the Remote Script's tick, with begin/end gesture so Live records one touch;
+// "sample" — while the Remote Script plays a range without recording, it reads the
+// parameters 50 times a second (their arrangement automation playing back).
 //
 // Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames" | "capture" | "modulate" |
 //            "unmodulate" | "follow" | "unfollow" | "automate", "args": {...}}
@@ -48,7 +50,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -68,6 +70,7 @@ const MOD_TICK_MS = 20;               // 50 updates a second, each glided over b
 const MOD_RESOLVE_MS = 3000;
 const MAX_PATH = /^live_set( [a-z_]+( \d+)?){1,12}$/;
 const MAX_AUTOMATE_POINTS = 100000;
+const MAX_LANES = 64;
 const AUTOMATE_TIMEOUT_MS = 15 * 60 * 1000;
 const FOLLOW_ACTIONS = ["next", "previous", "first", "last", "any", "other", "again", "stop"];
 const MAX_RULES = 16;
@@ -93,6 +96,7 @@ const state = {
   queries: new Map(),                 // query id -> callback waiting for context.js
   automation: null,                   // the running "automate" pass
   lastAutomation: null,
+  sampling: null,                     // the running or finished "sample" pass
   nextQuery: 1,
   ticker: null,
 };
@@ -197,6 +201,8 @@ function hello() {
     modulations: [...state.mods.values()].map(describeMod), mod_slots: MOD_SLOTS,
     follow: [...state.rules.values()].map(describeRule),
     automation: describeAutomation(state.automation || state.lastAutomation),
+    sampling: state.sampling ? { phase: state.sampling.phase,
+                                 reads: state.sampling.reads } : null,
   };
 }
 
@@ -339,6 +345,9 @@ function tick() {
   if (state.automation) {
     automateTick(state.automation, now);
   }
+  if (state.sampling && state.sampling.phase !== "done") {
+    sampleTick(state.sampling, now);
+  }
   for (const mod of state.mods.values()) {
     const value = modValue(mod, now);
     if (mod.last === null || Math.abs(value - mod.last) > (mod.max - mod.min) * 1e-5) {
@@ -349,13 +358,15 @@ function tick() {
 }
 
 function startTicker() {
-  if (state.ticker === null && (state.mods.size || state.rules.size || state.automation)) {
+  if (state.ticker === null && (state.mods.size || state.rules.size || state.automation ||
+                                (state.sampling && state.sampling.phase !== "done"))) {
     state.ticker = setInterval(tick, MOD_TICK_MS);
   }
 }
 
 function stopTickerIfIdle() {
-  if (state.ticker !== null && !state.mods.size && !state.rules.size && !state.automation) {
+  if (state.ticker !== null && !state.mods.size && !state.rules.size && !state.automation &&
+      !(state.sampling && state.sampling.phase !== "done")) {
     clearInterval(state.ticker);
     state.ticker = null;
   }
@@ -508,12 +519,14 @@ function describeAutomation(pass) {
     return null;
   }
   return {
-    path: pass.path, start: pass.start, end: pass.end, phase: pass.phase,
-    writes: pass.writes, first_beat: pass.first, last_beat: pass.last, error: pass.error,
+    paths: pass.lanes.map((lane) => lane.path), start: pass.start, end: pass.end,
+    phase: pass.phase, writes: pass.lanes.reduce((sum, lane) => sum + lane.writes, 0),
+    first_beat: pass.first, last_beat: pass.last, error: pass.error,
   };
 }
 
-// The curve's value at `beat` (points sorted by time; before / after them: the end values).
+// The curve's value at `beat` (points sorted by time; before / after them: the end values;
+// at a time with two points the later one wins).
 function curveAt(points, mode, beat) {
   if (beat <= points[0][0]) {
     return points[0][1];
@@ -541,9 +554,11 @@ function curveAt(points, mode, beat) {
 }
 
 function finishAutomation(pass, phase, error) {
-  if (pass.gesture) {
-    maxApi.outlet("call", "end_gesture", ...atoms(pass.path));
-    pass.gesture = false;
+  for (const lane of pass.lanes) {
+    if (lane.gesture) {
+      maxApi.outlet("call", "end_gesture", ...atoms(lane.path));
+      lane.gesture = false;
+    }
   }
   pass.phase = phase;
   pass.error = error || null;
@@ -559,7 +574,7 @@ function automateTick(pass, now) {
   }
   const beat = songBeat(now);
   if (beat === null) {
-    if (pass.gesture) {                  // stopped in the middle: the Remote Script aborts
+    if (pass.phase === "writing") {      // stopped in the middle: the Remote Script aborts
       finishAutomation(pass, "aborted", "the transport stopped");
     }
     return;
@@ -567,19 +582,21 @@ function automateTick(pass, now) {
   if (beat < pass.start - 1e-6) {
     return;
   }
-  if (!pass.gesture) {
-    maxApi.outlet("call", "begin_gesture", ...atoms(pass.path));
-    pass.gesture = true;
-    pass.phase = "writing";
-  }
   const at = Math.min(beat, pass.end);
-  const value = curveAt(pass.points, pass.mode, at);
-  if (pass.lastValue === null || Math.abs(value - pass.lastValue) > 1e-9) {
-    maxApi.outlet("setvalue", value, ...atoms(pass.path));
-    pass.lastValue = value;
-    pass.writes += 1;
-    if (pass.first === null) {
-      pass.first = at;
+  if (pass.phase !== "writing") {
+    pass.phase = "writing";
+    pass.first = at;
+  }
+  for (const lane of pass.lanes) {
+    if (!lane.gesture) {
+      maxApi.outlet("call", "begin_gesture", ...atoms(lane.path));
+      lane.gesture = true;
+    }
+    const value = curveAt(lane.points, lane.mode, at);
+    if (lane.lastValue === null || Math.abs(value - lane.lastValue) > 1e-9) {
+      maxApi.outlet("setvalue", value, ...atoms(lane.path));
+      lane.lastValue = value;
+      lane.writes += 1;
     }
   }
   pass.last = at;
@@ -588,20 +605,40 @@ function automateTick(pass, now) {
   }
 }
 
-function automate(args, reply) {
-  const target = String(args.path || "");
+function parseLane(spec) {
+  const target = String(spec && spec.path || "");
   if (!MAX_PATH.test(target)) {
-    reply({ type: "bad_args", message: "path must be a Live object path" });
-    return;
+    return { error: "path must be a Live object path" };
   }
-  const points = Array.isArray(args.points) ? args.points.map((p) => [Number(p[0]),
+  const points = Array.isArray(spec.points) ? spec.points.map((p) => [Number(p[0]),
     Number(p[1])]) : [];
   if (!points.length || points.length > MAX_AUTOMATE_POINTS ||
       points.some((p) => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) {
-    reply({ type: "bad_args", message: "points: 1.." + MAX_AUTOMATE_POINTS + " [beat, value]" });
-    return;
+    return { error: "points: 1.." + MAX_AUTOMATE_POINTS + " [beat, value]" };
   }
   points.sort((a, b) => a[0] - b[0]);
+  return {
+    path: target, points: points, mode: spec.mode === "step" ? "step" : "linear",
+    writes: 0, lastValue: null, gesture: false,
+  };
+}
+
+function automate(args, reply) {
+  const specs = Array.isArray(args.lanes) ? args.lanes
+    : [{ path: args.path, points: args.points, mode: args.mode }];
+  if (!specs.length || specs.length > MAX_LANES) {
+    reply({ type: "bad_args", message: "lanes: 1.." + MAX_LANES });
+    return;
+  }
+  const lanes = [];
+  for (const spec of specs) {
+    const lane = parseLane(spec);
+    if (lane.error) {
+      reply({ type: "bad_args", message: lane.error });
+      return;
+    }
+    lanes.push(lane);
+  }
   const start = Number(args.start);
   const end = Number(args.end);
   if (!(Number.isFinite(start) && Number.isFinite(end) && end > start)) {
@@ -617,9 +654,8 @@ function automate(args, reply) {
     return;
   }
   state.automation = {
-    path: target, points: points, mode: args.mode === "step" ? "step" : "linear",
-    start: start, end: end, created: Date.now(), phase: "waiting", writes: 0,
-    first: null, last: null, lastValue: null, gesture: false, error: null,
+    lanes: lanes, start: start, end: end, created: Date.now(), phase: "waiting",
+    first: null, last: null, error: null,
   };
   startTicker();
   reply(null, describeAutomation(state.automation));
@@ -631,6 +667,90 @@ function cancelAutomation(reply) {
     finishAutomation(pass, "aborted", "stopped");
   }
   reply(null, { stopped: describeAutomation(pass) });
+}
+
+// ---------------------------------------------------------------------------- sampling pass
+
+function sampleTick(pass, now) {
+  if (now - pass.created > AUTOMATE_TIMEOUT_MS) {
+    pass.phase = "done";
+    pass.error = "the pass did not reach its end in time";
+    stopTickerIfIdle();
+    return;
+  }
+  const beat = songBeat(now);
+  if (beat === null || beat < pass.start - 1e-6 || pass.pending) {
+    return;
+  }
+  const at = Math.min(beat, pass.end);
+  pass.pending = true;
+  pass.phase = "reading";
+  const id = state.nextQuery++;
+  const timer = setTimeout(() => {
+    state.queries.delete(id);
+    pass.pending = false;
+  }, FOLLOW_QUERY_MS);
+  state.queries.set(id, (found) => {
+    clearTimeout(timer);
+    state.queries.delete(id);
+    pass.pending = false;
+    pass.reads += 1;
+    found.values.forEach((value, index) => {
+      const lane = pass.samples[index];
+      if (lane && Number.isFinite(value) && (!lane.length ||
+          Math.abs(lane[lane.length - 1][1] - value) > 1e-9 ||
+          at - lane[lane.length - 1][0] >= 1)) {
+        lane.push([at, value]);
+      }
+    });
+    if (at >= pass.end) {
+      pass.phase = "done";
+      stopTickerIfIdle();
+    }
+  });
+  maxApi.outlet("getvalues", id, pass.paths.join("|"));
+}
+
+// lbcontext answer: values <id> <value per path...>
+function values(id, ...numbers) {
+  const waiting = state.queries.get(Number(id));
+  if (waiting) {
+    waiting({ values: numbers.map(Number) });
+  }
+}
+
+function sample(args, reply) {
+  if (args.result) {
+    const pass = state.sampling;
+    reply(null, pass ? { phase: pass.phase, reads: pass.reads, error: pass.error || null,
+                         paths: pass.paths, samples: pass.samples } : null);
+    return;
+  }
+  const paths = Array.isArray(args.paths) ? args.paths.map(String) : [];
+  if (!paths.length || paths.length > MAX_LANES || paths.some((p) => !MAX_PATH.test(p))) {
+    reply({ type: "bad_args", message: "paths: 1.." + MAX_LANES + " Live object paths" });
+    return;
+  }
+  const start = Number(args.start);
+  const end = Number(args.end);
+  if (!(Number.isFinite(start) && Number.isFinite(end) && end > start)) {
+    reply({ type: "bad_args", message: "start and end (beats) with end > start" });
+    return;
+  }
+  if (!maxApi) {
+    reply({ type: "unsupported", message: "sampling needs the device running in Live" });
+    return;
+  }
+  if (state.sampling && state.sampling.phase !== "done") {
+    reply({ type: "busy", message: "a sampling pass is already running" });
+    return;
+  }
+  state.sampling = {
+    paths: paths, start: start, end: end, created: Date.now(), phase: "waiting",
+    pending: false, reads: 0, samples: paths.map(() => []), error: null,
+  };
+  startTicker();
+  reply(null, { phase: "waiting", paths: paths });
 }
 
 // ---------------------------------------------------------------------------- follow actions
@@ -950,6 +1070,8 @@ function handle(request, reply) {
     } else {
       automate(args, reply);
     }
+  } else if (request.cmd === "sample") {
+    sample(args, reply);
   } else if (request.cmd === "follow") {
     follow(args, reply);
   } else if (request.cmd === "unfollow") {
@@ -1045,6 +1167,7 @@ function start() {
     maxApi.addHandler("transport", setTransport);
     maxApi.addHandler("resolved", resolved);
     maxApi.addHandler("info", info);
+    maxApi.addHandler("values", values);
   }
 }
 

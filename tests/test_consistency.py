@@ -84,11 +84,14 @@ TOOL_NAMES = sorted(t.name for t in asyncio.run(_APP.list_tools()))
 #: Arguments for tools that need some (everything else is called with no arguments).
 SAMPLE_ARGS = {
     "live_arrangement_create_clip": {"track": "Bass", "start": 16},
-    "live_arrangement_duplicate_clip": {"time": 32, "track": "Bass", "slot": 0},
+    "live_arrangement_duplicate_clip": {"time": 32, "track": "Bass", "slot": 0,
+                                        "automation": False},
     "live_arrangement_move_clip": {"start": 48, "track": "Bass", "index": 0},
     "live_arrangement_delete_clip": {"track": "Bass", "index": 0},
-    "live_arrangement_from_scenes": {"sections": [0, {"scene": 1, "bars": 2}]},
-    "live_arrangement_copy_range": {"start": 0, "end": 8, "destination": 64},
+    "live_arrangement_from_scenes": {"sections": [0, {"scene": 1, "bars": 2}],
+                                     "automation": False},
+    "live_arrangement_copy_range": {"start": 0, "end": 8, "destination": 64,
+                                    "automation": False},
     "live_arrangement_resize_clip": {"track": "Bass", "index": 0, "length": 8},
     "live_audio_analyze": {"track": "Vocals", "slot": 0},
     "live_audio_compare": {"before": {"track": "Vocals", "slot": 0},

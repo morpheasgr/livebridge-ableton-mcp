@@ -948,6 +948,7 @@ def test_record_faster_at_another_tempo(bridge, song):
     assert started["tempo_during_pass"] == 496.0
     assert started["expected_seconds"] == pytest.approx(4 * 60 / 496.0, abs=0.1)
     assert song.tempo == 496.0                       # set before Arrangement Record goes on
+    assert song.start_time == 4.0                    # playback starts at the start marker
     bridge.update_display()
     _record_ticks(bridge, song, 4.0, 8.0, 0.5)
     assert param.value == 1000.0
@@ -956,6 +957,7 @@ def test_record_faster_at_another_tempo(bridge, song):
     status = run(bridge, "automation.record_status")
     assert status["phase"] == "done" and song.tempo == 124.0
     assert status["restored"]["tempo"] == 124.0 and song.record_mode is False
+    assert song.start_time == 0.0
 
 
 def test_record_with_an_external_writer(bridge, song):
@@ -994,6 +996,66 @@ def test_record_tempo_refusals(bridge, song):
     assert blocked["type"] == "invalid_state" and "tempo automation" in blocked["message"]
     tempo_param._automation_state = 0
     assert song.tempo == 124.0 and song.record_mode is False
+
+
+def test_record_several_lanes_in_one_pass(bridge, song):
+    freq = operator(song).parameters[2]
+    volume = song.tracks[0].mixer_device.volume
+    started = run(bridge, "automation.record", preroll=0, tempo=480, lanes=[
+        {"parameter": "song.tracks[0].devices[0].parameters[2]",
+         "points": [[4, 100], [8, 1000]]},
+        {"track": "Bass", "parameter": "volume", "points": [[4, 0.5], [6, 0.5], [6, 0.8],
+                                                           [10, 0.8]], "mode": "linear"}])
+    assert started["range"] == [4.0, 10.0] and len(started["lanes"]) == 2
+    assert started["expected_seconds"] == pytest.approx(6 * 60 / 480.0, abs=0.1)
+    bridge.update_display()
+    _record_ticks(bridge, song, 4.0, 5.0, 1.0)
+    assert freq.value == pytest.approx(325.0) and volume.value == pytest.approx(0.5)
+    _record_ticks(bridge, song, 7.0, 7.0)
+    assert volume.value == pytest.approx(0.8)              # the step at beat 6
+    _record_ticks(bridge, song, 10.0, 10.0)
+    for _ in range(3):
+        bridge.update_display()
+    status = run(bridge, "automation.record_status")
+    assert status["phase"] == "done" and [lane["writes"] > 1 for lane in status["lanes"]] \
+        == [True, True]
+    assert freq.value == 1000.0 and song.tempo == 124.0
+
+
+def test_sample_reads_values_without_recording(bridge, song):
+    freq = operator(song).parameters[2]
+    started = run(bridge, "automation.record", action="sample", start=0, end=4, preroll=0,
+                  tempo=300, lanes=[{"track": "Bass", "parameter": "Filter Freq"}])
+    assert started["mode"] == "sample" and "samples" not in started["lanes"][0]
+    bridge.update_display()
+    assert song.record_mode is False and song.is_playing is True
+    for beat, value in ((0.0, 200.0), (1.0, 200.0), (2.0, 600.0), (3.0, 900.0), (4.0, 900.0)):
+        freq.value = value                    # the arrangement automation playing back
+        song.current_song_time = beat
+        bridge.update_display()
+    for _ in range(3):
+        bridge.update_display()
+    status = run(bridge, "automation.record_status")
+    assert status["phase"] == "done" and status["sampled"] == [0.0, 4.0]
+    samples = status["lanes"][0]["samples"]
+    assert samples[0] == [0.0, 200.0] and [3.0, 900.0] in samples and [2.0, 600.0] in samples
+    assert song.tempo == 124.0 and song.record_mode is False
+
+
+def test_lanes_validation(bridge, song):
+    bad = [dict(lanes=[]), dict(lanes=[{"points": [[0, 1]]}]),
+           dict(lanes=[{"track": 0, "parameter": "Resonance"}]),
+           dict(lanes=[{"track": 0, "parameter": "Resonance", "points": [[0, 0], [4, 1]],
+                        "colour": 1}]),
+           dict(lanes=[{"track": 0, "parameter": "Resonance", "points": [[0, 0], [4, 1]]},
+                       {"track": 0, "parameter": "Resonance", "points": [[0, 0], [4, 1]]}]),
+           dict(lanes=[{"track": 0, "parameter": "Resonance", "points": [[0, 0], [4, 1]],
+                        "mode": "curvy"}]),
+           dict(action="sample", lanes=[{"track": 0, "parameter": "Resonance"}]),
+           dict(lanes=[{"track": "master", "parameter": "tempo", "points": [[0, 120], [4, 130]]}],
+                tempo=300)]
+    for args in bad:
+        assert fail(bridge, "automation.record", **args)["type"] == "bad_args", args
 
 
 def test_record_validation(bridge, song):

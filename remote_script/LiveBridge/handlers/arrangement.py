@@ -502,6 +502,159 @@ def envelope_report(source, copy):
     return {"source": had, "copied": copied}, (ENVELOPES_LOST if had and not copied else None)
 
 
+# -- automation for the arrangement --------------------------------------------------------
+#
+# Live's API cannot draw arrangement automation lanes and drops clip envelopes from arrangement
+# copies (device parameters always; mixer ones when the track holds an instrument or an audio
+# effect — LIVE_API_VERIFIED §19.5). With automation=true the arrangement commands therefore
+# report what the arrangement should contain as lanes the MCP server then records
+# (automation.record lanes=...): the lost envelopes as curves at their new positions
+# (duplicate_clip, from_scenes), or the parameters to sample from the source range and record
+# at the destination (copy_range).
+
+_EDGE = 1e-4                         # beats between the two breakpoints of a step
+_MAX_LANE_POINTS = 2048
+_MAX_REPEATS = 512
+
+
+def _loop_region(clip):
+    get = compat.safe_getattr
+    if get(clip, "looping", False):
+        begin, end = get(clip, "loop_start", 0.0), get(clip, "loop_end", 0.0)
+    else:
+        begin, end = get(clip, "start_marker", 0.0), get(clip, "end_marker", 0.0)
+    begin, end = float(begin or 0.0), float(end or 0.0)
+    if end <= begin:
+        end = begin + float(get(clip, "length", 0.0) or 0.0)
+    return begin, end
+
+
+def _breakpoints(envelope, begin, end):
+    """Times of the envelope's breakpoints inside (begin, end) — a 1/16 grid when this Live
+    cannot list them."""
+    times = []
+    if compat.has(envelope, "events_in_range"):
+        try:
+            times = sorted({float(compat.safe_getattr(e, "time", 0.0))
+                            for e in envelope.events_in_range(float(begin), float(end))})
+        except Exception:
+            times = []
+    if not times:
+        step, t = 0.25, begin + 0.25
+        while t < end - 1e-9 and len(times) < _MAX_LANE_POINTS:
+            times.append(t)
+            t += step
+    return [t for t in times if begin + 1e-9 < t < end - 1e-9]
+
+
+def _envelope_segment(source, envelope, position, length):
+    """``(start, end, [(beat, value)])``: ``envelope`` as the copy at ``position`` plays it for
+    ``length`` beats (the clip loop repeating)."""
+    begin, end = _loop_region(source)
+    span = end - begin
+    if span <= 0 or length <= 0:
+        return None
+    stop = position + length
+    times = _breakpoints(envelope, begin, end)
+    value = envelope.value_at_time
+    points = []
+    for repeat in range(_MAX_REPEATS):
+        offset = position + repeat * span - begin
+        if offset + begin >= stop - 1e-9:
+            break
+        points.append((offset + begin, float(value(begin + 1e-6))))
+        for t in times:
+            x = offset + t
+            if x >= stop - 1e-9:
+                break
+            before, after = float(value(t)), float(value(t + 1e-6))
+            if abs(before - after) > 1e-9:
+                points.append((x - _EDGE, before))
+            points.append((x, after))
+        x_end = min(offset + end, stop)
+        points.append((x_end - _EDGE, float(value(x_end - offset - 1e-6))))
+    return position, stop, points
+
+
+def _lane_points(segments, base, range_start, range_end):
+    """One lane from ``segments`` with ``base`` (the parameter's value) between them."""
+    segments = sorted(segments, key=lambda seg: seg[0])
+    points = []
+    first = segments[0][0]
+    if first > range_start + 1e-6:
+        points += [(range_start, base), (first - _EDGE, base)]
+    for index, (start, end, seg_points) in enumerate(segments):
+        points.extend(seg_points)
+        following = segments[index + 1][0] if index + 1 < len(segments) else None
+        if following is None:
+            if end < range_end - 1e-6:
+                points += [(end, base), (range_end, base)]
+        elif following > end + 1e-3:
+            points += [(end, base), (following - _EDGE, base)]
+    points.sort(key=lambda item: item[0])
+    if len(points) > _MAX_LANE_POINTS:            # keep the shape, thin the middle
+        step = len(points) / float(_MAX_LANE_POINTS)
+        points = [points[int(i * step)] for i in range(_MAX_LANE_POINTS - 1)] + [points[-1]]
+    return [[rnd(t, 6), v] for t, v in points]
+
+
+def envelope_lanes(ctx, placements, range_start, range_end):
+    """Lanes for the clip envelopes the arrangement copies lost.
+
+    ``placements``: ``[(track, source clip, position, length, [copies])]``.  Returns
+    ``[{"track", "parameter" (path), "name", "points"}]``."""
+    from . import automation as automation_handlers   # (imports this module's neighbours)
+    by_param, entries_of = {}, {}
+    for track_obj, source, position, length, copies in placements:
+        if compat.safe_getattr(source, "has_envelopes", True) is False:
+            continue
+        key = id(track_obj)
+        if key not in entries_of:
+            entries_of[key] = automation_handlers.track_parameters(ctx, track_obj)
+        for param, _label, path in entries_of[key]:
+            envelope = automation_handlers.get_envelope(source, param)
+            if envelope is None:
+                continue
+            if copies and all(automation_handlers.get_envelope(c, param) is not None
+                              for c in copies):
+                continue                          # Live kept it in the copy
+            segment = _envelope_segment(source, envelope, float(position), float(length))
+            if segment is None:
+                continue
+            lane = by_param.setdefault(path, {"param": param, "track": track_obj,
+                                              "segments": []})
+            lane["segments"].append(segment)
+    lanes = []
+    for path, lane in by_param.items():
+        base = float(compat.safe_getattr(lane["param"], "value", 0.0) or 0.0)
+        lanes.append({"track": compat.safe_getattr(lane["track"], "name"), "parameter": path,
+                      "name": compat.safe_getattr(lane["param"], "name"),
+                      "points": _lane_points(lane["segments"], base, range_start, range_end)})
+    return lanes
+
+
+def automated_parameters(ctx, tracks, clips=()):
+    """Paths of the parameters on ``tracks`` that have arrangement automation playing (or an
+    envelope in one of ``clips``) — what copy_range samples."""
+    from . import automation as automation_handlers
+    found = []
+    for track_obj in tracks:
+        for param, _label, path in automation_handlers.track_parameters(ctx, track_obj):
+            if compat.safe_getattr(param, "is_enabled", True) is False:
+                continue
+            state = compat.safe_getattr(param, "automation_state", 0)
+            enveloped = any(automation_handlers.get_envelope(c, param) is not None
+                            for c in clips if compat.safe_getattr(c, "has_envelopes", True))
+            if (state not in (0, None) or enveloped) and path not in [f[1] for f in found]:
+                found.append((track_obj, path, param))
+    return found
+
+
+def _automation_result(ctx, placements, range_start, range_end):
+    lanes = envelope_lanes(ctx, placements, range_start, range_end)
+    return {"range": [rnd(range_start), rnd(range_end)], "lanes": lanes}
+
+
 def _source_and_destination(ctx, track, slot, clip, target_track):
     source = resolve_clip(ctx, track, slot, clip)
     destination = ctx.track(target_track) if target_track is not None else owner_track(source)
@@ -516,7 +669,8 @@ def _source_and_destination(ctx, track, slot, clip, target_track):
          doc="Copy a session clip (or any clip) onto the arrangement timeline — once, "
              "repeated, or stretched to fill a length")
 def arrangement_duplicate_clip(ctx, time, track=None, slot=None, clip=None, target_track=None,
-                               unit="beats", length=None, count=None, replace=True):
+                               unit="beats", length=None, count=None, replace=True,
+                               automation=False):
     """Duplicate a clip into the arrangement (``Track.duplicate_clip_to_arrangement``).
 
     Args:
@@ -531,6 +685,9 @@ def arrangement_duplicate_clip(ctx, time, track=None, slot=None, clip=None, targ
         replace: with length/count — first delete clips on the destination
             track that start inside the filled range (default true; Live itself
             cuts clips the copy overlaps).
+        automation: also return ``automation: {range, lanes}`` — the clip
+            envelopes Live did not copy, as curves at the copy's position for
+            ``automation.record lanes=`` (what the MCP tool records).
 
     Returns:
         One copy (no length/count): the new arrangement clip summary.
@@ -562,6 +719,12 @@ def arrangement_duplicate_clip(ctx, time, track=None, slot=None, clip=None, targ
             row["envelopes"] = envelopes
         if lost:
             row["note"] = lost
+        if as_bool(automation, "automation"):
+            span = _timeline_length(new_clip) or float(
+                compat.safe_getattr(source, "length", 0.0) or 0.0)
+            row["automation"] = _automation_result(
+                ctx, [(destination, source, position, span, [new_clip])], position,
+                position + span)
         return row
     if length is not None and count is not None:
         raise BridgeError("bad_args", "pass length or count, not both")
@@ -584,6 +747,9 @@ def arrangement_duplicate_clip(ctx, time, track=None, slot=None, clip=None, targ
         notes.append(lost)
     if notes:
         result["note"] = "; ".join(notes)
+    if as_bool(automation, "automation"):
+        result["automation"] = _automation_result(
+            ctx, [(destination, source, position, end - position, placed)], position, end)
     return result
 
 
@@ -681,7 +847,7 @@ def _section_items(ctx, sections, unit):
          doc="Build a song: lay scenes out one after another on the timeline (one call for "
              "every track and section)")
 def arrangement_from_scenes(ctx, sections, start=None, unit="beats", tracks=None,
-                            replace=True):
+                            replace=True, automation=False):
     """Turn session scenes into arrangement sections.
 
     For each section every track's clip in that scene is copied to the
@@ -700,6 +866,10 @@ def arrangement_from_scenes(ctx, sections, start=None, unit="beats", tracks=None
             regular track.
         replace: delete clips of those tracks that start inside each section
             before placing (default true — "paste over").
+        automation: also return ``automation: {range, lanes}`` — every clip
+            envelope Live did not copy, as one curve per parameter over the
+            whole arrangement (the parameter's current value between the
+            sections that carry it) for ``automation.record lanes=``.
 
     Returns:
         {"sections": [{"scene", "name", "start", "end", "start_bar", "length",
@@ -723,8 +893,10 @@ def arrangement_from_scenes(ctx, sections, start=None, unit="beats", tracks=None
         chosen = [ctx.track(spec, include_returns=False, include_master=False)
                   for spec in specs]
     replace = as_bool(replace, "replace")
+    with_automation = as_bool(automation, "automation")
     first = cursor
     rows, notes, placed_total = [], [], 0
+    placements = []
     for scene_index, scene, beats in items:
         sources = []
         for track_obj in chosen:
@@ -746,6 +918,7 @@ def arrangement_from_scenes(ctx, sections, start=None, unit="beats", tracks=None
         for track_obj, source in sources:
             placed, extra = _place(ctx, track_obj, source, cursor, beats, 1, replace)
             placed_total += len(placed)
+            placements.append((track_obj, source, cursor, beats, placed))
             names.append(compat.safe_getattr(track_obj, "name"))
             notes.extend("%s: %s" % (compat.safe_getattr(track_obj, "name"), n) for n in extra
                          if not n.startswith("replaced"))
@@ -758,13 +931,15 @@ def arrangement_from_scenes(ctx, sections, start=None, unit="beats", tracks=None
               "end_bar": bar_beat(ctx, cursor), "placed": placed_total}
     if notes:
         result["note"] = "; ".join(notes[:10])
+    if with_automation:
+        result["automation"] = _automation_result(ctx, placements, first, cursor)
     return result
 
 
 @command("arrangement.copy_range", mutating=True,
          doc="Copy a time range of the arrangement (all or some tracks) to another position")
 def arrangement_copy_range(ctx, start, end, destination, unit="beats", tracks=None,
-                           replace=True):
+                           replace=True, automation=False):
     """Copy a section of the arrangement ("copy bars 9-16 to bar 33").
 
     Every clip that starts inside [start, end) is copied to ``destination``
@@ -777,6 +952,12 @@ def arrangement_copy_range(ctx, start, end, destination, unit="beats", tracks=No
         tracks: limit to these tracks (list); default every regular track.
         replace: first delete clips of those tracks that start inside the
             destination range (default true — "paste over").
+        automation: also return ``automation: {sample: {range, destination,
+            lanes: [{track, parameter}]}}`` — the parameters of those tracks
+            whose automation plays in the range (lanes or clip envelopes): play
+            the range with ``automation.record action="sample"`` and record the
+            samples at the destination (what the MCP tool does). Their envelopes
+            in the new copies are cleared so they do not play twice.
 
     Returns:
         {"copied": n, "range": [start, end], "destination": [start, end],
@@ -819,6 +1000,8 @@ def arrangement_copy_range(ctx, start, end, destination, unit="beats", tracks=No
                 continue
             plan.append((track_obj, candidate, clip_start, clip_end))
     copied, per_track = 0, {}
+    sampled = automated_parameters(ctx, chosen, [c for _t, c, _s, _e in plan]) \
+        if as_bool(automation, "automation") else None
     if as_bool(replace, "replace"):
         for track_obj in chosen:
             _clear_starting_in(track_obj, target, target + span)
@@ -839,11 +1022,22 @@ def arrangement_copy_range(ctx, start, end, destination, unit="beats", tracks=No
         copied += 1
         name = compat.safe_getattr(track_obj, "name")
         per_track[name] = per_track.get(name, 0) + 1
+        for owner, _path, param in sampled or ():
+            if owner == track_obj and compat.has(new_clip, "clear_envelope"):
+                try:
+                    new_clip.clear_envelope(param)    # the recorded lane replaces it
+                except Exception:
+                    pass
     result = {"copied": copied, "range": [rnd(begin), rnd(finish)],
               "destination": [rnd(target), rnd(target + span)],
               "tracks": [{"name": n, "clips": c} for n, c in per_track.items()]}
     if skipped:
         result["skipped"] = skipped
+    if sampled is not None:
+        result["automation"] = {"sample": {
+            "range": [rnd(begin), rnd(finish)], "destination": rnd(target),
+            "lanes": [{"track": compat.safe_getattr(t, "name"), "parameter": path}
+                      for t, path, _p in sampled]}}
     return result
 
 

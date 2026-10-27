@@ -1615,49 +1615,87 @@ def _curve_value(points, time, mode):
 _EXTERNAL_MARGIN_S = 0.08
 
 
-class _Recording(object):
-    """One ``automation.record`` pass, advanced by Live's display tick."""
+class _Lane(object):
+    """One parameter of a recording pass: its curve (record) or its readings (sample)."""
 
-    def __init__(self, ctx, track_obj, param, label, path, points, mode, start, end, begin,
-                 tempo=None, external=False):
+    def __init__(self, track_obj, param, label, path, points, mode):
+        self.track = track_obj
+        self.param = param
+        self.info = param_info(param, label, path, True)
+        self.path = path
+        self.points = points
+        self.mode = mode
+        self.last_value = None
+        self.writes = 0
+        self.gesture = False
+        self.samples = []
+
+    def write(self, now, start, end):
+        value = _curve_value(self.points, min(max(now, start), end), self.mode)
+        if self.last_value is not None and abs(value - self.last_value) < 1e-9:
+            return False
+        self.param.value = value
+        self.last_value = value
+        self.writes += 1
+        return True
+
+    def sample(self, now):
+        value = float(compat.safe_getattr(self.param, "value", 0.0) or 0.0)
+        if not self.samples or abs(self.samples[-1][1] - value) > 1e-9 or \
+                now - self.samples[-1][0] > 1.0:
+            self.samples.append((rnd(now, 6), value))
+
+
+class _Recording(object):
+    """One ``automation.record`` pass, advanced by Live's display tick.
+
+    ``lanes`` are written along their curves (Arrangement Record + Automation Arm), or with
+    ``sample`` only read: the range plays without recording and each lane collects the values
+    its parameter takes (the arrangement automation playing back)."""
+
+    def __init__(self, ctx, lanes, start, end, begin, tempo=None, external=False,
+                 sample=False):
         _RECORDER["counter"] += 1
         self.id = "rec%d" % _RECORDER["counter"]
         self.ctx = ctx
         self.song = ctx.song
-        self.track = track_obj
-        self.param = param
-        self.info = param_info(param, label, path, True)
-        self.track_name = _name(track_obj)
-        self.points = points
-        self.mode = mode
+        self.lanes = lanes
         self.start = start
         self.end = end
         self.begin = begin
         self.phase = "arming"
         self.outcome = None
         self.error = None
-        self.writes = 0
-        self.last_value = None
         self.first_time = None
         self.last_time = None
         self.ticks = 0
-        self.gesture = False
         self.started_at = _time.time()
         self.saved = {}
         self.disarmed = []
         #: the song tempo during the pass (automation is stored in beats: a faster pass
         #: records the same lane sooner), restored afterwards
         self.tempo = tempo
-        #: another writer (the LiveBridge Engine) moves the parameter; this pass only arms,
+        #: another writer (the LiveBridge Engine) moves the parameters; this pass only arms,
         #: plays, stops and restores
         self.external = external
+        #: read the parameters instead of writing them (no Arrangement Record)
+        self.sample = sample
+
+    # the single-lane view older callers use
+    @property
+    def param(self):
+        return self.lanes[0].param
+
+    @property
+    def writes(self):
+        return sum(lane.writes for lane in self.lanes)
 
     # -- setup / teardown -------------------------------------------------
     def setup(self):
         song = self.song
         get = compat.safe_getattr
         for prop in ("loop", "punch_in", "punch_out", "session_automation_record",
-                     "current_song_time", "tempo"):
+                     "current_song_time", "tempo", "start_time"):
             self.saved[prop] = get(song, prop)
         for candidate in list(get(song, "tracks", ()) or ()):
             if get(candidate, "can_be_armed", False) and get(candidate, "arm", False):
@@ -1665,11 +1703,16 @@ class _Recording(object):
         try:
             for candidate in self.disarmed:
                 candidate.arm = False
-            for prop, value in (("loop", False), ("punch_in", False), ("punch_out", False),
-                                ("session_automation_record", True)):
+            settings = [("loop", False), ("punch_in", False), ("punch_out", False)]
+            if not self.sample:
+                settings.append(("session_automation_record", True))
+            for prop, value in settings:
                 if compat.has(song, prop):
                     setattr(song, prop, value)
             song.current_song_time = float(self.begin)
+            # playback (and Arrangement Record) starts at the start marker, not the playhead
+            if compat.has(song, "start_time"):
+                song.start_time = float(self.begin)
             if self.tempo is not None:
                 song.tempo = float(self.tempo)
         except Exception as error:
@@ -1705,6 +1748,12 @@ class _Recording(object):
                 song.current_song_time = float(position)
             except Exception as error:
                 problems.append("current_song_time: %s" % error)
+        marker = self.saved.get("start_time")
+        if marker is not None and compat.has(song, "start_time"):
+            try:
+                song.start_time = float(marker)
+            except Exception as error:
+                problems.append("start_time: %s" % error)
         if problems:
             self.error = (self.error + "; " if self.error else "") + \
                 "could not restore " + ", ".join(problems)
@@ -1735,7 +1784,10 @@ class _Recording(object):
     def _advance(self):
         song = self.song
         if self.phase == "arming":
-            song.record_mode = True
+            if self.sample:
+                song.start_playing()
+            else:
+                song.record_mode = True
             self.phase = "waiting"
             return
         if self.phase == "waiting":
@@ -1743,36 +1795,52 @@ class _Recording(object):
             now = float(compat.safe_getattr(song, "current_song_time", 0.0) or 0.0)
             if playing and now >= self.start - 1e-6:
                 self.phase = "recording"
-                if self.external:
-                    self.first_time = now
-                    self.last_time = now
+                self.first_time = now
+                self.last_time = now
+                if self.sample:
+                    for lane in self.lanes:
+                        lane.sample(now)
                     return
-                self.param.begin_gesture()
-                self.gesture = True
-                self._write(now)
+                if self.external:
+                    return
+                for lane in self.lanes:
+                    lane.param.begin_gesture()
+                    lane.gesture = True
+                    lane.write(now, self.start, self.end)
             elif self.ticks > _RECORD_WAIT_TICKS:
                 self.error = "playback did not reach beat %s" % rnd(self.start)
                 self._finish("failed")
             return
         if self.phase == "recording":
-            if not compat.safe_getattr(song, "is_playing", False) or \
-                    not compat.safe_getattr(song, "record_mode", True):
+            if not compat.safe_getattr(song, "is_playing", False) or (
+                    not self.sample and not compat.safe_getattr(song, "record_mode", True)):
                 self.error = "the transport was stopped before the end of the range"
                 self._finish("aborted")
                 return
             now = float(compat.safe_getattr(song, "current_song_time", 0.0) or 0.0)
+            if self.sample:
+                self.last_time = min(now, self.end)
+                for lane in self.lanes:
+                    lane.sample(min(now, self.end))
+                if now >= self.end - 1e-6:
+                    self._finish("done")
+                return
             if self.external:
-                # the other writer ends its gesture at `end`: give it ~80 ms to get there
+                # the other writer ends its gestures at `end`: give it ~80 ms to get there
                 tempo = float(compat.safe_getattr(song, "tempo", 120.0) or 120.0)
                 self.last_time = min(now, self.end)
                 if now >= self.end + tempo / 60.0 * _EXTERNAL_MARGIN_S - 1e-6:
                     self._finish("done")
                 return
             if now >= self.end - 1e-6:
-                self._write(self.end)
+                for lane in self.lanes:
+                    lane.write(self.end, self.start, self.end)
+                self.last_time = self.end
                 self._finish("done")
                 return
-            self._write(now)
+            for lane in self.lanes:
+                lane.write(now, self.start, self.end)
+            self.last_time = now
             return
         if self.phase == "stopping":
             try:
@@ -1784,31 +1852,23 @@ class _Recording(object):
             self.restore()
             self.phase = self.outcome or "done"
 
-    def _write(self, now):
-        value = _curve_value(self.points, min(max(now, self.start), self.end), self.mode)
-        if self.last_value is not None and abs(value - self.last_value) < 1e-9:
-            return
-        self.param.value = value
-        self.last_value = value
-        self.writes += 1
-        if self.first_time is None:
-            self.first_time = now
-        self.last_time = now
-
     def _finish(self, outcome, wait=True):
-        """End the gesture, leave record mode; stop + restore on the next ticks."""
+        """End the gestures, leave record mode; stop + restore on the next ticks."""
         self.outcome = outcome
-        if self.gesture:
+        for lane in self.lanes:
+            if lane.gesture:
+                try:
+                    lane.param.end_gesture()
+                except Exception as error:
+                    self.error = (self.error + "; " if self.error else "") + \
+                        "end_gesture: %s" % error
+                lane.gesture = False
+        if not self.sample:
             try:
-                self.param.end_gesture()
+                self.song.record_mode = False
             except Exception as error:
                 self.error = (self.error + "; " if self.error else "") + \
-                    "end_gesture: %s" % error
-            self.gesture = False
-        try:
-            self.song.record_mode = False
-        except Exception as error:
-            self.error = (self.error + "; " if self.error else "") + "record_mode: %s" % error
+                    "record_mode: %s" % error
         if wait:
             self.phase = "stopping"
         else:
@@ -1838,28 +1898,176 @@ class _Recording(object):
             progress = max(0.0, min(1.0, (self.last_time - self.start) / span))
         else:
             progress = 0.0
+        first = self.lanes[0]
         data = {"id": self.id, "phase": self.phase, "finished": finished,
-                "track": self.track_name, "parameter": self.info,
+                "track": _name(first.track), "parameter": first.info,
                 "range": [rnd(self.start), rnd(self.end)], "writes": self.writes,
                 "progress": rnd(progress, 3), "ticks": self.ticks,
                 "elapsed_s": rnd(_time.time() - self.started_at, 2)}
+        if len(self.lanes) > 1 or self.sample:
+            data["lanes"] = [{"track": _name(lane.track), "parameter": lane.info["name"],
+                              "path": lane.path, "writes": lane.writes}
+                             for lane in self.lanes]
+        if self.sample:
+            data["mode"] = "sample"
+            del data["writes"]
+            for row in data["lanes"]:
+                del row["writes"]
+            if finished:
+                for row, lane in zip(data["lanes"], self.lanes):
+                    row["samples"] = [[t, v] for t, v in lane.samples]
         if self.tempo is not None:
             data["tempo_during_pass"] = rnd(self.tempo)
         if self.external:
             data["writer"] = "external"
-            del data["writes"]
+            data.pop("writes", None)
+            for row in data.get("lanes", ()):
+                row.pop("writes", None)
         if self.first_time is not None:
-            data["recorded"] = [rnd(self.first_time), rnd(self.last_time)]
+            data["recorded" if not self.sample else "sampled"] = [rnd(self.first_time),
+                                                                 rnd(self.last_time)]
         if self.error:
             data["error"] = self.error
         if finished:
-            data["state_after"] = _state(self.param)
+            data["state_after"] = _state(first.param)
             data["restored"] = {"loop": self.saved.get("loop"),
                                 "position": rnd(self.saved.get("current_song_time") or 0.0),
                                 "rearmed": [_name(t) for t in self.disarmed]}
             if self.tempo is not None:
                 data["restored"]["tempo"] = rnd(self.saved.get("tempo") or 0.0)
         return data
+
+
+_MAX_LANES = 64
+
+
+def _check_pass(ctx, preroll, tempo, writer):
+    """Shared checks of a recording / sampling pass; returns the normalised writer."""
+    if isinstance(preroll, bool) or not isinstance(preroll, (int, float)) or \
+            not 0.0 <= preroll <= 16.0:
+        raise BridgeError("bad_args", "preroll must be 0..16 beats")
+    song = ctx.song
+    if compat.safe_getattr(song, "is_playing", False):
+        raise BridgeError("invalid_state", "stop the transport first — the recording starts "
+                          "playback itself")
+    if compat.safe_getattr(song, "record_mode", False):
+        raise BridgeError("invalid_state", "Arrangement Record is already on")
+    writer = str(writer).strip().lower()
+    if writer not in ("live", "external"):
+        raise BridgeError("bad_args", "writer must be live or external")
+    if tempo is not None and (isinstance(tempo, bool) or not isinstance(tempo, (int, float))
+                              or not 20.0 <= float(tempo) <= 999.0):
+        raise BridgeError("bad_args", "tempo must be 20..999 BPM")
+    return writer
+
+
+def _song_tempo_param(song):
+    return compat.safe_getattr(compat.safe_getattr(
+        compat.safe_getattr(song, "master_track"), "mixer_device"), "song_tempo")
+
+
+def _start_lanes(ctx, lanes, start, end, preroll, tempo, writer, sample=False):
+    """automation.record with ``lanes`` (several parameters, one pass) or action="sample"."""
+    writer = _check_pass(ctx, preroll, tempo, writer)
+    if not isinstance(lanes, (list, tuple)) or not lanes:
+        raise BridgeError("bad_args", "lanes must be a non-empty list of {parameter, track?, "
+                          "device?%s}" % ("" if sample else ", points"))
+    if len(lanes) > _MAX_LANES:
+        raise BridgeError("bad_args", "at most %d lanes per pass" % _MAX_LANES)
+    song = ctx.song
+    song_tempo = _song_tempo_param(song)
+    built, seen = [], []
+    to_beats = clips_handlers.to_beats
+    for index, spec in enumerate(lanes):
+        if not isinstance(spec, dict) or "parameter" not in spec:
+            raise BridgeError("bad_args", "lanes[%d] needs a parameter" % index)
+        unknown = set(spec) - {"parameter", "track", "device", "points", "mode"}
+        if unknown:
+            raise BridgeError("bad_args", "lanes[%d]: unknown key(s) %s"
+                              % (index, ", ".join(sorted(unknown))))
+        track_obj, (param, label, path) = _param_target(ctx, spec.get("track"),
+                                                        spec["parameter"], spec.get("device"))
+        if any(param == other for other in seen):
+            raise BridgeError("bad_args", "lanes[%d]: %r is in the pass twice"
+                              % (index, _name(param)))
+        seen.append(param)
+        if not sample and compat.safe_getattr(param, "is_enabled", True) is False:
+            raise BridgeError("invalid_state", "lanes[%d]: %r is disabled (macro-mapped or "
+                              "controlled by Max) — Live does not record it"
+                              % (index, _name(param)))
+        if tempo is not None and song_tempo is not None and param == song_tempo:
+            raise BridgeError("bad_args", "lanes[%d]: the tempo itself cannot be recorded at "
+                              "another tempo — leave tempo out" % index)
+        points, mode = [], "linear"
+        if not sample:
+            raw = spec.get("points")
+            if not isinstance(raw, (list, tuple)) or not raw:
+                raise BridgeError("bad_args", "lanes[%d] needs points [[beat, value], ...]"
+                                  % index)
+            if len(raw) > _MAX_POINTS:
+                raise BridgeError("bad_args", "lanes[%d]: at most %d points"
+                                  % (index, _MAX_POINTS))
+            mode = str(spec.get("mode", "linear")).strip().lower()
+            if mode not in ("linear", "step"):
+                raise BridgeError("bad_args", "lanes[%d]: mode must be linear or step" % index)
+            converter = _Converter(param, False)
+            for number, point in enumerate(raw):
+                if not isinstance(point, (list, tuple)) or len(point) != 2:
+                    raise BridgeError("bad_args", "lanes[%d].points[%d] must be [beat, value]"
+                                      % (index, number))
+                beats = to_beats(ctx, point[0], "beats", "lanes[%d].points[%d]"
+                                 % (index, number), position=True, allow_none=False,
+                                 minimum=0.0)
+                points.append((float(beats), converter.fit(converter(point[1]))))
+            points.sort(key=lambda item: item[0])
+        built.append(_Lane(track_obj, param, label, path, points, mode))
+    if tempo is not None and song_tempo is not None and _state(song_tempo) != "none":
+        raise BridgeError("invalid_state", "the song has tempo automation, which would "
+                          "override the faster tempo — record at normal speed")
+    if start is None:
+        if sample:
+            raise BridgeError("bad_args", "sampling needs start and end")
+        begin = min(lane.points[0][0] for lane in built)
+    else:
+        begin = to_beats(ctx, start, "beats", "start", position=True, minimum=0.0)
+    if end is None:
+        if sample:
+            raise BridgeError("bad_args", "sampling needs start and end")
+        finish = max(lane.points[-1][0] for lane in built)
+    else:
+        finish = to_beats(ctx, end, "beats", "end", position=True, minimum=0.0)
+    if finish <= begin:
+        raise BridgeError("bad_args", "end must be after start")
+    if finish - begin > _RECORD_MAX_BEATS:
+        raise BridgeError("bad_args", "the range is %s beats — at most %d per pass"
+                          % (rnd(finish - begin), int(_RECORD_MAX_BEATS)))
+    lead_in = max(0.0, begin - float(preroll))
+    song_length = compat.safe_getattr(song, "song_length")
+    if song_length is not None and lead_in > float(song_length) + 1e-9:
+        raise BridgeError("invalid_state", "the song ends at beat %s — Live cannot put the "
+                          "playhead at beat %s" % (rnd(song_length), rnd(lead_in)))
+    recording = _Recording(ctx, built, begin, finish, lead_in,
+                           tempo=None if tempo is None else float(tempo),
+                           external=writer == "external" and not sample, sample=sample)
+    recording.setup()
+    try:
+        recording.schedule()
+    except BridgeError:
+        recording.restore()
+        raise
+    _RECORDER["current"] = recording
+    _RECORDER["last"] = recording
+    pace = float(tempo if tempo is not None else
+                 compat.safe_getattr(song, "tempo", 120.0) or 120.0)
+    result = recording.status()
+    result.update({"expected_seconds": rnd((finish - lead_in) * 60.0 / pace, 1),
+                   "note": "the pass runs in real time — poll automation.record_status "
+                           "until finished"})
+    if recording.external:
+        result["curves"] = [{"path": lane.path, "mode": lane.mode,
+                             "points": [[rnd(t, 6), v] for t, v in lane.points]}
+                            for lane in built]
+    return result
 
 
 def _record_points(ctx, converter, points, shape, start, end, low, high, period, cycles,
@@ -1972,7 +2180,7 @@ def _song_length_arg(ctx, value, bar, name):
 def automation_record(ctx, parameter=None, track=None, device=None, points=None, shape=None,
                       start=None, end=None, low=0.0, high=1.0, normalized=None, period=None,
                       cycles=None, phase=0.0, duty=0.5, curve=1.0, seed=None, mode="linear",
-                      preroll=1.0, action="start", tempo=None, writer="live"):
+                      preroll=1.0, action="start", tempo=None, writer="live", lanes=None):
     """Write real arrangement (track) automation — the only way through Live's API.
 
     Live's API cannot draw into an automation lane, so this does what a person
@@ -2001,12 +2209,21 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
             and automation.write).
         mode: how points connect — "linear" (default) or "step".
         preroll: beats of playback before ``start`` (0..16).
-        action: "start" (default) or "stop" (abort the running recording;
-            nothing else needed).
+        action: "start" (default), "stop" (abort the running recording;
+            nothing else needed) or "sample": play ``start``..``end`` WITHOUT
+            recording and read the ``lanes``' values on every tick (their
+            arrangement automation playing back) — the samples come with the
+            finished status (``lanes[].samples`` [[beat, value]]).
         tempo: play the pass at this song tempo (20..999) and restore the
             tempo afterwards — automation is stored in beats, so a faster pass
             records the same lane sooner (coarser per tick). Not for the tempo
             itself, nor when the song has tempo automation (it would win).
+        lanes: instead of one parameter: several in ONE pass, each
+            ``{"parameter", "track"?, "device"?, "points": [[song beat,
+            value], ...], "mode"?}`` (values in the parameter's own units, as
+            ``automation.get`` reads them); ``start``/``end`` default to the
+            earliest/latest point. With action="sample": ``{"parameter",
+            "track"?, "device"?}`` only.
         writer: "live" (default: this script writes on every tick) or
             "external" (another writer — the LiveBridge Engine — moves the
             parameter from ``start`` to ``end``, begin/end gesture included;
@@ -2038,11 +2255,14 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
             return last.status()
         current.abort("stopped with action=stop")
         return current.status()
-    if action != "start":
-        raise BridgeError("bad_args", "action must be start or stop")
+    if action not in ("start", "sample"):
+        raise BridgeError("bad_args", "action must be start, stop or sample")
     if current is not None and current.phase not in ("done", "aborted", "failed"):
         raise BridgeError("invalid_state", "recording %s is still running — wait for it "
                           "(automation.record_status) or stop it (action=stop)" % current.id)
+    if lanes is not None or action == "sample":
+        return _start_lanes(ctx, lanes, start, end, preroll, tempo, writer,
+                            sample=action == "sample")
     if parameter is None:
         raise BridgeError("bad_args", "parameter is required")
     if points is None and shape is None:
@@ -2097,8 +2317,9 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
                           "+ 32 beats) — Live cannot put the playhead at beat %s; place a "
                           "clip or the loop brace further out first"
                           % (rnd(song_length), rnd(lead_in)))
-    recording = _Recording(ctx, track_obj, param, label, path, curve_points, mode, begin,
-                           finish, lead_in, tempo=None if tempo is None else float(tempo),
+    lane = _Lane(track_obj, param, label, path, curve_points, mode)
+    recording = _Recording(ctx, [lane], begin, finish, lead_in,
+                           tempo=None if tempo is None else float(tempo),
                            external=writer == "external")
     recording.setup()
     try:

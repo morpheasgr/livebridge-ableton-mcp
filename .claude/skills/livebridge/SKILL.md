@@ -148,6 +148,10 @@ Genre starting points (tempo, feel, key):
     duplicate result); **track automation in the arrangement**: `live_automation_record(parameter=
     "Filter Freq", track=..., points=[[0, "200 Hz"], [32, "4 kHz"]], start=..., end=...)` - it
     plays through the range in real time (poll `action="status"`), then restores the transport.
+    Arranging tools carry automation by default: `live_arrangement_from_scenes`,
+    `live_arrangement_duplicate_clip` and `live_arrangement_copy_range` record the clip
+    envelopes / copied lanes into the arrangement in the background (`automation` in the
+    result; wait for `live_automation_record(action="status")` to say `finished`).
     Add `speed="fast"` for long ranges: the pass runs at a raised tempo (restored after; ~5x
     faster with a LiveBridge Engine in the set, which writes 50x a second) - not for the
     tempo itself or a song with tempo automation.

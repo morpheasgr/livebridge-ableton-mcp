@@ -30,6 +30,7 @@ import re
 from typing import Any
 
 from . import bridge_call, drop_none, tool_error
+from .. import arrange_automation
 from ..client import BridgeClient
 from .clips import address_args, clip_address, check_range
 
@@ -93,8 +94,45 @@ def _selector(track: Any, index: int | None, at: float | str | None, clip: str |
     return None
 
 
+_AUTOMATION_DOC = ("runs in the background (a fast Arrangement Record pass, the transport is "
+                   "stopped first) — check live_automation_record(action=\"status\") and "
+                   "leave the transport alone until it finished")
+
+
 def register(mcp: Any, bridge: BridgeClient) -> None:
     """Register the arrangement tools on the MCP app."""
+
+    def run_automation(result: Any, origin: str) -> Any:
+        """Start the background pass for an arrangement command's ``automation`` part and
+        put a short summary in its place."""
+        if not isinstance(result, dict) or not isinstance(result.get("automation"), dict):
+            return result
+        plan = result.pop("automation")
+        runner = arrange_automation.runner_for(
+            lambda cmd, args: bridge_call(bridge, cmd, args), id(bridge))
+        if "sample" in plan:
+            sample = plan["sample"]
+            lanes = sample.get("lanes") or []
+            if not lanes:
+                result["automation"] = {"note": "no automation plays in the copied range"}
+                return result
+            job = arrange_automation.Job("copy", lanes, sample["range"][0], sample["range"][1],
+                                         destination=sample["destination"], origin=origin)
+        else:
+            lanes = [lane for lane in plan.get("lanes") or [] if lane.get("points")]
+            if not lanes:
+                result["automation"] = {"note": "nothing to record: the copies kept their "
+                                                "clip envelopes, or the clips had none"}
+                return result
+            start, end = plan.get("range") or [0, 0]
+            job = arrange_automation.Job("record", lanes, start, end, origin=origin)
+        runner.submit(job)
+        summary = job.summary()
+        result["automation"] = {
+            "job": job.id, "kind": job.kind,
+            "parameters": summary["parameters"],
+            "status": _AUTOMATION_DOC}
+        return result
 
     @mcp.tool()
     def live_arrangement_overview(
@@ -249,6 +287,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         length: Time | None = None,
         count: int | None = None,
         replace: bool = True,
+        automation: bool = True,
     ) -> Any:
         """Copy a session clip (or any clip) onto the arrangement timeline — once, repeated, or
         stretched to fill a length (one call instead of one per repetition).
@@ -265,16 +304,23 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             count: Or: place this many back-to-back copies (1..512).
             replace: With length/count, first delete clips on the destination track that start
                 inside the filled range (default true — like pasting over them).
+            automation: Default true: the clip envelopes Live does not copy into the
+                arrangement (device parameters always, mixer ones on tracks with an instrument
+                or audio effect) are recorded into the track's automation lanes at the copy —
+                the arrangement sounds like the session clip. False: copy only.
 
         Returns:
             Plain copy: the new arrangement clip summary (path, start_time, end_time, index ...,
             envelopes: {source, copied}, note?). With length/count: {"clips": [...], "count",
-            "range": [start, end], "start_bar", "envelopes", "note"?}.
+            "range": [start, end], "start_bar", "envelopes", "note"?}. Plus `automation`:
+            {job, parameters, status} when lanes are being recorded, or {note}.
 
-        Gotchas: notes and loop settings travel with the copy; clip envelopes are NOT reliably
-        copied (Live 12.4.5 copied them on a track without devices but dropped all of them with
-        an instrument on the track) — check `envelopes.copied`; when false, record the
-        automation with live_automation_record or redraw it. A clip cannot be
+        Gotchas: notes and loop settings travel with the copy; Live's copy keeps clip
+        envelopes only for mixer parameters on tracks without an instrument or audio effect —
+        the rest becomes automation lanes (automation=true), recorded in the background: a
+        fast pass of Arrangement Record (one for every parameter), the transport stopped first;
+        the lanes are track automation, so moving the clip later does not move them. A clip
+        cannot be
         stretched over a clip that starts later on the same track (`note` says where Live
         stopped it). To lay out whole scenes use `live_arrangement_from_scenes`.
         """
@@ -292,7 +338,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               count=count))
         if not replace and (length is not None or count is not None):
             args["replace"] = False
-        return bridge_call(bridge, cmd, args)
+        if automation:
+            args["automation"] = True
+        return run_automation(bridge_call(bridge, cmd, args), "duplicate_clip")
 
     @mcp.tool()
     def live_arrangement_resize_clip(
@@ -343,6 +391,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         unit: str = "beats",
         tracks: list[Ref] | None = None,
         replace: bool = True,
+        automation: bool = True,
     ) -> Any:
         """Build a song structure in ONE call: lay session scenes out one after another on the
         timeline — every track's clip of each scene is copied and filled to the section length.
@@ -359,14 +408,21 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             tracks: Only these tracks (default every regular track).
             replace: Delete clips of those tracks that start inside each section first
                 (default true).
+            automation: Default true: the scenes' clip envelopes that Live does not copy into
+                the arrangement become automation lanes over the whole song (each parameter
+                at its current value outside the sections that move it), recorded in ONE fast
+                background pass. False: clips only.
 
         Returns:
             {"sections": [{"scene", "name", "start", "end", "start_bar", "length", "clips",
-            "tracks"}], "start", "end", "end_bar", "placed", "note"?}
+            "tracks"}], "start", "end", "end_bar", "placed", "note"?, "automation": {job,
+            parameters, status} | {note}}
 
         Gotchas: looping clips repeat inside their section, non-looping ones are repeated and
         cut. Tracks without a clip in a scene stay empty there. Scene tempo/signature changes are
-        not written. Check the result with `live_arrangement_overview`.
+        not written. The automation pass plays the song (Arrangement Record, at a raised tempo
+        when it can) — wait for `live_automation_record(action="status")` before playing.
+        Check the result with `live_arrangement_overview`.
         """
         cmd = "arrangement.from_scenes"
         error = _unit_error(unit, cmd) or _position_error(start, "start", unit, cmd)
@@ -390,7 +446,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             args["tracks"] = tracks
         if not replace:
             args["replace"] = False
-        return bridge_call(bridge, cmd, args)
+        if automation:
+            args["automation"] = True
+        return run_automation(bridge_call(bridge, cmd, args), "from_scenes")
 
     @mcp.tool()
     def live_arrangement_copy_range(
@@ -400,6 +458,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         unit: str = "beats",
         tracks: list[Ref] | None = None,
         replace: bool = True,
+        automation: bool = True,
     ) -> Any:
         """Copy a section of the arrangement to another position — all tracks or some
         ("copy bars 9-16 to bar 33").
@@ -411,14 +470,21 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             tracks: Only these tracks (default every regular track).
             replace: Delete clips of those tracks that start inside the destination range first
                 (default true).
+            automation: Default true: the automation of those tracks goes along — every
+                parameter whose automation plays in the range (track lanes and clip
+                envelopes) is read while the range plays and recorded at the destination,
+                in two fast background passes. False: clips only.
 
         Returns:
             {"copied": n, "range": [start, end], "destination": [start, end],
             "tracks": [{"name", "clips"}], "skipped"?: [{"track", "name", "start_time",
-            "reason"}]}
+            "reason"}], "automation": {job, parameters, status} | {note}}
 
         Gotchas: clips that start before the range are skipped (listed); clips running past
-        the end are cut on the copy. The destination must not overlap the range.
+        the end are cut on the copy. The destination must not overlap the range. Lanes are
+        copied by playing them (Live's API cannot read them): resolution ~0.2 beat with a
+        LiveBridge Engine in the set, ~0.5 beat without — ramps exact, sharp steps soften
+        slightly.
         """
         cmd = "arrangement.copy_range"
         error = _unit_error(unit, cmd) or _position_error(start, "start", unit, cmd) or \
@@ -432,7 +498,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             args["tracks"] = tracks
         if not replace:
             args["replace"] = False
-        return bridge_call(bridge, cmd, args)
+        if automation:
+            args["automation"] = True
+        return run_automation(bridge_call(bridge, cmd, args), "copy_range")
 
     @mcp.tool()
     def live_arrangement_delete_clip(

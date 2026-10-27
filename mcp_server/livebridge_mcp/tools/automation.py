@@ -30,7 +30,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import bridge_call, drop_none, tool_error
-from .. import engine
+from .. import arrange_automation, engine
 from ..client import BridgeClient
 from .cues import time_error
 
@@ -471,8 +471,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 low/high, false for points).
             mode: How points connect: "linear" (default) or "step".
             preroll: Beats of playback before `start` (0..16).
-            action: "start" (default), "status" (progress of the running/last pass) or "stop"
-                (abort the running pass).
+            action: "start" (default), "status" (progress of the running/last pass, and of
+                the background automation jobs the arrangement tools started) or "stop" (abort
+                the running pass and those jobs).
             speed: Record faster than real time — automation is stored in beats, so the pass
                 plays at a raised tempo and the tempo is restored after. "fast": as fast as
                 keeps ~0.2 beat between writes (with a LiveBridge Engine in the set it writes
@@ -493,13 +494,27 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Existing automation of the parameter inside the range is replaced; the lane cannot be
         read back through the API. For clip-level automation use live_automation_write/shape.
         """
+        runner = arrange_automation.runner_for(
+            lambda c, a: bridge_call(bridge, c, a), id(bridge))
         if action == "status":
-            return with_engine(bridge_call(bridge, "automation.record_status", {}))
+            status = with_engine(bridge_call(bridge, "automation.record_status", {}))
+            jobs = runner.status()
+            if jobs and isinstance(status, dict):
+                status["arrangement_jobs"] = jobs
+                status["finished"] = bool(status.get("finished", True)) and \
+                    not runner.active()
+            return status
         cmd = "automation.record"
         if action == "stop":
+            cancelled = runner.cancel()
             stopped = bridge_call(bridge, cmd, {"action": "stop"})
             cancel_engine()
-            return with_engine(stopped)
+            if cancelled and isinstance(stopped, dict) and "error" in stopped:
+                stopped = {"phase": "aborted", "finished": True}
+            result = with_engine(stopped)
+            if cancelled and isinstance(result, dict):
+                result["cancelled_jobs"] = cancelled
+            return result
         if action != "start":
             return tool_error("action must be start, status or stop", cmd=cmd)
         error = _param_error(parameter, cmd) or time_error(start, "start", cmd) or \
