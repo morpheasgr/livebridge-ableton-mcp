@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~185 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~187 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -174,6 +174,13 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   - *The user's reference track*: structure (`energy`), loudness and balance to aim for.
   It needs the optional audio libraries (`type: "unsupported"` carries the pip command - relay
   it). It measures; the user's ears decide.
+- **`live_engine_listen`** (real time, no bounce): when the optional LiveBridge Engine Max for
+  Live device sits on the master (`live_engine_status` says so), listen while the song plays:
+  `live_transport_play()` then `live_engine_listen(seconds=4)` -> momentary/short-term LUFS,
+  peak, crest, band balance, correlation, `low_end_width` and the same `flags`. Right after
+  playback, `live_engine_listen(history=True, seconds=30)` answers at once from the last minute.
+  Use it for quick before/after checks of a mix move; bounce + `live_audio_analyze` for tempo,
+  key and the energy curve. No device -> the tool says how to add it; don't insist.
 
 ## 4c. Remember, keep sounds, generate, compare
 

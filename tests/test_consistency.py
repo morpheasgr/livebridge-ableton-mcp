@@ -262,6 +262,8 @@ def test_every_tool_runs_end_to_end(name, tcp_bridge, song, tmp_path, monkeypatc
     monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
     # sample search: never a real Live database on a developer's machine
     monkeypatch.setenv("LIVEBRIDGE_LIVE_DATABASE", str(tmp_path / "no Live database"))
+    # Engine tools: no running LiveBridge Engine device
+    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path / "engine"))
     app = _APP
     token = ""
     if name in NEEDS_TOKEN:

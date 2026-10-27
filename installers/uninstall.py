@@ -85,6 +85,8 @@ class Uninstaller(Ops):
             self.info("no install record at %s -- detecting what to remove" % manifest_file)
         if self.args.remote_script:
             self.remove_remote_script(manifest)
+            if self.args.engine:
+                self.remove_engine(manifest)
         if self.args.desktop:
             self.clean_claude_desktop(manifest)
         if self.args.claude_code:
@@ -152,6 +154,34 @@ class Uninstaller(Ops):
             self.manual.append("In Live: Preferences {a} Link, Tempo & MIDI {a} Control Surface "
                                "{a} set the LiveBridge slot to None (or restart Live)."
                                .format(a=self.arrow))
+
+    def remove_engine(self, manifest: Dict[str, Any]) -> None:
+        """Remove the LiveBridge Engine device folder the installer copied (only if it really
+        is the device; a symlink/junction is left alone)."""
+        self.step("Removing the LiveBridge Engine device")
+        folders: List[Path] = []
+        if manifest.get("engine_dir"):
+            folders.append(Path(manifest["engine_dir"]))
+        located, _, _ = inst.find_remote_scripts_dir(self.host, self.args.remote_scripts_dir)
+        if located is not None:
+            default = located.parent.joinpath(*inst.ENGINE_PRESETS) / inst.ENGINE_NAME
+            if default not in folders:
+                folders.append(default)
+        found = False
+        for folder in folders:
+            if inst.is_link_or_junction(folder):
+                found = True
+                self.info("%s is a symlink/junction (developer setup) -- left alone" % folder)
+            elif folder.is_dir():
+                found = True
+                if inst.is_engine_device(folder):
+                    if self.delete_tree_or_explain(folder, "the Engine device"):
+                        self.removed.append(str(folder))
+                else:
+                    self.warn("%s is not the LiveBridge Engine -- left alone" % folder)
+        if not found:
+            self.info("not installed (looked in: %s)"
+                      % (", ".join(str(f) for f in folders) or "nowhere -- no Live on this OS"))
 
     def clean_claude_desktop(self, manifest: Dict[str, Any]) -> None:
         self.step("Removing LiveBridge from Claude Desktop")
@@ -341,6 +371,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "Live's preferences)")
     parser.add_argument("--no-remote-script", dest="remote_script", action="store_false",
                         help="leave the Remote Script in Live's User Library")
+    parser.add_argument("--keep-engine", dest="engine", action="store_false",
+                        help="keep the LiveBridge Engine device in the User Library")
     parser.add_argument("--no-desktop", dest="desktop", action="store_false",
                         help="leave Claude Desktop's config alone")
     parser.add_argument("--desktop-config", metavar="PATH",

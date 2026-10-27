@@ -5,6 +5,15 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **LiveBridge Engine, a Max for Live device for real-time listening** (`live_engine_status`,
+  `live_engine_listen`; needs Max for Live): drop it on the master and Claude reads what is
+  playing right now — momentary/short-term LUFS (BS.1770 K-weighting in gen~), peaks, crest
+  factor, the 8 spectral bands of `live_audio_analyze`, stereo correlation, width and the width
+  below 120 Hz, with the same mix flags — without bouncing; the last 60 s stay available
+  (`history=true`). The device talks to the MCP server over a local, token-protected TCP port
+  it registers in `~/.livebridge/engine/`; the Remote Script is unchanged. Built from source by
+  `max_for_live/build.py`; the installer copies it into the User Library
+  (`--no-engine` skips it). See `docs/ENGINE.md`.
 - **Production knowledge for Claude**, next to the skill and served as MCP resources:
   `GENRES.md` (`livebridge://genres`: drum patterns, bass lines, chords and sounds for techno,
   hardgroove, house, UK and speed garage, trance, bass music, synthwave, acid, ambient and

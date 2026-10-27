@@ -1145,7 +1145,51 @@ def test_uninstall_reverses_the_install(tmp_path):
     assert runner.commands("/fake/claude mcp remove --scope user livebridge")
     assert not runner.commands("mcp remove --scope user splice")
     assert not (host.home / ".livebridge").exists()
+    assert not engine_dir(host).exists() and engine_dir(host).parent.is_dir()
     assert "Control Surface" in out
+
+
+def engine_dir(host):
+    return (remote_dir_mac(host).parent.parent / "Presets" / "Audio Effects" / "Max Audio Effect"
+            / "LiveBridge Engine")
+
+
+def test_engine_device_is_copied_into_the_user_library(tmp_path):
+    host = mac_host(tmp_path)
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert code == 0, out
+    dest = engine_dir(host)
+    source = REPO / "max_for_live" / "LiveBridge Engine"
+    assert sorted(p.name for p in dest.iterdir()) == sorted(p.name for p in source.iterdir()
+                                                            if p.name != "__pycache__")
+    assert (dest / "LiveBridge Engine.amxd").read_bytes() == \
+        (source / "LiveBridge Engine.amxd").read_bytes()
+    assert read(host.home / ".livebridge" / "install.json")["engine_dir"] == str(dest)
+    assert "Max Audio Effect -> LiveBridge Engine" in out and "live_engine_listen" in out
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert "unchanged: " + str(dest) in out
+
+
+def test_no_engine_and_foreign_folders(tmp_path):
+    host = mac_host(tmp_path)
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code", "--no-engine"])
+    assert code == 0 and not engine_dir(host).exists()
+    assert read(host.home / ".livebridge" / "install.json")["engine_dir"] is None
+    foreign = engine_dir(host)
+    foreign.mkdir(parents=True)
+    (foreign / "mine.amxd").write_text("x", encoding="utf-8")
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert code == 0 and "not the LiveBridge Engine -- left alone" in out
+    assert sorted(p.name for p in foreign.iterdir()) == ["mine.amxd"]
+    code, out, _ = run_uninstall(host)
+    assert (foreign / "mine.amxd").is_file()
+
+
+def test_uninstall_keep_engine(tmp_path):
+    host = mac_host(tmp_path)
+    run_install(host, ["--no-desktop", "--no-claude-code"])
+    code, out, _ = run_uninstall(host, ["--keep-engine"])
+    assert code == 0 and (engine_dir(host) / "engine.js").is_file()
 
 
 def test_uninstall_remove_splice_and_keep_config(tmp_path):
