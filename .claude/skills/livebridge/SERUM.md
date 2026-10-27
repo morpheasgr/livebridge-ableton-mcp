@@ -1,6 +1,6 @@
 # Sound design in Serum 2
 
-> The 128 knobs below are what Live can reach. For the **whole patch** — wavetable selection, oscillator modes, matrix routes, FX order — design the preset file instead: `SERUM_PRESETS.md` (`live_preset_find`, `live_preset_edit`, `live_preset_load`).
+> The 128 knobs below are what Live can reach. For the **whole patch** — wavetable selection, oscillator modes, matrix routes, FX order — design the preset file instead: `SERUM_PRESETS.md` (`live_preset_find`, `live_preset_edit`, `live_preset_load`); §6 below lists every Serum 2 control, knob or not.
 
 
 Companion to `SKILL.md` (§5 explains the mechanics). This file is the *sound design*: which
@@ -194,3 +194,152 @@ for timbre drift. Chorus-Ensemble and a long reverb after the rack, low cut 150-
 - **Variation over time**: never leave a Serum part static for more than 8 bars: automate a
   macro (filter, detune, WT position) slowly through each section, open it into drops, close it
   in breakdowns (`PRODUCTION.md` §3).
+
+## 6. The whole synth: controls reference
+
+Everything Serum 2 has, including what the 128 knobs cannot reach. Use it to **design a preset
+file** (`SERUM_PRESETS.md`: find where a control is stored with `live_preset_search` /
+`live_preset_compare`, then `live_preset_edit`) and to write exact manual steps. Adapted from
+kasperikaivola's ableton-mcp-pro Serum 2 guide (MIT, `THIRD_PARTY_NOTICES.md`), which was
+checked against Xfer's Serum 2 user guide (software 2.0.18, manual 1.0.3); later builds may
+rename or add controls. A control listed here is not proof that it is exposed in Live or set in
+the user's instance. Serum **2** has three oscillators and two filters: never assume Serum 1's
+two oscillators and one filter.
+
+**Where things are**: OSC A/B/C, SUB, NOISE and FILTER 1/2 on the oscillator page; FX and
+MIXER for racks and routing; ENV/LFO/MATRIX for movement; ARP/CLIP for generated notes; GLOBAL
+for voices, quality and tuning.
+
+### Oscillators
+
+OSC A, B and C each run in one of five modes — **Wavetable, Multisample, Sample, Granular,
+Spectral** — and the mode decides which controls exist, so choose it first. Every oscillator
+also has: enable; OCT / SEMI / FINE and pitch tracking; PHASE and RAND (with phase-memory
+options); UNISON voices, DETUNE and BLEND (plus spread and stereo options); PAN and LEVEL; two
+WARP slots (mode and amount, applied in order before the filter).
+
+- **Wavetable**: the table is a named asset; WT POS scans its frames (a single-cycle sine or
+  saw needs no scanning). Give the table's name and the position and its modulation range.
+  Never step through table indices hoping to hit a name you haven't confirmed. The wavetable
+  editor (drawing, harmonics, frame morphing, import from audio, image or formula) is manual.
+- **Warp families**: sync adds harmonics; bend / asymmetry / PWM reshape the wave; mirror and
+  remap change its geometry; FM / AM / RM need a modulator (FM from B needs B running, even
+  when B's output is routed to None); phase distortion, folding, saturation and the oscillator
+  filter change the harmonic balance. Check the exact mode label in the preset.
+- **Multisample**: an instrument (SFZ) with its envelope, velocity tracking, randomization and
+  timbre — acoustic or layered pitched foundations. Not interchangeable with one WAV.
+- **Sample**: an audio file with root and tracking, start/end, loop start/end/mode and
+  crossfade, scan and rate, slicing — one-shots, loops, tape-like gestures. Keep the start for
+  transients; start after the transient for pads.
+- **Granular**: a sample cut into overlapping grains.
+
+  | Control | Decide |
+  |---|---|
+  | Start/end, loop, crossfade | Region and direction, smooth seam |
+  | SCAN, X/Y | Automatic movement or a fixed position; path and rate |
+  | WINDOW | Grain edge shape (not the amp envelope) |
+  | DENSITY | Hz, tempo-synced or a grain count; Jump Start, Max Grains (CPU) |
+  | LENGTH | ms, synced, or a percentage of the density period (not in grain-count mode) |
+  | OFFSET / DIR / PITCH random, RAND LENGTH/PAN/LEVEL | Scatter in position, direction, pitch, length, stereo, level |
+
+  Long overlapping grains make smooth textures; short sparse or synced grains add detail. Keep
+  pitch randomization small on harmonic pads.
+- **Spectral**: the source is resynthesized from its frequency content: start/end, lower and
+  upper analysed frequency, loop, X/Y, SCAN, CUT, FILTER, MIX (CUT and FILTER depend on the
+  spectral mode — not an ordinary low-pass). Frozen, evolving timbres and odd transition FX.
+
+**SUB**: waveform, pitch, phase, pan, level, route. A centred sine routed Direct gives a clean
+fundamental; not every patch needs one. **NOISE**: a sample (not necessarily white noise) with
+one-shot/loop, start and random start, pitch and tracking, pan, level, route.
+
+### Filters and routing
+
+FILTER 1/2: power, type, cutoff (Hz), resonance, drive, VAR, mix, key tracking, output. VAR
+means something different per type (a second frequency, a character control) — read it from
+the type, never guess. Families: low/high/band/notch and combinations, comb/flanger, formant,
+special models; tune comb and formant filters to the harmony when they must follow it.
+
+Each oscillator, SUB and NOISE routes to **Filter** (FILTER 1, 2 or both), **Main** (into the
+FX), **Direct** (past filters and FX) or **None** (silent, still usable as a modulator), plus
+BUS 1/2 sends. Two enabled filters are not automatically in series: write down the whole path.
+In the MIXER, don't count a dry signal twice (direct plus a dry bus).
+
+### Modulation
+
+- **ENV 1-4**: attack, hold, decay, sustain, release and curves. ENV 1 is the amp envelope;
+  ENV 2-4 do nothing without a route. Legato and retrigger change them.
+- **LFOs**: Normal, Path, Chaos (Lorenz, Rossler) or S&H; drawn shape; Free / Retrig /
+  Envelope (one-shot) mode; mono or poly; synced or Hz rate; phase, delay, rise, smoothing.
+- **MATRIX** route: source, optional aux source, destination, depth, polarity, curve, enabled.
+  An envelope, LFO or macro without a route does nothing. Give the base value and both end
+  points in real units. Sources: velocity, note, mod wheel, aftertouch, macros, random, MPE.
+- **Macros**: name the gesture, route every destination with end points, give its start value.
+
+### Effects
+
+Three racks — **MAIN, BUS 1, BUS 2** — processed top to bottom; a module can appear twice, so
+name the rack *and* the slot. For every module: enabled, its controls, MIX and output level.
+
+| Module | Main controls |
+|---|---|
+| Bode | frequency shift, range, direction, delay (synced), feedback, balance, blur |
+| Chorus | rate (sync), delay 1/2 ms, depth, feedback, wet low/high-pass |
+| Compressor | single or multiband, threshold, ratio, attack, release, gain |
+| Convolve | impulse file, size, tone, pre-delay, attack/decay/damp |
+| Delay | normal / ping-pong / tap, synced or ms times L/R, link, feedback, wet filter frequency and Q |
+| Distortion | algorithm, drive, filter type/cutoff/resonance pre or post |
+| Equalizer | two bands: type, frequency, Q, gain |
+| Filter | model, cutoff, resonance, drive, VAR (on the summed voices, not per voice) |
+| Flanger / Phaser | rate (sync), depth, feedback, stereo phase; phaser poles and frequency |
+| Hyper / Dimension | voices, rate, detune, retrigger; dimension size |
+| Reverb | Plate, Hall, Vintage, Nitrous or Basin — each with its own controls (size is not decay time) |
+| Splitter | low/high, low/mid/high or mid/side branches, each with its own modules and gain |
+| Utility | polarity L/R, low/high-pass, mono bass and its frequency, width, pan |
+
+Order matters: distortion before a filter tames its harmonics, after it restores edge; chorus
+before reverb widens what the reverb hears; delay before reverb blurs the echoes, after it
+echoes the whole tail.
+
+### Performance and global
+
+Polyphony, mono/legato, portamento time/curve/always, pitch-bend range, master level (long
+releases with unison or grains multiply the voice count — set a budget). **ARP** and **CLIP**
+generate notes inside Serum: keep both off when the Live clip should decide what plays.
+**GLOBAL**: voice control (per-voice pan/detune/cutoff/envelope randomization), quality,
+Serum 1 compatibility, tuning (A=440, tuning file, MTS-ESP) — keep the tuning unless asked.
+
+### Recipe: Mystic Halo (new pitched FX texture)
+
+An original proposal, not a factory patch: a slow upper-mid shimmer around held chord tones.
+Start from Init (on a new track only); ARP/CLIP off, BUS sends 0, SUB/NOISE/C off, warps off.
+
+| Area | Target |
+|---|---|
+| OSC A | Single-cycle triangle (confirm the table), tracking on, unison 3, detune ~0.06, blend 70 %, RAND 100 %, level 55 % |
+| OSC B | Single-cycle sine, +1 oct +7 semitones, unison 1, RAND 100 %, level 14 % |
+| Filter | A+B -> FILTER 1 -> Main; MG Low 12, 1800 Hz, resonance 12 %, drive 8 %; FILTER 2 off |
+| ENV 1 | A 1200 ms, H 0, D 2400 ms, S 75 %, R 3800 ms |
+| LFO 1 | sine 0.07 Hz free, mono -> Filter 1 cutoff 1400-2300 Hz |
+| LFO 2 | sine 0.11 Hz free, mono -> OSC B level 10-18 % |
+| MAIN FX | 1 Chorus 0.18 Hz, 8/13 ms, depth 20 %, mix 18 %; 2 Delay ping-pong dotted 1/8, feedback 24 %, wet 2.5 kHz, mix 14 %; 3 Reverb Hall size 70 %, pre-delay 30 ms, decay 4.8 s, mix 28 % |
+| Voices | poly 12, no legato, bend ±2, master -12 dB |
+| Gesture | mod wheel -> Filter 1 cutoff 1800-3500 Hz and Hall mix 28-38 % |
+
+Notes: the root or fifth held for 2-4 bars, high register, a little overlap. Audition at
+matched level; shorten the tail or the mix if it covers the lead.
+
+### Improving an existing patch
+
+Keep its preset, sources, FX and automation; pick the one change that answers the complaint:
+- **Static**: a 0.09 Hz sine LFO on WT POS, ±5 % around its position (multi-frame tables), or
+  cutoff ±2 semitones for a single-cycle source.
+- **Flat attack**: ENV 2 (A 10 ms, D 350 ms, S 0, R 200 ms) -> cutoff, up one octave from its
+  base — unless a route already does that.
+- **Thin body**: a quiet second source, same octave, sine, single voice, ~18 dB under the main
+  one, through the same filter (an octave down fights the bass).
+- **No expression**: mod wheel -> cutoff up one octave, optionally one FX mix +8 points.
+
+### Saving
+
+A new preset under a new name, never over the user's. `live_preset_load` publishes the file as
+a `.vstpreset` and loads it; saving inside Serum's own browser stays manual.

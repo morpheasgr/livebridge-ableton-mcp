@@ -23,10 +23,10 @@ More companions next to this file (also MCP resources), read the one that fits t
 | File | Resource | Read it when |
 |---|---|---|
 | `GENRES.md` | `livebridge://genres` | writing drums, bass, chords or sounds in a named genre: techno, hardgroove, house, UK garage, speed garage, trance, Reese/growl/dubstep, synthwave, acid, ambient, hip-hop/trap/DnB grooves, loop-to-track |
-| `SERUM.md` | `livebridge://serum` | designing or tweaking a Serum 2 sound: parameter cheat sheet, recipes (sub, 808, Reese, growl, acid, supersaw, pluck, pad, riser), what the API cannot change |
+| `SERUM.md` | `livebridge://serum` | designing or tweaking a Serum 2 sound: parameter cheat sheet, recipes (sub, 808, Reese, growl, acid, supersaw, pluck, pad, riser), what the API cannot change, every Serum 2 control (oscillator modes, granular, spectral, routing, matrix, FX racks) |
 | `SERUM_PRESETS.md` | `livebridge://serum-presets` | a Serum 2 sound beyond the 128 exposed knobs: a new preset designed as a file (wavetables, oscillator modes, matrix routes, FX order), "make this preset darker/faster", copying a wavetable or FX rack from another preset, then `live_preset_load` |
 | `OMNISPHERE.md` | `livebridge://omnisphere` | designing or improving an Omnisphere 2/3 sound: sources, granular, filters, modulation, Orb, effects, recipes; what Live can reach (Configure) |
-| `WORKFLOWS.md` | `livebridge://workflows` | extending an arrangement, co-writing parts with the user, starting a project, grooves and MIDI cleanup, chords, mix diagnosis, side-chain, reference matching, mix check / pre-master audit, vocal chain, session snapshot |
+| `WORKFLOWS.md` | `livebridge://workflows` | extending an arrangement, co-writing parts with the user, starting a project, grooves and MIDI cleanup, chords, mix diagnosis, side-chain, reference matching, mix check / pre-master audit, vocal chain, session snapshot, technical check, parallel compression, mastering chain, send effects, adding one section (drop, breakdown, buildup, intro, outro), designing a synth sound with its manual-settings hand-off |
 
 ## 1. Start every session the same way
 

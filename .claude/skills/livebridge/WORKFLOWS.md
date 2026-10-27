@@ -4,7 +4,8 @@ Companion to `SKILL.md` (tools), `PRODUCTION.md` (how a track works), `GENRES.md
 genre) and `SERUM.md` (Serum 2). This file is step-by-step procedures for common requests:
 extending an arrangement, co-writing, grooves, MIDI cleanup, chords, mix diagnosis, side-chain,
 reference matching, pre-master checks, vocal chains, tempo and session snapshots, technical
-checks and layer alignment, parallel compression, a mastering chain and creative send effects. Several are
+checks and layer alignment, parallel compression, a mastering chain, creative send effects, adding
+one section and designing a synth sound. Several are
 adapted from glincker/ableton-skills (MIT, see `THIRD_PARTY_NOTICES.md`).
 
 **Principles in every workflow**
@@ -436,3 +437,122 @@ on **returns**, fed by sends, so one space glues several parts (`PRODUCTION.md` 
 3. Keep the low end out of every return (high-pass 150-300 Hz) and check mono: send effects
    are the usual source of a wide, phasey low end (`live_engine_listen` -> `low_end_width`).
 
+
+## 16. Add one section
+
+User: *"add a breakdown after the last drop"*, *"a 32-bar drop at bar 65"*, *"a buildup at bar
+49"*, *"give it an intro"*. One section in an existing arrangement; a whole song from a loop is
+§1. Adapted from kasperikaivola's ableton-mcp-pro `arrangement-sections` skill (MIT,
+`THIRD_PARTY_NOTICES.md`). Do not change the tempo.
+
+1. **Read**: `live_set_snapshot(detail="minimal")` (signature, tracks),
+   `live_arrangement_overview(include_empty=false)` and `live_cue_list()`. Positions: give
+   tools bars with `unit="bars"` (1-based) or beats; one bar is `numerator * 4 / denominator`
+   beats (4/4 = 4, 6/8 = 3).
+2. **The range.** The user's bar and length win. Default length: buildup 8 bars, everything
+   else 16. *After the last drop* starts at the end of the last drop, rounded up to a bar. Find
+   that drop in this order:
+   1. the latest cue whose name contains "drop" (it runs to the next cue, or 16 bars);
+   2. the latest arrangement clip named "drop";
+   3. density: the last run of bars where a drum track and a bass track both have clips.
+   Nothing found: say so and write nothing (an empty set still takes a section at a given bar).
+3. **Roles** from the track name, otherwise the instrument: kick/snare/hat/perc/drum = drums;
+   bass/sub = bass; pad/chord/stab/keys = harmonic; lead/pluck = lead; fx/riser/noise/atmos =
+   fx. Skip group tracks.
+4. **Overlap.** List the clips wholly inside the range and those that cross its edges
+   (`live_arrangement_clips(start=..., end=..., unit="bars")`). Delete a clip
+   (`live_arrangement_delete_clip`) only when it lies wholly inside and its track must change
+   for this section; read its notes first if it is the source you copy from. A clip that
+   crosses an edge: shorten it with `live_arrangement_resize_clip` only when the user agreed,
+   otherwise leave it and report it. A buildup only adds.
+5. **Write the section** (table below). Repeat material that exists rather than inventing:
+   - a session loop: `live_arrangement_duplicate_clip(track=..., slot=..., time=...,
+     length=..., unit="bars")` (repeats it to fill, clip envelopes recorded as lanes);
+   - an arrangement passage: `live_arrangement_copy_range(start=..., end=..., destination=...,
+     tracks=[...], unit="bars")` (lanes come along);
+   - new notes: `live_arrangement_create_clip(track=..., start=..., length=..., unit="bars")`,
+     then `live_clip_write_pattern` / `live_clip_add_notes` on the returned clip; a role
+     without material gets notes from `GENRES.md`;
+   - an audio hit: `live_sample_search(query="crash")` (or "impact"), then
+     `live_arrangement_create_clip(track=<free audio track>, start=..., file_path=...)`;
+     `live_tracks_create(type="audio", name="FX")` only when no audio track is free there.
+6. **Automation is part of the section**, not a manual step: sweeps, send rises and fades with
+   `live_automation_record(..., start=..., end=..., speed="fast")` (one recording at a time;
+   wait for `finished`).
+7. **Mark and check**: `live_cue_add(time=..., name="Breakdown")`, then
+   `live_arrangement_overview` over the section. Report the start bar, the length, what was
+   written, what was left in place and the automation recorded.
+
+| Section | What it does |
+|---|---|
+| **Drop** | Full energy: repeat the fullest 4- or 8-bar loop on drums, bass and harmonic tracks, drums not thinned; a crash on beat 1; other roles left alone unless a clip inside the range blocks them |
+| **Breakdown** | Pads, chords, atmospheres and fx stay; no kick, no main bass (delete only clips wholly inside). Last 4 bars: a snare or clap roll of 16ths, velocity rising 40 -> 110. Automate a low-pass opening or a reverb send rise over the last bars |
+| **Interlude** | New sparse material, not a thinned drop: a 2-bar motif on a pad or lead tiled across, kick only on beat 1 of each bar (or none), the drop bass not copied unchanged; a new MIDI track for the motif when no pad or lead can take it |
+| **Buildup** | Adds on top of the groove: a snare/clap 16th roll over the last 4 bars (last 8 when the build is 16+), velocity 40 -> 110; hat 16ths at 70-100 where the hat track is empty; a rising line of 8ths from the root to the octave on a lead or a new riser track (Auto Filter + Reverb after it). Record the high-pass or filter sweep, the riser send and a volume swell; crash on the next downbeat. Don't raise a send on a track that also plays outside the range — automate it |
+| **Intro** | Drums throughout, bass and harmonic parts from the midpoint, crash on the last downbeat |
+| **Outro** | Harmonic and fx throughout, drums and bass for the first half; a volume or filter fade on the master or the music group over the last bars |
+
+## 17. Design a synth sound (Serum 2 or Omnisphere)
+
+User: *"add a mystical FX synth to make this fuller"*, *"make a Serum preset for this style"*,
+*"the lead sounds bland, ideas?"*, *"make this preset darker"*. Adapted from kasperikaivola's
+ableton-mcp-pro synth sound-design skill and guide overview (MIT, `THIRD_PARTY_NOTICES.md`).
+
+**What the request allows**
+
+| Request | Do |
+|---|---|
+| "Add a … synth", "a new sound for …" | Read the song, design the sound, create the track and load it — no extra approval needed |
+| "Create a Serum 2 preset in this style" | Design and write a new `.SerumPreset` (`SERUM_PRESETS.md`); a file-only request needs no Live connection |
+| "Make this preset darker / faster / bouncier" | Edit the preset file into a new file (`live_preset_edit`), keep the original and everything unrelated; "faster" never means the song tempo |
+| "Suggest", "ideas", "why is it bland" | Read-only: one recommended change plus up to two options, nothing written |
+| "Improve / change this patch" | Small targeted writes with before values read back; never Init an existing patch |
+
+**Read the context first**
+1. `live_set_snapshot` (tempo, key, tracks), `live_tracks_get` on the target and its
+   neighbours, the section's clips and notes (`live_clip_get_notes`, `live_theory_analyze`)
+   for key, register and rhythm. Say what the evidence is ("from the MIDI and track names");
+   don't claim to have heard anything without `live_engine_listen` or a bounce.
+2. An existing synth: `live_device_parameters` (no filter) for the reachable controls; a
+   Serum preset file holds the rest (`live_preset_inspect`).
+3. Choose the smallest addition that fills a real gap: a quiet mid texture, transient detail or
+   movement often helps more than another pad or bass. State role, register, density and
+   width, and how it stays out of the existing parts' way.
+
+**Choose the synth**
+
+| Need | First choice | Why |
+|---|---|---|
+| Precise animated timbre, digital FX, clean modulation | Serum 2 | Wavetables, warp and matrix are all designable in the preset file |
+| Organic, cinematic, acoustic or choir textures, hybrid atmospheres | Omnisphere | Soundsource layers and granular; Live reaches only Configured parameters (`OMNISPHERE.md`) |
+| Improving an existing patch | Its own synth | Keep its identity; don't swap the instrument |
+| The synth isn't installed (`live_plugin_list`) | Say so | Offer a design for one that is (Wavetable, Operator, Drift); never substitute silently |
+
+**New Serum 2 sound**: design the whole patch as a file — sources, sub/noise, filters and
+routing, envelopes, LFOs and matrix routes, FX order, voicing (`SERUM_PRESETS.md`; controls in
+`SERUM.md` §6). One or two changes from a template is not a new preset; check with
+`live_preset_compare` against the template. Then `live_preset_load(source_path=...,
+track_name=...)` creates the track with Serum 2 and that patch (don't load a second Serum
+from the browser). Add a clip only when asked or to audition it.
+
+**New Omnisphere sound or another plug-in**: `live_browser_load(query="Omnisphere",
+category="plugin", new_track=true, track_name=...)`, read the exposed parameters, set the
+mapped ones, everything else goes in the hand-off list.
+
+**Hand-off.** End with the design in chat: role and rationale, observed context and
+assumptions, the patch (or the targeted change), what was verified, then one list per
+instance with every setting Claude could not apply:
+
+```text
+Serum 2 — manual settings            (or: Omnisphere — manual settings, with version, Part, Layer)
+Track: <name>, device <n>, role: <role>
+Section / control | Desired value (units) | Status
+```
+
+Status is one of: *verified* (written and read back), *in the preset file, loaded* (set by
+`live_preset_load`; not read back knob by knob), *in the preset file, not loaded* (give the
+path), *not applied — set manually*. Values in real units (Hz, ms, dB, cents, %, note
+divisions), never a guessed 0-1 number; modulation as source -> destination, base, end points,
+rate, sync and retrigger. Automation is recorded with `live_automation_record`, not listed. If
+nothing is left: "No manual settings required." Never call a sound finished while manual
+steps remain.

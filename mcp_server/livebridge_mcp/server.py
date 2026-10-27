@@ -156,7 +156,7 @@ COMPANIONS = (
      "hip-hop/trap/DnB"),
     ("SERUM.md", "livebridge://serum", "livebridge_serum",
      "LiveBridge Serum 2 sound design (SERUM.md): parameter cheat sheet, recipes (sub, Reese, "
-     "growl, acid, supersaw, pluck, pad), what the API cannot change"),
+     "growl, acid, supersaw, pluck, pad), what the API cannot change, every Serum 2 control"),
     ("SERUM_PRESETS.md", "livebridge://serum-presets", "livebridge_serum_presets",
      "LiveBridge Serum 2 preset files (SERUM_PRESETS.md): designing, editing and loading complete "
      "Serum 2 presets — wavetables, matrix, FX — with the live_preset_* tools"),
@@ -165,7 +165,8 @@ COMPANIONS = (
      "effects and recipes, and what Live can reach"),
     ("WORKFLOWS.md", "livebridge://workflows", "livebridge_workflows",
      "LiveBridge workflows (WORKFLOWS.md): extend an arrangement, co-write parts, start a "
-     "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit"),
+     "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit, "
+     "add one section, design a synth sound"),
 )
 
 _SKILL_FALLBACK = """# LiveBridge workflow
