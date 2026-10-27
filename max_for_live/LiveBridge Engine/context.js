@@ -5,15 +5,25 @@
 // asking once it runs) and again when the track is renamed. engine.js puts it in the registry
 // file the MCP server reads. Nothing is sent while Live's API cannot place the device yet;
 // engine.js asks again.
+//
+// Also, for the parameter modulation in engine.js: "resolve <slot> <path...>" answers
+// "resolved <slot> <id> <min> <max> <value> <name...>" (id 0 when nothing is there), and the
+// transport is reported as "transport <beat> <tempo> <playing>" when it changes (song position
+// at most every 50 ms while playing).
 
 autowatch = 0;
 inlets = 1;
 outlets = 1;
 
 var nameObserver = null;
+var transportObservers = null;
+var transportState = { beat: 0, tempo: 120, playing: 0 };
+var lastPositionReport = 0;
+var POSITION_EVERY_MS = 50;
 
 function bang() {
     report();
+    observeTransport();
     var track = nameObserver === null ? trackOf() : null;
     if (track !== null) {
         nameObserver = new LiveAPI(onName, track.unquotedpath);
@@ -25,6 +35,69 @@ function onName(args) {
     if (args && args[0] === "name") {
         report();
     }
+}
+
+function observeTransport() {
+    if (transportObservers !== null) {
+        sendTransport();
+        return;
+    }
+    var song = new LiveAPI("live_set");
+    if (!song || song.id == 0) {
+        return;
+    }
+    transportState.tempo = Number(song.get("tempo")) || 120;
+    transportState.playing = Number(song.get("is_playing")) ? 1 : 0;
+    transportState.beat = Number(song.get("current_song_time")) || 0;
+    transportObservers = [];
+    var watch = function (property) {
+        var api = new LiveAPI(onTransport, "live_set");
+        api.property = property;
+        transportObservers.push(api);
+    };
+    watch("tempo");
+    watch("is_playing");
+    watch("current_song_time");
+    sendTransport();
+}
+
+function onTransport(args) {
+    if (!args || args.length < 2) {
+        return;
+    }
+    var value = Number(args[1]);
+    if (args[0] === "tempo") {
+        transportState.tempo = value || 120;
+    } else if (args[0] === "is_playing") {
+        transportState.playing = value ? 1 : 0;
+    } else if (args[0] === "current_song_time") {
+        transportState.beat = value;
+        var now = new Date().getTime();
+        if (now - lastPositionReport < POSITION_EVERY_MS) {
+            return;
+        }
+        lastPositionReport = now;
+    } else {
+        return;
+    }
+    sendTransport();
+}
+
+function sendTransport() {
+    outlet(0, "transport", transportState.beat, transportState.tempo, transportState.playing);
+}
+
+function resolve() {
+    var parts = arrayfromargs(arguments);
+    var slot = parts.shift();
+    var api = new LiveAPI(parts.join(" "));
+    if (!api || api.id == 0 || api.type !== "DeviceParameter") {
+        outlet(0, "resolved", slot, 0, 0, 0, 0);
+        return;
+    }
+    var name = api.get("name");
+    outlet(0, "resolved", slot, Number(api.id), Number(api.get("min")), Number(api.get("max")),
+           Number(api.get("value")), name && name.length ? String(name.join(" ")) : "");
 }
 
 function trackOf() {

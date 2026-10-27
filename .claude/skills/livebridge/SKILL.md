@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~190 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~192 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -186,6 +186,12 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     `live_engine_masking(seconds=8)` (fader levels included, muted tracks skipped).
   - *Capture*: `live_engine_capture(seconds=8, tracks=["master"])` -> WAV paths for
     `live_audio_analyze` (tempo, key, energy), `live_audio_compare` or `live_sample_import`.
+  - *Movement*: `live_engine_modulate(track="Bass", device="Auto Filter", parameter=
+    "Frequency", shape="sine", rate="2 bars", depth=0.4)` sweeps a parameter in time with the
+    song (also "1/8d", "1/16t", "0.5 Hz"; shapes triangle, saw, square, random,
+    smooth_random, steps=[...]); nothing is written and `live_engine_unmodulate` puts the
+    value back. Use it to audition movement; when the user likes it, write it as automation
+    (`live_automation_*`) — modulations are not saved with the set.
   No device -> the tool says how to add it; don't insist.
 
 ## 4c. Remember, keep sounds, generate, compare

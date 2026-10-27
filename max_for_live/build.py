@@ -34,6 +34,7 @@ ENGINE_GENDSP = ENGINE_DIR / "lb_engine.gendsp"
 AUDIO_EFFECT = 0x61616161          # 'aaaa'
 MIDI_EFFECT = 0x6D6D6D6D           # 'mmmm'
 FRAME_MS = 100
+MOD_SLOTS = 8                       # live.remote~ objects (engine.js MOD_SLOTS)
 APP_VERSION = {"major": 9, "minor": 0, "revision": 7, "architecture": "x64", "modernui": 1}
 
 #: (name, low Hz, high Hz) — the same bands as livebridge_mcp.audio_analysis.BANDS.
@@ -245,8 +246,13 @@ def engine_patcher() -> dict:
         _box("obj-thisdevice", "live.thisdevice", [440.0, 220.0, 90.0, 22.0], 1, 3,
              ["bang", "int", "int"]),
         _box("obj-context", "js context.js", [440.0, 260.0, 90.0, 22.0], 1, 1),
-        _box("obj-route", "route status log context capture", [120.0, 340.0, 200.0, 22.0],
-             1, 5),
+        _box("obj-route", "route status log context capture resolve mod",
+             [120.0, 340.0, 300.0, 22.0], 1, 7),
+        # parameter lookups for the modulation go to context.js as "resolve <slot> <path...>"
+        _box("obj-resolve", "prepend resolve", [560.0, 220.0, 100.0, 22.0], 1, 1),
+        # "mod <slot> value <v> [ms]" / "mod <slot> id <n>" -> one live.remote~ per slot
+        _box("obj-modslot", "route " + " ".join(str(i) for i in range(MOD_SLOTS)),
+             [700.0, 380.0, 200.0, 22.0], 1, MOD_SLOTS + 1),
         # recording for captures: "open <path>", 1 (start), 0 (stop and close) from engine.js
         _box("obj-sfrecord", "sfrecord~ 2", [20.0, 380.0, 80.0, 22.0], 2, 1, ["signal"]),
         _box("obj-set", "prepend set", [120.0, 380.0, 80.0, 22.0], 1, 1),
@@ -269,9 +275,23 @@ def engine_patcher() -> dict:
         _line("obj-node", 0, "obj-route", 0), _line("obj-route", 0, "obj-set", 0),
         _line("obj-set", 0, "obj-status", 0), _line("obj-route", 1, "obj-print", 0),
         _line("obj-route", 2, "obj-context", 0), _line("obj-route", 3, "obj-sfrecord", 0),
-        _line("obj-route", 4, "obj-print", 0),
+        _line("obj-route", 4, "obj-resolve", 0), _line("obj-resolve", 0, "obj-context", 0),
+        _line("obj-route", 5, "obj-modslot", 0), _line("obj-route", 6, "obj-print", 0),
         _line("obj-plugin", 0, "obj-sfrecord", 0), _line("obj-plugin", 1, "obj-sfrecord", 1),
     ]
+    for i in range(MOD_SLOTS):
+        x = 700.0 + 110.0 * i
+        boxes += [
+            _box(f"obj-modroute{i}", "route value id", [x, 420.0, 90.0, 22.0], 1, 3),
+            _box(f"obj-line{i}", "line~", [x, 460.0, 40.0, 22.0], 2, 2, ["signal", "bang"]),
+            _box(f"obj-modid{i}", "prepend id", [x + 45.0, 460.0, 60.0, 22.0], 1, 1),
+            _box(f"obj-remote{i}", "live.remote~", [x, 500.0, 80.0, 22.0], 2, 0),
+        ]
+        lines += [_line("obj-modslot", i, f"obj-modroute{i}", 0),
+                  _line(f"obj-modroute{i}", 0, f"obj-line{i}", 0),
+                  _line(f"obj-line{i}", 0, f"obj-remote{i}", 0),
+                  _line(f"obj-modroute{i}", 1, f"obj-modid{i}", 0),
+                  _line(f"obj-modid{i}", 0, f"obj-remote{i}", 1)]
     # metro -> trigger fires right to left: every snapshot~ reports into the pack, the
     # leftmost (pack's hot inlet) last, so one complete frame leaves per tick
     for i in range(n):

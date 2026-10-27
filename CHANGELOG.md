@@ -22,6 +22,11 @@ the MCP server package and the installer have their own version numbers. `live_s
   device and runs the masking analysis at fader level, skipping muted tracks;
   `live_engine_listen(track="all")` reads every device over one window. The device now also
   reports which track it is on when Node for Max starts after the device.
+- **Live parameter modulation** (`live_engine_modulate`, `live_engine_unmodulate`; device
+  1.2.0): tempo-synced LFOs (sine, triangle, saw, ramp down, square, random, smooth random) and
+  step sequences on any device or mixer parameter, locked to Live's song position ("1 bar",
+  "1/8d", "1/16t") or free ("0.5 Hz"), through the device's 8 `live.remote~` slots: no
+  automation, no undo steps, nothing saved with the set; stopping restores the value.
 - **Production knowledge for Claude**, next to the skill and served as MCP resources:
   `GENRES.md` (`livebridge://genres`: drum patterns, bass lines, chords and sounds for techno,
   hardgroove, house, UK and speed garage, trance, bass music, synthwave, acid, ambient and

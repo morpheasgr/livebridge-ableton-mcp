@@ -227,6 +227,15 @@ module.exports = {
   addHandler: (name, fn) => { global.__maxHandlers[name] = fn; },
   outlet: (...args) => {
     fs.appendFileSync(process.env.OUTLET_LOG, JSON.stringify(args) + "\n");
+    if (args[0] === "resolve") {
+      // like context.js: parameters 99 does not exist; everything else is a 20..20000 knob at
+      // 1000 whose id is 100 + the parameter index
+      const last = Number(args[args.length - 1]);
+      const index = Number.isInteger(last) ? last : 50;
+      setImmediate(() => global.__maxHandlers.resolved(
+        args[1], index === 99 ? 0 : 100 + index, 20, 20000, 1000, "Filter", "Freq"));
+      return;
+    }
     if (args[0] !== "capture") {
       return;
     }
@@ -522,3 +531,178 @@ def test_live_masking_uses_fader_levels_and_skips_muted_tracks(engines, tcp_brid
 
     assert call_tool(app, "live_engine_masking", {"tracks": ["Bass"]})["type"] == "bad_args"
     assert call_tool(app, "live_engine_masking", {"seconds": 1})["type"] == "bad_args"
+
+
+# ----------------------------------------------------------------------------- step 3: live
+# parameter modulation
+
+def test_rates_and_paths():
+    assert engine.parse_rate("1 bar") == {"beats": 4.0}
+    assert engine.parse_rate("2 bars") == {"beats": 8.0}
+    assert engine.parse_rate("3 beats") == {"beats": 3.0}
+    assert engine.parse_rate("1/4") == {"beats": 1.0}
+    assert engine.parse_rate("1/8d") == {"beats": 0.75}
+    assert engine.parse_rate("1/16T") == {"beats": pytest.approx(1 / 6)}
+    assert engine.parse_rate("0.5 Hz") == {"hz": 0.5}
+    assert engine.parse_rate(2) == {"beats": 2.0}
+    for bad in ("fast", "1/0", "", True):
+        with pytest.raises(ValueError):
+            engine.parse_rate(bad)
+    assert engine.lom_to_max("song.tracks[0].devices[1].parameters[3]") == \
+        "live_set tracks 0 devices 1 parameters 3"
+    assert engine.lom_to_max("song.master_track.mixer_device.volume") == \
+        "live_set master_track mixer_device volume"
+    assert engine.lom_to_max("song.tracks[2].devices[0].drum_pads[36].chains[0]."
+                             "devices[0].parameters[5]").startswith(
+        "live_set tracks 2 devices 0 drum_pads 36 chains 0")
+    for bad in ("tracks[0]", "song", "song.tracks[x]", "live_set tracks 0"):
+        with pytest.raises(ValueError):
+            engine.lom_to_max(bad)
+
+
+SHAPE_SCRIPT = r"""
+const engine = require(process.argv[1]);
+const mod = { shape: "", beats: 4, hz: null, low: 0.25, high: 0.75, phase: 0, min: 0, max: 100,
+              started: 0, seed: 7, steps: [0, 1, 0.5, 1] };
+const out = {};
+for (const shape of ["sine", "triangle", "saw", "ramp_down", "square", "random",
+                     "smooth_random", "steps"]) {
+  mod.shape = shape;
+  out[shape] = [0, 0.125, 0.25, 0.5, 0.75, 0.999, 1.25].map((c) => engine.shapeAt(mod, c));
+}
+// song position: Live at beat 2 of a 1-bar saw, playing at 120 BPM, reported 250 ms ago
+engine.state.transport = { beat: 2, tempo: 120, playing: true, at: Date.now() - 250 };
+mod.shape = "saw";
+out.synced = engine.modValue(mod, Date.now());
+mod.phase = 0.5;
+out.shifted = engine.modValue(mod, Date.now());
+mod.phase = 0; mod.beats = null; mod.hz = 2; mod.started = Date.now() - 125;
+out.free = engine.modValue(mod, Date.now());
+process.stdout.write(JSON.stringify(out));
+process.exit(0);
+"""
+
+
+def test_modulation_shapes_and_sync(tmp_path):
+    if NODE is None:
+        pytest.skip("node is not installed")
+    env = dict(os.environ, LIVEBRIDGE_ENGINE_DIR=str(tmp_path))
+    done = subprocess.run([NODE, "-e", SHAPE_SCRIPT, str(ENGINE_JS)], capture_output=True,
+                          text=True, env=env, timeout=30)
+    out = json.loads(done.stdout)
+    assert out["sine"][:5] == pytest.approx([0.5, 0.5 + 0.5 * math.sin(math.pi / 4), 1, 0.5, 0])
+    assert out["triangle"][:5] == pytest.approx([0, 0.25, 0.5, 1, 0.5])
+    assert out["saw"][:5] == pytest.approx([0, 0.125, 0.25, 0.5, 0.75])
+    assert out["ramp_down"][1] == pytest.approx(0.875)
+    assert out["square"][:5] == [1, 1, 1, 0, 0]
+    random = out["random"]
+    assert len(set(random[:6])) == 1 and random[6] != random[0] and 0 <= random[0] < 1
+    smooth = out["smooth_random"]
+    assert smooth[0] == pytest.approx(random[0]) and smooth[5] == pytest.approx(random[6],
+                                                                               abs=1e-3)
+    assert out["steps"][:6] == [0, 0, 1, 0.5, 1, 1]
+    # beat 2 + 0.5 beat since the report = 2.5 of 4 beats -> saw 0.625 -> 25 + 50 * 0.625
+    assert out["synced"] == pytest.approx(56.25, abs=0.5)
+    assert out["shifted"] == pytest.approx(25 + 50 * 0.125, abs=0.5)
+    assert out["free"] == pytest.approx(25 + 50 * 0.25, abs=1.0)    # 2 Hz, 125 ms in
+    assert not list(tmp_path.glob("*.json"))
+
+
+def test_live_modulation_end_to_end(engines, tcp_bridge, song):
+    _process, send, outlets = engines()
+    send("context", "master", "Main")
+    _wait_roles(1)
+
+    def sent():
+        return [json.loads(line) for line in outlets.read_text(encoding="utf-8").splitlines()]
+
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    started = call_tool(app, "live_engine_modulate", {
+        "track": "Bass", "device": "Operator", "parameter": "Filter Freq", "shape": "triangle",
+        "rate": "1/4", "depth": 0.5})
+    assert "modulation" in started, started
+    mod = started["modulation"]
+    assert started["engine"] == {"role": "master", "track": "Main"}
+    assert mod["slot"] == 0 and mod["rate"] == {"beats": 1.0}
+    assert mod["path"] == "song.tracks[0].devices[0].parameters[2]"
+    assert (mod["low"], mod["high"]) in ((0.0, 0.5), (0.5, 1.0)) or \
+        mod["high"] - mod["low"] == pytest.approx(0.5)
+    # the first value goes to line~ before live.remote~ gets the parameter's id
+    log = sent()
+    first_value = next(i for i, m in enumerate(log) if m[:3] == ["mod", 0, "value"])
+    take = log.index(["mod", 0, "id", 102])
+    assert first_value < take and ["resolve", 0, "live_set", "tracks", 0, "devices", 0,
+                                   "parameters", 2] in log
+    time.sleep(0.3)
+    values = [m[3] for m in sent() if m[:3] == ["mod", 0, "value"] and len(m) == 5]
+    assert len(values) >= 5 and all(m == 20 for m in
+                                    [x[4] for x in sent() if x[:3] == ["mod", 0, "value"]
+                                     and len(x) == 5])
+    low = 20 + (20000 - 20) * mod["low"]
+    high = 20 + (20000 - 20) * mod["high"]
+    assert all(low - 1 <= v <= high + 1 for v in values) and max(values) - min(values) > 100
+
+    status = call_tool(app, "live_engine_status", {})
+    (running,) = status["devices"][0]["modulations"]
+    assert running["shape"] == "triangle" and running["original"] == 1000
+
+    # again on the same parameter: replaced in its slot
+    again = call_tool(app, "live_engine_modulate", {
+        "track": "Bass", "device": "Operator", "parameter": "Filter Freq", "shape": "steps",
+        "rate": "1 bar", "steps": [0, 1, 0, 1], "low": 0.1, "high": 0.9})
+    assert "modulation" in again, again
+    assert again["modulation"]["slot"] == 0 and again["modulation"]["rate"] == {"beats": 4.0}
+    # a mixer parameter by path takes the next slot
+    volume = call_tool(app, "live_engine_modulate", {
+        "parameter": "song.tracks[1].mixer_device.volume", "shape": "sine", "rate": "2 Hz",
+        "depth": 0.1})
+    assert "modulation" in volume, volume
+    assert volume["modulation"]["slot"] == 1 and volume["modulation"]["rate"] == {"hz": 2.0}
+
+    stopped = call_tool(app, "live_engine_unmodulate", {"track": "Bass", "device": "Operator",
+                                                        "parameter": "Filter Freq"})
+    assert [m["slot"] for m in stopped["stopped"]] == [0]
+    log = sent()
+    assert log.index(["mod", 0, "value", 1000]) < log.index(["mod", 0, "id", 0])
+    assert len(call_tool(app, "live_engine_status", {})["devices"][0]["modulations"]) == 1
+    everything = call_tool(app, "live_engine_unmodulate", {"all": True})
+    assert [m["slot"] for m in everything["stopped"]] == [1]
+    assert call_tool(app, "live_engine_unmodulate", {"all": True})["note"] == \
+        "nothing was modulated"
+
+    # 8 slots per device, then "busy"; a parameter Live does not have is refused
+    device = engine.choose(engine.devices())
+    for index in range(8):
+        engine.request(device, "modulate", {"path": f"live_set tracks 0 devices 0 parameters "
+                                                    f"{index}", "beats": 1})
+    with pytest.raises(engine.EngineError) as busy:
+        engine.request(device, "modulate", {"path": "live_set tracks 0 devices 0 parameters 8",
+                                            "beats": 1})
+    assert busy.value.type == "busy"
+    engine.request(device, "unmodulate", {"all": True})
+    with pytest.raises(engine.EngineError) as missing:
+        engine.request(device, "modulate", {"path": "live_set tracks 0 devices 0 parameters "
+                                                    "99", "beats": 1})
+    assert missing.value.type == "not_found"
+    for args in ({"path": "tracks 0", "beats": 1}, {"path": "live_set tracks 0", "beats": 1,
+                                                    "hz": 1},
+                 {"path": "live_set tracks 0", "beats": 1, "shape": "wobble"},
+                 {"path": "live_set tracks 0", "beats": 1, "low": 2},
+                 {"path": "live_set tracks 0", "beats": 1, "shape": "steps", "steps": []}):
+        with pytest.raises(engine.EngineError) as refused:
+            engine.request(device, "modulate", args)
+        assert refused.value.type == "bad_args", args
+
+
+def test_modulate_argument_checks(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path / "none"))
+    app = create_app(BridgeClient(host="127.0.0.1", port=9, timeout=0.5))
+    for args in ({"parameter": "x", "shape": "wobble"}, {"parameter": "x", "rate": "fast"},
+                 {"parameter": "x", "rate": "100 bars"}, {"parameter": "x", "rate": "50 Hz"},
+                 {"parameter": "x", "shape": "steps"},
+                 {"parameter": "x", "steps": [0.5]}, {"parameter": "x", "phase": 1},
+                 {"parameter": "x", "depth": 2}, {"parameter": "x", "low": 0.2}):
+        assert call_tool(app, "live_engine_modulate", args)["type"] == "bad_args", args
+    assert call_tool(app, "live_engine_unmodulate", {})["type"] == "bad_args"
+    assert call_tool(app, "live_engine_unmodulate", {"all": True, "parameter": 1})["type"] \
+        == "bad_args"

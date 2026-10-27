@@ -11,7 +11,13 @@
 // patch's sfrecord~, driven through the "capture" outlet), starting at a given wall-clock
 // time so several devices record the same moment.
 //
-// Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames" | "capture", "args": {...}}
+// And it modulates Live parameters ("modulate" / "unmodulate"): up to 8 at a time, each through
+// one of the patch's live.remote~ objects (no automation, no undo steps, nothing saved with the
+// set), with LFO shapes or step sequences synced to Live's song position. context.js turns a
+// parameter's path into the id live.remote~ needs and reports the transport.
+//
+// Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames" | "capture" | "modulate" |
+//            "unmodulate", "args": {...}}
 // Answers:  {"id": 1, "ok": true, "result": {...}} or {"id": 1, "ok": false,
 //           "error": {"type": "bad_args", "message": "..."}}
 
@@ -31,7 +37,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -46,6 +52,12 @@ const MAX_LINE = 64 * 1024;
 const MAX_CAPTURE_SECONDS = 60;
 const MAX_CAPTURE_DELAY_MS = 5000;
 const CAPTURE_NAME = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,119}\.wav$/;
+const MOD_SLOTS = 8;                  // live.remote~ objects in the patch
+const MOD_TICK_MS = 20;               // 50 updates a second, each glided over by line~
+const MOD_RESOLVE_MS = 3000;
+const MAX_PATH = /^live_set( [a-z_]+( \d+)?){1,12}$/;
+const SHAPES = ["sine", "triangle", "saw", "ramp_down", "square", "random", "smooth_random",
+  "steps"];
 
 const state = {
   instance: crypto.randomBytes(6).toString("hex"),
@@ -57,6 +69,10 @@ const state = {
   waiters: new Set(),
   port: null,
   capturing: false,
+  mods: new Map(),                    // slot -> modulation
+  resolving: new Map(),               // slot -> callback waiting for context.js
+  transport: null,                    // {beat, tempo, playing, at}
+  ticker: null,
 };
 
 function registryDir() {
@@ -156,6 +172,7 @@ function hello() {
     role: state.role, track: state.track, started: state.started, fields: FRAME_FIELDS,
     frames_buffered: state.frames.length, frame_interval_ms: frameInterval(),
     history_seconds: HISTORY_SECONDS, capture: Boolean(maxApi), capturing: state.capturing,
+    modulations: [...state.mods.values()].map(describeMod), mod_slots: MOD_SLOTS,
   };
 }
 
@@ -225,6 +242,235 @@ function capture(args, reply) {
   }, Math.max(0, delay));
 }
 
+// ---------------------------------------------------------------------------- modulation
+
+function describeMod(mod) {
+  return {
+    slot: mod.slot, path: mod.path, name: mod.name, shape: mod.shape, beats: mod.beats,
+    hz: mod.hz, low: mod.low, high: mod.high, phase: mod.phase, min: mod.min, max: mod.max,
+    original: mod.original, started: mod.started,
+  };
+}
+
+function setTransport(beat, tempo, playing) {
+  state.transport = {
+    beat: Number(beat) || 0, tempo: Number(tempo) || 120, playing: Number(playing) === 1,
+    at: Date.now(),
+  };
+}
+
+// Song position in beats: Live's while playing (extrapolated between reports), otherwise a
+// free-running clock at the song tempo from when the modulation started.
+function beatsFor(mod, now) {
+  const t = state.transport;
+  const tempo = t ? t.tempo : 120;
+  if (t && t.playing) {
+    return t.beat + (now - t.at) / 60000 * tempo;
+  }
+  return (now - mod.started) / 60000 * tempo;
+}
+
+// A repeatable pseudo-random value in 0..1 for cycle n.
+function noise(seed, n) {
+  let x = (Math.imul(n | 0, 2654435761) ^ Math.imul(seed | 0, 1597334677)) >>> 0;
+  x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0;
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+// The shape's value (0..1) at a position measured in cycles.
+function shapeAt(mod, cycles) {
+  const n = Math.floor(cycles);
+  const phase = cycles - n;
+  switch (mod.shape) {
+    case "sine": return 0.5 + 0.5 * Math.sin(2 * Math.PI * phase);
+    case "triangle": return 1 - Math.abs(2 * phase - 1);
+    case "saw": return phase;
+    case "ramp_down": return 1 - phase;
+    case "square": return phase < 0.5 ? 1 : 0;
+    case "random": return noise(mod.seed, n);
+    case "smooth_random": {
+      const a = noise(mod.seed, n);
+      const b = noise(mod.seed, n + 1);
+      return a + (b - a) * (0.5 - 0.5 * Math.cos(Math.PI * phase));
+    }
+    case "steps": return mod.steps[Math.min(mod.steps.length - 1,
+      Math.floor(phase * mod.steps.length))];
+    default: return 0;
+  }
+}
+
+function modValue(mod, now) {
+  const cycles = (mod.hz ? (now - mod.started) / 1000 * mod.hz
+    : beatsFor(mod, now) / mod.beats) + mod.phase;
+  const amount = mod.low + (mod.high - mod.low) * shapeAt(mod, cycles);
+  return mod.min + (mod.max - mod.min) * amount;
+}
+
+function tick() {
+  const now = Date.now();
+  for (const mod of state.mods.values()) {
+    const value = modValue(mod, now);
+    if (mod.last === null || Math.abs(value - mod.last) > (mod.max - mod.min) * 1e-5) {
+      mod.last = value;
+      maxApi.outlet("mod", mod.slot, "value", value, MOD_TICK_MS);   // line~ glides there
+    }
+  }
+}
+
+function startTicker() {
+  if (state.ticker === null && state.mods.size) {
+    state.ticker = setInterval(tick, MOD_TICK_MS);
+  }
+}
+
+function stopTickerIfIdle() {
+  if (state.ticker !== null && !state.mods.size) {
+    clearInterval(state.ticker);
+    state.ticker = null;
+  }
+}
+
+function release(mod) {
+  // back to the value the parameter had, then let go of it
+  maxApi.outlet("mod", mod.slot, "value", mod.original);
+  maxApi.outlet("mod", mod.slot, "id", 0);
+  state.mods.delete(mod.slot);
+  stopTickerIfIdle();
+}
+
+function parseModulation(args) {
+  const shape = String(args.shape || "sine");
+  if (SHAPES.indexOf(shape) < 0) {
+    return { error: "shape must be one of " + SHAPES.join(", ") };
+  }
+  const beats = args.beats === undefined || args.beats === null ? null : Number(args.beats);
+  const hz = args.hz === undefined || args.hz === null ? null : Number(args.hz);
+  if ((beats === null) === (hz === null)) {
+    return { error: "give beats or hz" };
+  }
+  if (beats !== null && !(beats >= 1 / 64 && beats <= 256)) {
+    return { error: "beats must be 1/64..256" };
+  }
+  if (hz !== null && !(hz > 0 && hz <= 40)) {
+    return { error: "hz must be > 0 and <= 40" };
+  }
+  const low = Number(args.low === undefined ? 0 : args.low);
+  const high = Number(args.high === undefined ? 1 : args.high);
+  if (!(low >= 0 && low <= 1 && high >= 0 && high <= 1)) {
+    return { error: "low and high must be 0..1" };
+  }
+  const phase = Number(args.phase || 0);
+  if (!(phase >= 0 && phase < 1)) {
+    return { error: "phase must be 0..1" };
+  }
+  let steps = null;
+  if (shape === "steps") {
+    steps = Array.isArray(args.steps) ? args.steps.map(Number) : [];
+    if (!steps.length || steps.length > 64 || steps.some((v) => !(v >= 0 && v <= 1))) {
+      return { error: "steps: 1..64 values 0..1" };
+    }
+  }
+  return {
+    shape: shape, beats: beats, hz: hz, low: low, high: high, phase: phase, steps: steps,
+    seed: Number(args.seed || 0) | 0,
+  };
+}
+
+function modulate(args, reply) {
+  const target = String(args.path || "");
+  if (!MAX_PATH.test(target)) {
+    reply({ type: "bad_args", message: "path must be a Live object path like 'live_set tracks 0 "
+      + "devices 1 parameters 3'" });
+    return;
+  }
+  const spec = parseModulation(args);
+  if (spec.error) {
+    reply({ type: "bad_args", message: spec.error });
+    return;
+  }
+  if (!maxApi) {
+    reply({ type: "unsupported", message: "modulating needs the device running in Live" });
+    return;
+  }
+  let slot = null;
+  for (const mod of state.mods.values()) {
+    if (mod.path === target) {
+      slot = mod.slot;                    // the same parameter again: replace its modulation
+    }
+  }
+  if (slot === null) {
+    for (let i = 0; i < MOD_SLOTS && slot === null; i++) {
+      if (!state.mods.has(i) && !state.resolving.has(i)) {
+        slot = i;
+      }
+    }
+  }
+  if (slot === null) {
+    reply({ type: "busy", message: "all " + MOD_SLOTS + " modulation slots of this device are "
+      + "in use — stop one, or use another LiveBridge Engine" });
+    return;
+  }
+  const existing = state.mods.get(slot);
+  if (existing) {
+    Object.assign(existing, spec, { started: Date.now(), last: null });
+    reply(null, describeMod(existing));
+    return;
+  }
+  const timer = setTimeout(() => {
+    state.resolving.delete(slot);
+    reply({ type: "timeout", message: "Live did not answer for " + target });
+  }, MOD_RESOLVE_MS);
+  state.resolving.set(slot, (found) => {
+    clearTimeout(timer);
+    state.resolving.delete(slot);
+    if (!found.id) {
+      reply({ type: "not_found", message: "no parameter at " + target });
+      return;
+    }
+    const mod = Object.assign({
+      slot: slot, path: target, id: found.id, name: found.name, min: found.min,
+      max: found.max, original: found.value, started: Date.now(), last: null,
+    }, spec);
+    state.mods.set(slot, mod);
+    // jump line~ to the first value before live.remote~ takes the parameter over
+    mod.last = modValue(mod, Date.now());
+    maxApi.outlet("mod", slot, "value", mod.last);
+    maxApi.outlet("mod", slot, "id", mod.id);
+    startTicker();
+    reply(null, describeMod(mod));
+  });
+  maxApi.outlet("resolve", slot, ...target.split(" ").map((part) =>
+    (/^\d+$/.test(part) ? Number(part) : part)));
+}
+
+// context.js answer: resolved <slot> <id> <min> <max> <value> <name...>
+function resolved(slot, id, min, max, value, ...name) {
+  const waiting = state.resolving.get(Number(slot));
+  if (waiting) {
+    waiting({
+      id: Number(id) || 0, min: Number(min), max: Number(max), value: Number(value),
+      name: name.join(" "),
+    });
+  }
+}
+
+function unmodulate(args, reply) {
+  const stopped = [];
+  for (const mod of [...state.mods.values()]) {
+    if (args.all || mod.path === args.path) {
+      stopped.push(describeMod(mod));
+      if (maxApi) {
+        release(mod);
+      } else {
+        state.mods.delete(mod.slot);
+      }
+    }
+  }
+  stopTickerIfIdle();
+  reply(null, { stopped: stopped });
+}
+
 // sfrecord~ closes the file asynchronously: poll until its size stops changing.
 function waitForFile(file, attempts, done) {
   let last = -1;
@@ -280,6 +526,10 @@ function handle(request, reply) {
     }, seconds * 1000);
   } else if (request.cmd === "capture") {
     capture(args, reply);
+  } else if (request.cmd === "modulate") {
+    modulate(args, reply);
+  } else if (request.cmd === "unmodulate") {
+    unmodulate(args, reply);
   } else {
     reply({ type: "unknown_command", message: "unknown command " + JSON.stringify(request.cmd) });
   }
@@ -368,9 +618,11 @@ function start() {
   if (maxApi) {
     maxApi.addHandler("frame", (...values) => addFrame(values));
     maxApi.addHandler("context", (role, ...track) => setContext(String(role), track.map(String)));
+    maxApi.addHandler("transport", setTransport);
+    maxApi.addHandler("resolved", resolved);
   }
 }
 
 start();
 
-module.exports = { addFrame, setContext, capture, FRAME_FIELDS, state };
+module.exports = { addFrame, setContext, capture, modValue, shapeAt, FRAME_FIELDS, state };

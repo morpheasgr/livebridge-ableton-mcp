@@ -28,8 +28,8 @@ from typing import Any
 from .audio_analysis import BANDS, _flags
 from .config import config_dir
 
-__all__ = ["EngineError", "capture", "capture_dir", "devices", "engine_dir", "request",
-           "select", "summarize"]
+__all__ = ["EngineError", "capture", "capture_dir", "devices", "engine_dir", "lom_to_max",
+           "parse_rate", "request", "select", "summarize"]
 
 FIELDS = ("ms_left", "ms_right", "peak_left", "peak_right", "ms_k",
           "band_sub", "band_bass", "band_low_mid", "band_mud", "band_mid", "band_presence",
@@ -226,6 +226,59 @@ def capture(chosen: list[dict[str, Any]], seconds: float,
     return each(chosen, lambda device: request(
         device, "capture", {"seconds": seconds, "name": by_device[id(device)], "at": at},
         timeout=seconds + lead_ms / 1000.0 + 10.0))
+
+
+# ----------------------------------------------------------------------------- modulation
+
+SHAPES = ("sine", "triangle", "saw", "ramp_down", "square", "random", "smooth_random", "steps")
+_LOM_PART = re.compile(r"^([a-z_]+)(?:\[(\d+)\])?$")
+_RATE = re.compile(r"^\s*(?:(\d+(?:\.\d+)?)\s*(bars?|beats?)|(\d+)\s*/\s*(\d+)\s*([dt])?"
+                   r"|(\d+(?:\.\d+)?)\s*hz)\s*$", re.IGNORECASE)
+
+
+def lom_to_max(path: str) -> str:
+    """LiveBridge's LOM path (``song.tracks[0].devices[1].parameters[3]``) as Max's LiveAPI
+    path (``live_set tracks 0 devices 1 parameters 3``)."""
+    parts = str(path).strip().split(".")
+    if not parts or parts[0] != "song" or len(parts) < 2:
+        raise ValueError(f"not a Live object path: {path!r}")
+    words = ["live_set"]
+    for part in parts[1:]:
+        match = _LOM_PART.match(part)
+        if not match:
+            raise ValueError(f"not a Live object path: {path!r}")
+        words.append(match.group(1))
+        if match.group(2) is not None:
+            words.append(match.group(2))
+    return " ".join(words)
+
+
+def parse_rate(rate: Any, beats_per_bar: float = 4.0) -> dict[str, float]:
+    """``"1 bar"``, ``"2 bars"``, ``"3 beats"``, ``"1/4"``, ``"1/8d"`` (dotted), ``"1/16t"``
+    (triplet) or ``"0.5 Hz"`` -> ``{"beats": n}`` or ``{"hz": f}``. A plain number is in
+    beats."""
+    if isinstance(rate, bool):
+        raise ValueError("rate: give e.g. '1 bar', '1/4', '1/8d', '1/16t' or '0.5 Hz'")
+    if isinstance(rate, (int, float)):
+        return {"beats": float(rate)}
+    match = _RATE.match(str(rate))
+    if not match:
+        raise ValueError(f"rate {rate!r}: give e.g. '1 bar', '2 bars', '1/4', '1/8d', '1/16t' "
+                         "or '0.5 Hz'")
+    count, unit, num, den, mod, hz = match.groups()
+    if hz is not None:
+        return {"hz": float(hz)}
+    if count is not None:
+        value = float(count)
+        return {"beats": value * (beats_per_bar if unit.lower().startswith("bar") else 1.0)}
+    if int(den) == 0:
+        raise ValueError(f"rate {rate!r}: division by zero")
+    beats = 4.0 * int(num) / int(den)            # a whole note is 4 beats
+    if mod and mod.lower() == "d":
+        beats *= 1.5
+    elif mod and mod.lower() == "t":
+        beats *= 2.0 / 3.0
+    return {"beats": beats}
 
 
 def _label(device: dict[str, Any]) -> str:

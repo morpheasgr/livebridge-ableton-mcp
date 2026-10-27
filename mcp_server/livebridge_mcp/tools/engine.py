@@ -2,8 +2,9 @@
 device: `live_engine_status` lists the running devices, `live_engine_listen` reads what is
 playing right now (loudness, peaks, spectral balance, stereo) without bouncing anything,
 `live_engine_compare` is the A/B check of a change, `live_engine_capture` records what the
-devices hear to WAV files and `live_engine_masking` finds the parts that fight for the same
-frequencies while the song plays.
+devices hear to WAV files, `live_engine_masking` finds the parts that fight for the same
+frequencies while the song plays, and `live_engine_modulate` / `live_engine_unmodulate` move
+any parameter with a tempo-synced LFO or step sequence (no automation written).
 
 The device is optional: drop "LiveBridge Engine" (User Library > Presets > Audio Effects >
 Max Audio Effect) on the master track and at the end of the tracks to compare. Without it these
@@ -40,7 +41,11 @@ def _is_error(value: Any) -> bool:
 def _engine_failure(exc: engine.EngineError, cmd: str) -> dict[str, Any]:
     message = str(exc)
     if exc.type == "not_found":
-        return tool_error(message + ". " + _HOW_TO_ADD, type="not_found", cmd=cmd)
+        # the "add the device" hint only when it is the device that is missing
+        missing_device = message.startswith(("no LiveBridge Engine", "no Engine on",
+                                             "only the master has"))
+        return tool_error(message + (". " + _HOW_TO_ADD if missing_device else ""),
+                          type="not_found", cmd=cmd)
     if exc.type in ("bad_args", "busy", "unsupported", "capture_failed", "io"):
         kind = {"bad_args": "bad_args", "unsupported": "unsupported"}.get(exc.type,
                                                                           "invalid_state")
@@ -104,11 +109,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{devices:[{role ("master"|"track"), track, version, frames_buffered,
-            frame_interval_ms, started}], hint?}`.
+            frame_interval_ms, started, modulations:[{slot, path, name, shape, beats|hz,
+            low, high, phase}]}], hint?}`.
         """
         found = engine.devices()
         keep = ("role", "track", "version", "frames_buffered", "frame_interval_ms",
-                "started", "instance")
+                "started", "instance", "modulations")
         result: dict[str, Any] = {"devices": [{k: d.get(k) for k in keep} for d in found]}
         if not found:
             result["hint"] = _HOW_TO_ADD
@@ -411,4 +417,191 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         is_playing = playing()
         if is_playing is False:
             result["notes"].append("Live's transport was stopped while recording.")
+        return result
+
+    def parameter_target(cmd: str, parameter: Any, track: Any, device: Any
+                         ) -> dict[str, Any]:
+        args = {"parameter": parameter, "track": track, "device": device}
+        info = bridge_call(bridge, "devices.get_parameter",
+                           {k: v for k, v in args.items() if v is not None})
+        if _is_error(info) or not isinstance(info, dict):
+            return info if isinstance(info, dict) else tool_error(
+                "unexpected answer from Live", type="internal", cmd=cmd)
+        if not info.get("path"):
+            return tool_error("Live gave no path for this parameter", type="invalid_state",
+                              cmd=cmd)
+        try:
+            info["max_path"] = engine.lom_to_max(info["path"])
+        except ValueError as exc:
+            return tool_error(str(exc), type="invalid_state", cmd=cmd)
+        return info
+
+    @mcp.tool()
+    def live_engine_modulate(
+        parameter: int | str,
+        track: int | str | None = None,
+        device: int | str | None = None,
+        shape: str = "sine",
+        rate: str | float = "1 bar",
+        depth: float = 0.5,
+        center: float | None = None,
+        low: float | None = None,
+        high: float | None = None,
+        phase: float = 0.0,
+        steps: list[float] | None = None,
+        seed: int | None = None,
+    ) -> Any:
+        """Move a parameter continuously while the song plays — a tempo-synced LFO or step
+        sequence on any device or mixer parameter (filter sweeps, tremolo, auto-pan, gated
+        sends, wobble), run by the LiveBridge Engine device. Nothing is written: no
+        automation, no undo steps, and the set is not changed — stop it and the parameter goes
+        back to its value. Calling it again on the same parameter replaces the modulation.
+
+        Args:
+            parameter, track, device: Like `live_device_set_parameter` (name/index, or a LOM
+                path such as a mixer volume "song.tracks[0].mixer_device.volume").
+            shape: "sine", "triangle", "saw" (up), "ramp_down", "square", "random" (a new value
+                every cycle), "smooth_random" or "steps" (with `steps`).
+            rate: One cycle: "1 bar", "2 bars", "3 beats", "1/4", "1/8d" (dotted), "1/16t"
+                (triplet) — locked to Live's song position while playing — or "0.5 Hz" (free).
+                With "steps", the length of the whole sequence.
+            depth: How far it swings, as a share of the parameter's range (0..1), around
+                `center` (a share of the range, default the parameter's current value).
+            low, high: Or give the swing directly as shares of the range (0..1).
+            phase: Start of the cycle (0..1), e.g. 0.5 for a second LFO in opposite phase.
+            steps: For shape="steps": 1..64 values 0..1 (share of the range between low and
+                high), played evenly over `rate`.
+            seed: Seed for the random shapes (same seed, same values).
+
+        Returns:
+            `{modulation:{slot, parameter, path, shape, rate:{beats|hz}, low, high, phase,
+            range:{min, max}, original}, engine:{role, track}}`.
+
+        Gotchas: needs the LiveBridge Engine device (any one in the set does it; 8 parameters
+        per device). While modulated the parameter is greyed out in Live and its automation
+        and your mouse are ignored. Modulations end when the Engine is removed or Live quits,
+        and they are not saved with the set — write automation (`live_automation_*`) to keep a
+        movement.
+        """
+        cmd = "engine.modulate"
+        if shape not in engine.SHAPES:
+            return tool_error(f"shape must be one of {', '.join(engine.SHAPES)}", cmd=cmd)
+        try:
+            timing = engine.parse_rate(rate)
+        except ValueError as exc:
+            return tool_error(str(exc), cmd=cmd)
+        if "beats" in timing and not 1 / 64 <= timing["beats"] <= 256:
+            return tool_error("rate must be 1/64 beat .. 64 bars", cmd=cmd)
+        if "hz" in timing and not 0 < timing["hz"] <= 40:
+            return tool_error("rate in Hz must be > 0 and <= 40", cmd=cmd)
+        if shape == "steps":
+            if not steps or len(steps) > 64 or any(not 0 <= v <= 1 for v in steps):
+                return tool_error("steps: 1..64 values 0..1", cmd=cmd)
+        elif steps is not None:
+            return tool_error("steps only go with shape='steps'", cmd=cmd)
+        if not 0 <= phase < 1:
+            return tool_error("phase must be 0..1 (exclusive)", cmd=cmd)
+        for label, value in (("depth", depth), ("center", center), ("low", low),
+                             ("high", high)):
+            if value is not None and not 0 <= value <= 1:
+                return tool_error(f"{label} must be 0..1 (a share of the parameter's range)",
+                                  cmd=cmd)
+        if (low is None) != (high is None):
+            return tool_error("give both low and high, or depth/center", cmd=cmd)
+        info = parameter_target(cmd, parameter, track, device)
+        if _is_error(info):
+            return info
+        lo_value, hi_value = float(info.get("min", 0.0)), float(info.get("max", 1.0))
+        span = hi_value - lo_value
+        if span <= 0:
+            return tool_error("this parameter has no range to modulate", type="invalid_state",
+                              cmd=cmd)
+        if low is None:
+            here = center if center is not None else min(1.0, max(0.0, (float(
+                info.get("value", lo_value)) - lo_value) / span))
+            low, high = here - depth / 2, here + depth / 2
+            if low < 0:
+                low, high = 0.0, min(1.0, high - low)
+            if high > 1:
+                low, high = max(0.0, low - (high - 1)), 1.0
+        args = {"path": info["max_path"], "shape": shape, **timing, "low": round(low, 6),
+                "high": round(high, 6), "phase": phase}
+        if steps is not None:
+            args["steps"] = steps
+        if seed is not None:
+            args["seed"] = seed
+        try:
+            found = engine.devices()
+            if not found:
+                raise engine.EngineError("not_found", "no LiveBridge Engine is running")
+            # the same parameter may already run on some device: replace it there
+            running = next((d for d in found for m in d.get("modulations") or []
+                            if m.get("path") == info["max_path"]), None)
+            candidates = [running] if running else sorted(
+                found, key=lambda d: len(d.get("modulations") or []))
+            answer, last_error = None, None
+            for candidate in candidates:
+                try:
+                    answer = engine.request(candidate, "modulate", args, timeout=8.0)
+                    chosen = candidate
+                    break
+                except engine.EngineError as exc:
+                    last_error = exc
+                    if exc.type != "busy":
+                        break
+            if answer is None:
+                raise last_error or engine.EngineError("busy", "no free modulation slot")
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        modulation = {"slot": answer.get("slot"), "parameter": info.get("name"),
+                      "path": info.get("path"), "shape": shape, "rate": timing,
+                      "low": round(low, 3), "high": round(high, 3), "phase": phase,
+                      "range": {"min": lo_value, "max": hi_value},
+                      "original": answer.get("original", info.get("value"))}
+        if isinstance(info.get("device"), dict):
+            modulation["device"] = info["device"].get("name")
+        return {"modulation": modulation, "engine": _where(chosen)}
+
+    @mcp.tool()
+    def live_engine_unmodulate(
+        parameter: int | str | None = None,
+        track: int | str | None = None,
+        device: int | str | None = None,
+        all: bool = False,
+    ) -> Any:
+        """Stop a modulation started with `live_engine_modulate`: the parameter goes back to
+        the value it had and is free again. `all=true` stops every modulation of every
+        LiveBridge Engine.
+
+        Args:
+            parameter, track, device: The modulated parameter (as for live_engine_modulate).
+            all: Stop everything instead.
+
+        Returns:
+            `{stopped:[{slot, path, name, shape, original}], engines}`.
+        """
+        cmd = "engine.unmodulate"
+        if all == (parameter is not None):
+            return tool_error("give a parameter or all=true", cmd=cmd)
+        args: dict[str, Any] = {"all": True}
+        if not all:
+            info = parameter_target(cmd, parameter, track, device)
+            if _is_error(info):
+                return info
+            args = {"path": info["max_path"]}
+        try:
+            found = engine.devices()
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        if not found:
+            return _engine_failure(engine.EngineError("not_found",
+                                                      "no LiveBridge Engine is running"), cmd)
+        stopped = []
+        for answer in engine.each(found, lambda d: engine.request(d, "unmodulate", args)):
+            if isinstance(answer, dict):
+                stopped += [{k: m.get(k) for k in ("slot", "path", "name", "shape", "original")}
+                            for m in answer.get("stopped") or []]
+        result: dict[str, Any] = {"stopped": stopped, "engines": len(found)}
+        if not stopped:
+            result["note"] = "nothing was modulated" + ("" if all else " on that parameter")
         return result

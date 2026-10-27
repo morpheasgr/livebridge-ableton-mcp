@@ -4,7 +4,9 @@ LiveBridge talks to Live through a Python Remote Script, and Live's Python API c
 **LiveBridge Engine** is an optional Max for Live audio effect that can: put it on the master
 track (and at the end of any track you want Claude to hear on its own) and Claude reads
 loudness, peaks, spectral balance and stereo image *while the song plays*, compares before and
-after a change, records what it hears and finds masking between tracks — without bouncing.
+after a change, records what it hears and finds masking between tracks — without bouncing —
+and moves any parameter with tempo-synced LFOs and step sequences without writing
+automation.
 
 | Tool | What it does |
 |---|---|
@@ -13,6 +15,8 @@ after a change, records what it hears and finds masking between tracks — witho
 | `live_engine_compare` | A/B: a saved reading against a second one or what plays now on the same device — deltas, better/worse, flags resolved or new |
 | `live_engine_capture` | Record several devices to WAV at the same moment (`~/.livebridge/captures`, kept a week) for `live_audio_analyze`, `live_audio_compare`, `live_sample_import` |
 | `live_engine_masking` | Capture every track device at once and run the masking analysis of `live_audio_masking` at fader level (muted / -inf tracks left out) |
+| `live_engine_modulate` | LFO (sine, triangle, saw, ramp down, square, random, smooth random) or step sequence on any device or mixer parameter, synced to the song ("1 bar", "1/8d", "1/16t") or free ("0.5 Hz"), with depth/center or low/high and phase |
+| `live_engine_unmodulate` | Stop one modulation (or `all=true`); the parameter goes back to its value |
 
 Everything else in LiveBridge works without the device; without it these tools say how to
 add it.
@@ -61,13 +65,25 @@ together.
 - **Protocol**: one JSON object per line, `{"id", "token", "cmd", "args"}` ->
   `{"id", "ok", "result" | "error": {"type", "message"}}`. Commands: `hello` (role, track,
   version, frames buffered), `frames` (`seconds` ≤ 60, `wait`: true = collect from now on,
-  false = the last `seconds`) and `capture` (`seconds` ≤ 60, `name`: a plain `.wav` file name
+  false = the last `seconds`), `modulate` (`path`: Max LOM path, `shape`, `beats` or `hz`,
+  `low`/`high` shares of the range, `phase`, `steps`, `seed`), `unmodulate` (`path` or `all`)
+  and `capture` (`seconds` ≤ 60, `name`: a plain `.wav` file name
   in the capture folder, `at`: start time in epoch ms, at most 5 s ahead — the MCP server
   gives every device the same `at`). Captures are written by the patch's `sfrecord~`
   (`open <path>`, `1`, `0`); `LIVEBRIDGE_CAPTURE_DIR` moves the folder.
 - **Host side** (`mcp_server/livebridge_mcp/engine.py`): turns frames into readings. LUFS is
   K-weighted and averaged over the window, excluding frames below -70 LUFS (no relative gate);
   the peak is a sample peak, so values can differ from a mastering meter by a fraction of a dB.
+
+- **Modulation**: 8 slots per device, each a `line~` into a `live.remote~`. `engine.js`
+  computes the shape 50 times a second (`line~` glides 20 ms between values) from Live's song
+  position, which `context.js` observes (`current_song_time`, `tempo`, `is_playing`; at most
+  every 50 ms) and `engine.js` extrapolates in between; when the transport is stopped the
+  shapes run free at the song tempo. `context.js` also turns the parameter's path into the id
+  `live.remote~` needs (`resolve` / `resolved`), and reads min, max and the value to restore.
+  `live.remote~` changes the parameter without automation or undo steps; while it holds a
+  parameter, Live greys it out and ignores its automation. Modulations live in the device's
+  Node process: they end with the device and are not saved with the set.
 
 The Remote Script is not involved, so a busy Live main thread never delays the device and the
 device never touches the set.
@@ -88,5 +104,5 @@ readings), checks the patch wiring, and runs `engine.js` under Node with a stand
 
 ## Roadmap
 
-Next for the same device: live parameter modulation and transport-synced follow actions; a
-separate **LiveBridge MIDI** device handles MIDI input.
+Next for the same device: transport-synced follow actions and generative playback; a separate
+**LiveBridge MIDI** device handles MIDI input.
