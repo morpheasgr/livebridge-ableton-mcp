@@ -1096,6 +1096,24 @@ instrument, and keeps them on a track without devices. `arrangement.duplicate_cl
 `tests/live_stub_ext/arrangement_live.install(Live, copy_envelopes="without_devices")` models the
 rule. For arrangement automation use `automation.record`.
 
+**Probe, Live 12.4.7 (2026-10-27, `integration_check.py --scenario envelopes`)** — temporary MIDI
+tracks, a 4-beat session clip with a device envelope (normalized 0.2 -> 0.8) and a Track Volume
+envelope, `arrangement.duplicate_clip(time=4000)`, checked 1 s later:
+
+| Track content / route | Device envelope | Track Volume |
+|---|---|---|
+| no devices | — | kept |
+| Operator | lost | lost |
+| Auto Filter only (audio effect) | lost | lost |
+| Arpeggiator only (MIDI effect) | lost | **kept** |
+| Operator moved to another track (`devices.move`) before the copy, moved back after | lost — moving the device deleted its envelope from the session clip | **kept** (and kept after Operator came back) |
+| Operator, clip recorded into the arrangement (Arrangement Record, clip fired) instead of copied | lost | lost (the recorded clip has no envelopes) |
+
+So: **device-parameter clip envelopes never reach the arrangement** through the API (copy or
+recording); mixer envelopes do when the track holds no instrument and no audio effect at the time
+of the copy (MIDI effects do not matter), so moving those devices out and back keeps them. For
+device parameters, arrangement automation has to be recorded (`automation.record`).
+
 Also checked by the cross fixer on the same run: `Device.save_preset_to_compare_ab_slot()` works
 on Operator (`devices.set_state(save_to_compare_slot=true)`); `record.status` reports an armed
 MIDI track's input meter as `{level}` only (no left/right); a refused connection beyond
