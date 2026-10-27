@@ -94,6 +94,7 @@
     <nav class="nav" aria-label="Main">
       <a href="#examples">Examples</a>
       <a href="#features">Features</a>
+      <a href="#max-for-live">Max for Live</a>
       <a href="#install">Install</a>
       <a href="#tools">Tools</a>
       <a href="#faq">FAQ</a>
@@ -112,8 +113,10 @@
       <span class="eyebrow"><span class="dot"></span> Ableton Live 12 · MCP server · free and open source</span>
       <h1>Make music in Ableton Live by <span class="grad">talking to Claude</span>.</h1>
       <p class="lede">LiveBridge gives Claude <strong>197 tools</strong> for Ableton Live: beats and basslines,
-        chords and arps, Serum 2 sound design, automation, song structure, mixing and Splice samples.
-        You describe the music; Claude builds it in your set, one undo step at a time.</p>
+        chords and arps, Serum 2 sound design, automation, song structure, mixing, your whole sample
+        library and Splice. With the optional Max for Live devices, Claude also listens while the song
+        plays, moves parameters in time and plays along. You describe the music; Claude builds it in
+        your set, one undo step at a time.</p>
       <div class="cta">
         <a class="btn primary" href="#install">Get started</a>
         <a class="btn" href="https://github.com/valentijnh/livebridge-ableton-mcp">View on GitHub</a>
@@ -121,7 +124,7 @@
       <ul class="facts">
         <li>macOS and Windows</li>
         <li>Every Live 12 edition</li>
-        <li>No Max for Live</li>
+        <li>Max for Live optional</li>
         <li>Claude Code and Claude Desktop</li>
       </ul>
     </div>
@@ -247,8 +250,8 @@
       </div>
       <div class="feature" style="--c: var(--cyan)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12h2l3-7 4 14 4-10 3 5h4"/></svg></div>
-        <h3>Ears, of a kind</h3>
-        <p>A music-theory check (key, chords, clashes between parts) and audio analysis (LUFS, spectrum, stereo, tempo, key), also against your reference track.</p>
+        <h3>Ears</h3>
+        <p>A music-theory check (key, chords, clashes between parts), audio analysis of bounces (LUFS, spectrum, stereo, tempo, key, masking between parts, before/after), and with the LiveBridge Engine device, all of it live while the song plays.</p>
       </div>
       <div class="feature" style="--c: var(--orange)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 12 16 7"/><path d="M12 2v2M22 12h-2M4 12H2"/></svg></div>
@@ -273,9 +276,72 @@
       <div class="feature" style="--c: var(--violet)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div>
         <h3>Tested</h3>
-        <p>1,500+ unit tests against a simulated Live on macOS, Windows and Linux, plus end-to-end checks on a real Live 12.4.5.</p>
+        <p>1,600+ unit tests against a simulated Live on macOS, Windows and Linux, plus end-to-end checks and probes on a real Live 12.4.</p>
+      </div>
+      <div class="feature" style="--c: var(--cyan)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+        <h3>Your whole sample library</h3>
+        <p>Everything Live's browser lists under Samples — Core Library, packs, User Library, your folders — searchable by words and Live's own tags ("Drums|Kick", "Character|Punchy"), most used first, "sounds like this one", duplicates, categories and every installed plug-in.</p>
+      </div>
+      <div class="feature" style="--c: var(--orange)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 17h4l3-10 4 14 3-8h4"/></svg></div>
+        <h3>Arrangements with their automation</h3>
+        <p>Scenes become a song with their filter sweeps and fades as real automation lanes, and copied sections take their lanes along — Live's API drops both, LiveBridge records them back in a fast background pass.</p>
+      </div>
+      <div class="feature" style="--c: var(--violet)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg></div>
+        <h3>Production know-how and memory</h3>
+        <p>Genre recipes from techno to drum &amp; bass, a Serum 2 cheat sheet, workflows for extending an arrangement or fixing a mix; a sound library for presets you like, generative Euclidean rhythms and note chance, and notes about your project Claude remembers next session.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="max-for-live" aria-labelledby="m4l-title">
+  <div class="wrap">
+    <h2 id="m4l-title">Optional: Max for Live devices</h2>
+    <p class="sub">Live's API cannot hear audio, move a parameter in time or see your keyboard.
+      Two small Max for Live devices can, and Claude adds them to your set itself when a task needs
+      them. Everything else works without them. They need Max for Live (Live Suite, or Standard
+      with the add-on); the installer puts them in your User Library.</p>
+    <div class="features">
+      <div class="feature" style="--c: var(--cyan)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12h2l3-7 4 14 4-10 3 5h4"/></svg></div>
+        <h3>Real-time listening</h3>
+        <p><b>LiveBridge Engine</b> on the master or a track: momentary and short-term LUFS, peaks, crest, 8-band balance, stereo correlation and low-end width while the song plays, the last minute kept — no bouncing. <code>live_engine_listen</code></p>
+      </div>
+      <div class="feature" style="--c: var(--orange)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 7h10v10H7z"/><path d="M3 12h4M17 12h4"/></svg></div>
+        <h3>A/B and masking while playing</h3>
+        <p>Save a reading, change the EQ or the patch, compare. Engines at the end of tracks find which parts fight for the same frequencies, at fader level. <code>live_engine_compare</code> · <code>live_engine_masking</code></p>
+      </div>
+      <div class="feature" style="--c: var(--violet)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></div>
+        <h3>Captures</h3>
+        <p>Record what several tracks play to WAV at the same moment, for analysis, comparison or resampling onto a drum pad. <code>live_engine_capture</code></p>
+      </div>
+      <div class="feature" style="--c: var(--cyan)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12c2.5-6 5-6 7.5 0s5 6 7.5 0 3.5-4 5-2"/></svg></div>
+        <h3>Live modulation</h3>
+        <p>Tempo-synced LFOs and step sequences on any parameter — filter wobbles, gated sends, auto-pan — without writing automation; stop it and the knob goes back. <code>live_engine_modulate</code></p>
+      </div>
+      <div class="feature" style="--c: var(--orange)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 4v16M19 4v16"/><path d="m9 8 6 4-6 4z"/></svg></div>
+        <h3>Follow actions</h3>
+        <p>Live's follow actions are not in its API, so the Engine plays them: every N bars the next, another or a random clip (or scene), weighted, with a chance and a seed — evolving loops and generative arrangements. <code>live_engine_follow</code></p>
+      </div>
+      <div class="feature" style="--c: var(--violet)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 6v7M10 6v7M14 6v7M18 6v7"/></svg></div>
+        <h3>What you play, and playing along</h3>
+        <p><b>LiveBridge MIDI</b> before an instrument keeps the last 10 minutes of what you played, as clip-ready notes ("turn that riff into a clip"), and plays phrases into the instrument in time with the song. <code>live_midi_played</code> · <code>live_midi_play</code></p>
+      </div>
+      <div class="feature" style="--c: var(--cyan)">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></div>
+        <h3>Faster automation recording</h3>
+        <p>Arrangement lanes can only be recorded by playing. The Engine writes them 50 times a second while the pass runs at a raised tempo: about five times faster than real time. <code>live_automation_record(speed="fast")</code></p>
+      </div>
+    </div>
+    <p class="more"><a href="https://github.com/valentijnh/livebridge-ableton-mcp/blob/main/docs/ENGINE.md">How the devices work →</a></p>
   </div>
 </section>
 
@@ -283,13 +349,14 @@
   <div class="wrap">
     <h2 id="how-title">How it works</h2>
     <p class="sub">A small MIDI Remote Script runs inside Live; an MCP server turns it into tools
-      Claude can use. Nothing else is installed into Live.</p>
+      Claude can use. The optional Max for Live devices talk to the same MCP server over their own
+      local, token-protected connection.</p>
     <div class="flow">
       <div class="node"><small>Your AI app</small><h3>Claude</h3><p>Claude Code, Claude Desktop or any MCP client. Splice's MCP server can sit next to it.</p></div>
       <div class="arrow"><div><span>⇄</span>MCP · stdio</div></div>
       <div class="node"><small>livebridge-mcp</small><h3>MCP server</h3><p>197 validated tools, a reconnecting client and network discovery. Python 3.10+.</p></div>
       <div class="arrow"><div><span>⇄</span>TCP · JSON · token</div></div>
-      <div class="node"><small>Inside Ableton Live</small><h3>Remote Script</h3><p>Runs every command on Live's main thread against the Live Object Model. One undo step each.</p></div>
+      <div class="node"><small>Inside Ableton Live</small><h3>Remote Script</h3><p>Runs every command on Live's main thread against the Live Object Model. One undo step each. Optional: the LiveBridge Engine and LiveBridge MIDI devices.</p></div>
     </div>
   </div>
 </section>
@@ -300,7 +367,7 @@
       <h2 id="install-title">Install in a few minutes</h2>
       <p class="sub">You need Ableton Live 12, Python 3.10 or newer, and Claude Code or Claude
         Desktop. The installer does the rest: the Remote Script, the MCP server, a random token,
-        registration with Claude (and Splice), and the LiveBridge skill.</p>
+        registration with Claude (and Splice), the LiveBridge skill and the Max for Live devices.</p>
       <div class="tabs" role="tablist" aria-label="Operating system">
         <button class="tab" role="tab" id="tab-mac" aria-controls="panel-mac" data-os="macos">macOS</button>
         <button class="tab" role="tab" id="tab-win" aria-controls="panel-win" data-os="windows">Windows</button>
@@ -389,6 +456,10 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
       <div class="prompt"><span>Turn my scenes into a song: intro 8, verse 16, chorus 16, outro 8.</span><button type="button" data-copy>Copy</button></div>
       <div class="prompt"><span>Load Serum 2 on a new track and make a short, bright pluck.</span><button type="button" data-copy>Copy</button></div>
       <div class="prompt"><span>Is anything clipping? Read the meters while the drop plays.</span><button type="button" data-copy>Copy</button></div>
+      <div class="prompt"><span>Find a punchy kick in my library and load it onto C1.</span><button type="button" data-copy>Copy</button></div>
+      <div class="prompt"><span>Listen to the drop: is the low end mono, and how loud is it?</span><button type="button" data-copy>Copy</button></div>
+      <div class="prompt"><span>Wobble the bass filter every 1/8 note while I listen.</span><button type="button" data-copy>Copy</button></div>
+      <div class="prompt"><span>I just played a riff — turn it into a clip and add a bassline under it.</span><button type="button" data-copy>Copy</button></div>
     </div>
     <p class="more"><a href="https://github.com/valentijnh/livebridge-ableton-mcp/blob/main/examples/prompts.md">100+ more prompts →</a></p>
   </div>
@@ -401,11 +472,13 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
       <details><summary>Which Ableton Live versions does LiveBridge support?</summary>
         <p>Ableton Live 12, in every edition. It was built and verified against Live 12.4.5 Suite. Live 11 is not supported: the Remote Script is written for the Python 3.11 that Live 12 embeds.</p></details>
       <details><summary>Do I need Max for Live?</summary>
-        <p>No. LiveBridge is a MIDI Remote Script, the same kind of script that drives Push and other controllers, so it runs in every edition of Live 12.</p></details>
+        <p>No. LiveBridge is a MIDI Remote Script, the same kind of script that drives Push and other controllers, so it runs in every edition of Live 12. With Max for Live (Suite, or the add-on) two optional devices add real-time listening, live modulation, follow actions, MIDI input and faster automation recording.</p></details>
       <details><summary>Which AI apps can use LiveBridge?</summary>
         <p>Claude Code and Claude Desktop, which the installer sets up together with the LiveBridge skill, and any other MCP client that can start a local (stdio) server.</p></details>
       <details><summary>Can Claude hear my music?</summary>
-        <p>Not directly. Claude reads what Live knows (notes, devices, parameters, levels), checks harmony with a music-theory analysis and measures bounced audio: loudness, spectrum, stereo, tempo and key. Your ears still have the final say.</p></details>
+        <p>Yes, in numbers. With the LiveBridge Engine device it reads loudness, spectral balance and stereo image while the song plays; without it, it measures bounced audio (loudness, spectrum, stereo, tempo, key) and checks harmony with a music-theory analysis. Your ears still have the final say.</p></details>
+      <details><summary>Does arranging keep my automation?</summary>
+        <p>Yes. Live's API drops clip envelopes when it copies clips into the arrangement and cannot read automation lanes, so LiveBridge records them back: scenes laid out as a song keep their sweeps and fades, and copied sections take their lanes along.</p></details>
       <details><summary>Is LiveBridge free?</summary>
         <p>Yes, free and open source under the MIT license. You need Ableton Live 12 and a Claude plan; Splice is optional (searching is free, downloads use your Splice credits). If it helps your music, you can <a href="https://buymeacoffee.com/valentijnh">buy me a coffee</a>.</p></details>
       <details><summary>Does it work on Windows, and across two computers?</summary>

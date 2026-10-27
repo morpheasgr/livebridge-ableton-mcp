@@ -8,7 +8,7 @@
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
   197 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
-  macOS and Windows · every Live 12 edition · no Max for Live · MIT licensed
+  macOS and Windows · every Live 12 edition · Max for Live optional · MIT licensed
 </p>
 
 <p align="center">
@@ -59,7 +59,10 @@ It works on **macOS and Windows**, with **every Live 12 edition** (built and ver
 Live 12.4.5 Suite), with Live on the same computer as Claude **or on another computer in your
 network**, which is handy when you switch between a Mac and a Windows PC.
 
-No Max for Live needed. Nothing is installed into Live except a small MIDI Remote Script.
+No Max for Live needed: the core is a small MIDI Remote Script. With Max for Live, two optional
+devices — **LiveBridge Engine** and **LiveBridge MIDI** — add what Live's API cannot do: listening
+while the song plays, live modulation, follow actions, MIDI input and faster automation recording
+([docs/ENGINE.md](docs/ENGINE.md)). Claude adds them to your set itself when a task needs them.
 
 ## What you can ask
 
@@ -84,8 +87,19 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
   progression, humanize/swing/groove, section layouts, filter sweeps and LFOs, mixing in dB.
-- **Ears, of a kind:** a music-theory check (key, chords, clashes between parts) and audio
-  analysis (LUFS, spectrum, stereo, tempo, key), optionally against a reference track.
+- **Ears:** a music-theory check (key, chords, clashes between parts), audio analysis of
+  bounces (LUFS, spectrum, stereo, tempo, key, masking between parts, before/after), optionally
+  against a reference track — and with the LiveBridge Engine, live while the song plays.
+- **Your whole sample library:** everything Live's browser lists under Samples, searchable by
+  words and Live's own tags, most used first, "sounds like this one", plus installed plug-ins.
+- **Arrangements keep their automation:** scenes laid out as a song keep their clip envelopes
+  as automation lanes, and copied sections take their lanes along (recorded in a fast
+  background pass — Live's API drops both).
+- **Max for Live, optional:** real-time listening, A/B and masking while playing, captures,
+  tempo-synced modulation of any parameter, follow actions, what you played as notes, phrases
+  played live, ~5x faster automation recording.
+- **Production know-how and memory:** genre recipes, a Serum 2 cheat sheet, workflows, a sound
+  library, generative rhythms and note chance, and project notes Claude remembers.
 - **Big plug-ins, fully controllable:** Serum 2 and other VST3 synths without clicking
   *Configure* for every knob.
 - **Splice in the same conversation**, through Splice's official MCP server.
@@ -93,8 +107,8 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
   with discovery and a token.
 - **Safe to try:** every change is one undo step, the token protects the connection, LAN mode
   is opt-in and Python-in-Live can be switched off.
-- **Tested:** 1,500+ unit tests on macOS, Windows and Linux, and end-to-end checks against a
-  real Live 12.4.5.
+- **Tested:** 1,600+ unit tests on macOS, Windows and Linux, and end-to-end checks and probes
+  against a real Live 12.4.
 
 ## How it works
 
