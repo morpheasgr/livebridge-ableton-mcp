@@ -52,6 +52,12 @@ the MCP server package and the installer have their own version numbers. `live_s
   (`livebridge://omnisphere`). The codec, preset tree, VST3 container, packing and both guides
   are ported from kasperikaivola's fork of ableton-mcp-pro (MIT, commit 6ac32c8); new `serum`
   extra (cbor2, zstandard), installed by default.
+- **More guidance from the same fork** (MIT): `SERUM.md` §6 lists every Serum 2 control
+  (oscillator modes incl. granular and spectral, routing, matrix, FX racks, performance) with a
+  new-patch recipe and fixes for a bland patch; `WORKFLOWS.md` §16 adds one section to an
+  arrangement (drop, breakdown, interlude, buildup, intro, outro — finding "the last drop",
+  overlap rules, sweeps recorded as automation) and §17 designs a synth sound (Serum 2 or
+  Omnisphere, what each request allows, the "manual settings" hand-off).
 - **Technical problems and layer alignment** (`live_audio_problems`, `live_audio_align`):
   clipping, DC offset, left/right polarity, mains hum (50/60 Hz with harmonics, measured in the
   quiet passages), noise floor and persistent resonances (each with an EQ Eight bell: frequency,

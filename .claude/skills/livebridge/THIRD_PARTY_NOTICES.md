@@ -18,9 +18,12 @@ values, procedures) comes from these sources:
   (commit 6ac32c8, same MIT license and copyright notice below): the Serum 2 preset guide
   (`MCP_Server/synth_guides/serum-presets.md` -> `SERUM_PRESETS.md`, adapted to LiveBridge's
   tools) and the Omnisphere guide (`omnisphere.md` -> `OMNISPHERE.md`, with a LiveBridge header);
+  the Serum 2 control reference (`serum2.md` -> `SERUM.md` §6, condensed), the
+  `arrangement-sections` skill (-> `WORKFLOWS.md` §16) and the synth sound-design skill with
+  `synth_guides/overview.md` (-> `WORKFLOWS.md` §17, condensed);
   the code behind them is ported in `mcp_server/livebridge_mcp/serum/` (license copy there).
 
-`SERUM.md` is original to this fork, built on LiveBridge's Serum 2 parameter map.
+`SERUM.md` §1-5 are original to this fork, built on LiveBridge's Serum 2 parameter map.
 
 ## ableton-mcp-pro
 
