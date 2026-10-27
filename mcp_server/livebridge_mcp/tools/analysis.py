@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from . import bridge_call, tool_error
-from .. import audio_analysis, theory
+from .. import audio_analysis, mix, theory
 from ..client import BridgeClient
 from .clips import address_args, clip_address
 from .samples import _local_file
@@ -221,6 +221,96 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         return result
 
     @mcp.tool()
+    def live_theory_melody(
+        track: Ref | None = None,
+        slot: Ref | None = None,
+        clip: str | None = None,
+        harmony: list[Any] | None = None,
+        key: str | None = None,
+        mood: str | None = None,
+        length: float | None = None,
+    ) -> Any:
+        """Check a melody (lead, hook, topline, melodic bass) against the craft checklist that
+        separates a phrase from scale-walking: notes off the beat grid, at least 3 note lengths
+        and a long arrival, rests, a velocity arc peaking at the climax, one climax 60-75%
+        through, a leap answered by a step back, tension notes resolved by step (with
+        `harmony`), a motif developed rather than pasted, and question/answer phrasing — plus,
+        with `mood`, whether contour, velocity, density and scale fit that mood. Read-only.
+        Use it before handing over a melody you wrote, and after each round of feedback.
+
+        Args:
+            track, slot / clip: the melody clip (a chordal part is checked as its top voice).
+            harmony: chord/bass clips under it (`[{"track": "Pad", "slot": 0}, ...]`, max 8):
+                enables the tension-note check and helps the key.
+            key: force the key ("A minor", "F# dorian", "song" = Live's scale setting).
+            mood: melancholy, anger, calm, euphoria, tension, nostalgia, hope, loneliness,
+                triumph (or sad, euphoric, dark, uplifting, epic ...).
+            length: phrase length in beats (default: the clip length).
+
+        Returns:
+            `{key:{name, tonic, mode}, notes, bars, checks:[{check: off_grid|durations|rests|
+            velocity|climax|leaps|tension|motif|question_answer, ok, detail}], passed, total,
+            profile:{contour (up|down|level), ups, downs, notes_per_bar, velocity:{min, max,
+            mean}, range, climax:{note, beat}}, mood?:{name, checks, tempo?}, suggestions}`.
+
+        Gotchas: a check that fails on purpose (a relentless wall of 16ths for chaos) is fine
+        when it is a stated choice. Passing every check proves craft, not beauty — play it.
+        """
+        cmd = "notes.get"
+        if mood is not None and theory.mood_name(mood) is None:
+            return tool_error("mood must be one of " + ", ".join(theory.MOODS)
+                              + " (or sad, euphoric, dark, uplifting, epic ...)", cmd=cmd)
+        if length is not None and length <= 0:
+            return tool_error("length must be > 0 beats", cmd=cmd)
+        if harmony is not None and not 1 <= len(harmony) <= 8:
+            return tool_error("harmony must hold 1..8 clip addresses", cmd=cmd)
+        error = clip_address(track, slot, clip, cmd)
+        if error:
+            return error
+        state = bridge_call(bridge, "transport.get")
+        beats_per_bar, song_scale = 4.0, None
+        if isinstance(state, dict) and not _is_error(state):
+            match = re.match(r"^(\d+)/(\d+)$", str(state.get("signature", "")))
+            if match and int(match.group(2)):
+                beats_per_bar = int(match.group(1)) * 4.0 / int(match.group(2))
+            scale = state.get("scale") if isinstance(state.get("scale"), dict) else None
+            if scale and scale.get("root") and scale.get("name"):
+                song_scale = f"{scale['root']} {str(scale['name']).lower()}"
+        forced = None
+        if key is not None:
+            wanted = song_scale if key.strip().lower() == "song" else key
+            forced = _parse_key(wanted) if wanted else None
+            if forced is None:
+                return tool_error("key must look like 'A minor', 'F# dorian', 'Bbm' or 'song'"
+                                  + ("" if wanted else " — Live reports no song scale"),
+                                  cmd=cmd)
+        melody = fetch_notes(address_args(track, slot, clip))
+        if _is_error(melody) or not isinstance(melody, dict):
+            return melody
+        under: list[Any] = []
+        for item in harmony or []:
+            if isinstance(item, str):
+                address = address_args(None, None, item)
+                error = clip_address(None, None, item, cmd)
+            elif isinstance(item, dict) and set(item) <= {"track", "slot", "clip"}:
+                address = address_args(item.get("track"), item.get("slot"), item.get("clip"))
+                error = clip_address(item.get("track"), item.get("slot"), item.get("clip"), cmd)
+            else:
+                return tool_error("each entry of harmony must be a clip path/name or "
+                                  "{'track':..., 'slot':...}", cmd=cmd)
+            if error:
+                return error
+            answer = fetch_notes(address)
+            if _is_error(answer) or not isinstance(answer, dict):
+                return answer
+            under.extend(answer.get("notes") or [])
+        result = theory.melody_check(melody.get("notes") or [], beats_per_bar=beats_per_bar,
+                                     length=length or melody.get("length") or None,
+                                     harmony=under, key=forced, mood=mood)
+        result["clip"] = melody.get("clip")
+        return result
+
+    @mcp.tool()
     def live_audio_analyze(
         file_path: str | None = None,
         track: Ref | None = None,
@@ -231,6 +321,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         start: float | None = None,
         duration: float | None = None,
         sections: bool = True,
+        genre: str | None = None,
     ) -> Any:
         """Listen to audio by measuring it: loudness (LUFS, true peak, crest factor, loudness
         range, clipping), spectral balance in 8 bands with mix flags (mud, harshness, missing
@@ -249,6 +340,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 apply), "stem" / "loop" / "one_shot" (measurements without mix targets).
             start, duration: analyse a window in seconds (default: from 0, at most 10 minutes).
             sections: include `energy` (RMS over time, up to 32 steps).
+            genre: also compare the balance with a genre's (`genre_balance`: 6 bands, the
+                genre's typical loudness) — techno, trance, dnb, dubstep, hip_hop, trap, pop,
+                rnb, lo_fi, ambient, breaks, funk, jazz, metal, country, reggaeton, classical,
+                balanced. Rules of thumb: a reference track is the better target.
 
         Returns:
             `{file:{path, name, duration, sample_rate, channels, format, analysed?}, kind,
@@ -259,7 +354,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             {correlation, width, low_end_width} | {mono}, tempo?:{bpm, confidence,
             also_possible}, key?:{name, confidence, candidates}, energy?:{start_s, step_s,
             rms_db:[...]}, flags:[plain-language observations], reference?, comparison?:
-            {lufs, crest_db, bands_db, width, notes}}`
+            {lufs, crest_db, bands_db, width, notes}, genre_balance?:{genre, label,
+            target_lufs, bands:[{band, hz, measured_db, target_db, delta_db}], notes}}`
 
         Gotchas: this is measurement, not taste — flags are hints against typical full-mix
         values, a sparse intro or a single stem legitimately deviates. Tempo can land on
@@ -275,6 +371,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("start must be >= 0 seconds", cmd=cmd)
         if duration is not None and duration <= 0:
             return tool_error("duration must be > 0 seconds", cmd=cmd)
+        genre_name = None
+        if genre is not None:
+            genre_name = mix.genre_key(genre)
+            if genre_name is None:
+                return tool_error("unknown genre; use one of " + ", ".join(mix.GENRES), cmd=cmd)
         by_clip = track is not None or slot is not None or clip is not None
         if (file_path is None) == (not by_clip):
             return tool_error("pass either file_path or an audio clip (track + slot / clip)",
@@ -328,6 +429,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                                          "stereo", "tempo", "key")
                                    if k in other}
             result["comparison"] = audio_analysis.compare(result, other)
+        bands = (result.get("spectrum") or {}).get("bands_db")
+        if genre_name and bands:
+            balance = mix.genre_balance(bands, genre_name)
+            lufs = (result.get("loudness") or {}).get("lufs")
+            if lufs is not None and result.get("kind") == "mix":
+                gap = round(lufs - balance["target_lufs"], 1)
+                if abs(gap) >= 2:
+                    balance["notes"].append(f"{lufs} LUFS: {abs(gap)} LU "
+                                            f"{'louder' if gap > 0 else 'quieter'} than a "
+                                            f"typical {balance['label']} master.")
+            result["genre_balance"] = balance
         return result
 
     def audio_source(spec: Any, label: str, cmd: str) -> tuple[str, str] | dict[str, Any]:

@@ -133,7 +133,8 @@ Conventions:
   inventing a workaround.
 - For the full production workflow (beat, bass, chords, mix, arrangement, plug-ins, Splice) read
   the `livebridge://skill` resource or the `livebridge_workflow` prompt; for how a track is
-  built (sections, build-ups, transitions, effects, mix targets) read `livebridge://production`;
+  built (sections, build-ups, transitions, effects, mix targets, melody craft) read
+  `livebridge://production`;
   genre material in `livebridge://genres`, Serum 2 sound design in `livebridge://serum` (whole
   presets — wavetables, matrix, FX — in `livebridge://serum-presets`), Omnisphere in
   `livebridge://omnisphere`,
@@ -166,7 +167,7 @@ COMPANIONS = (
     ("WORKFLOWS.md", "livebridge://workflows", "livebridge_workflows",
      "LiveBridge workflows (WORKFLOWS.md): extend an arrangement, co-write parts, start a "
      "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit, "
-     "add one section, design a synth sound"),
+     "add one section, design a synth sound, transitions, sound check, balance and master"),
 )
 
 _SKILL_FALLBACK = """# LiveBridge workflow

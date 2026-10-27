@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~207 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~211 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -14,8 +14,8 @@ the user's feedback, so describe what you did in musical terms and invite them t
 **Making music, not just clips**: before arranging, building transitions/build-ups, choosing
 effects or mixing, read **`PRODUCTION.md`** next to this file (MCP resource
 `livebridge://production`): energy curves, section blueprints per genre, the build-up and
-transition toolbox, effect chains, harmony/melody rules, density, mix targets and a finishing
-checklist. A track must work as a whole: plan the sections first, make every part serve one
+transition toolbox, effect chains, harmony/melody rules, density, mix targets, a finishing
+checklist, melody craft (the seven traps, motifs, tension notes) and turning a mood into notes. A track must work as a whole: plan the sections first, make every part serve one
 idea, check theory and sound with the analysis tools.
 
 More companions next to this file (also MCP resources), read the one that fits the request:
@@ -26,7 +26,7 @@ More companions next to this file (also MCP resources), read the one that fits t
 | `SERUM.md` | `livebridge://serum` | designing or tweaking a Serum 2 sound: parameter cheat sheet, recipes (sub, 808, Reese, growl, acid, supersaw, pluck, pad, riser), what the API cannot change, every Serum 2 control (oscillator modes, granular, spectral, routing, matrix, FX racks) |
 | `SERUM_PRESETS.md` | `livebridge://serum-presets` | a Serum 2 sound beyond the 128 exposed knobs: a new preset designed as a file (wavetables, oscillator modes, matrix routes, FX order), "make this preset darker/faster", copying a wavetable or FX rack from another preset, then `live_preset_load` |
 | `OMNISPHERE.md` | `livebridge://omnisphere` | designing or improving an Omnisphere 2/3 sound: sources, granular, filters, modulation, Orb, effects, recipes; what Live can reach (Configure) |
-| `WORKFLOWS.md` | `livebridge://workflows` | extending an arrangement, co-writing parts with the user, starting a project, grooves and MIDI cleanup, chords, mix diagnosis, side-chain, reference matching, mix check / pre-master audit, vocal chain, session snapshot, technical check, parallel compression, mastering chain, send effects, adding one section (drop, breakdown, buildup, intro, outro), designing a synth sound with its manual-settings hand-off |
+| `WORKFLOWS.md` | `livebridge://workflows` | extending an arrangement, co-writing parts with the user, starting a project, grooves and MIDI cleanup, chords, mix diagnosis, side-chain, reference matching, mix check / pre-master audit, vocal chain, session snapshot, technical check, parallel compression, mastering chain, send effects, adding one section (drop, breakdown, buildup, intro, outro), designing a synth sound with its manual-settings hand-off, transitions per genre, a sound check before building, balancing and mastering by measurement |
 
 ## 1. Start every session the same way
 
@@ -175,6 +175,11 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   to the user's material (which key? which chords?) and **after** writing parts that play
   together. Fix clashes with `live_clip_modify_notes` / `live_clip_transform_notes(fit_scale=
   true)`. Drum Rack clips are recognised and only get statistics.
+- **`live_theory_melody`** (one melody clip, instant): the craft checklist for leads, hooks and
+  toplines — off-grid starts, 3+ note lengths, rests, a velocity arc, one climax 60-75% through,
+  a leap answered by a step, tension notes resolved by step (`harmony=[{"track": "Pad",
+  "slot": 0}]`), a developed motif, question/answer; `mood="melancholy"` also checks contour,
+  velocity and density. Run it before handing over a melody you wrote (`PRODUCTION.md` §11-12).
 - **`live_audio_analyze`** (audio, ~1 s per minute of audio): `file_path=` or an audio clip
   (`track`+`slot`) -> LUFS, true peak, crest factor, 8-band spectral balance with plain-language
   `flags` (mud, harsh, no sub, wide low end, clipping), stereo correlation/width, tempo, key and
@@ -207,6 +212,13 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     smooth_random, steps=[...]); nothing is written and `live_engine_unmodulate` puts the
     value back. Use it to audition movement; when the user likes it, write it as automation
     (`live_automation_*`) — modulations are not saved with the set.
+  - *Sound check, balance, master* (Engines on the tracks and the master, song playing):
+    `live_sound_check()` -> silent or strangled parts and filters shut below their role's
+    floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role
+    levels by measurement (kick on top ...) and says whether each band problem is a master or a
+    track fix; `live_master_auto(destination="streaming"|"club"|...)` drives EQ Eight -> Glue ->
+    Limiter to the loudness target and stops before the punch collapses. `WORKFLOWS.md`
+    §19-20. On the user's own mix, run `apply=false` first and show the plan.
   - *Follow actions / generative playback*: Live's API has none, the Engine plays them:
     `live_engine_follow(target="Drums", every="2 bars", actions={"next": 3, "other": 1},
     chance=0.8)` cycles clip variations; `target="scenes"` chains scenes. Stop with
@@ -341,6 +353,14 @@ LiveBridge does not search Splice itself; the official Splice MCP (a separate se
   `live_sample_import(mode="simpler")`); the Drum Sampler's sample (hot-swap the pad with a
   sample: `live_browser_hotswap(drum_pad=...)` puts a Simpler there). Details:
   `docs/LIVE_API_NOTES.md` §12.
+- **Things that fail silently** (no error, just no sound or the wrong sound): a track where a
+  session clip was fired ignores its arrangement clips until 'Back to Arrangement'
+  (`live_transport_set(back_to_arranger=false)`); automation overrides a value you set by hand
+  (rewrite or clear the automation); a note on an empty Drum Rack pad plays nothing
+  (`live_drumrack_overview`); editing a session clip does not update its arrangement copies;
+  a low-pass far below a part's range leaves only its fundamental (`live_sound_check`). Track
+  and device *indices* shift when anything is added or deleted — address by name, and delete
+  from the highest index down.
 - `live_lom_*` and `live_eval_python` are escape hatches for things no curated tool covers
   (`live_commands` lists what the installed Remote Script supports; `live_command_call` runs such
   a bridge command directly). Use `live_lom_describe` to explore first; `live_eval_python` only

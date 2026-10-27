@@ -5,7 +5,8 @@ genre) and `SERUM.md` (Serum 2). This file is step-by-step procedures for common
 extending an arrangement, co-writing, grooves, MIDI cleanup, chords, mix diagnosis, side-chain,
 reference matching, pre-master checks, vocal chains, tempo and session snapshots, technical
 checks and layer alignment, parallel compression, a mastering chain, creative send effects, adding
-one section and designing a synth sound. Several are
+one section, designing a synth sound, transitions, a sound check, and balancing and mastering by
+measurement. Several are
 adapted from glincker/ableton-skills (MIT, see `THIRD_PARTY_NOTICES.md`).
 
 **Principles in every workflow**
@@ -556,3 +557,102 @@ divisions), never a guessed 0-1 number; modulation as source -> destination, bas
 rate, sync and retrigger. Automation is recorded with `live_automation_record`, not listed. If
 nothing is left: "No manual settings required." Never call a sound finished while manual
 steps remain.
+
+## 18. Transitions that land
+
+User: *"the drop doesn't hit"*, *"the sections feel disconnected"*, *"add a transition"*.
+Adapted from hellyee's arrangement-transitions skill (MIT, `THIRD_PARTY_NOTICES.md`); the
+build-up toolbox is `PRODUCTION.md` §3-4. A transition is energy management: what leaves, what
+enters, what bridges the boundary.
+
+| Device | Recipe in LiveBridge | Effect |
+|---|---|---|
+| Riser | a riser preset or noise sweep held 4-8 bars into the boundary (`SERUM.md` noise riser) | rising tension |
+| Filter sweep | `live_automation_record(parameter="Frequency", device="Auto Filter", track=..., shape="ramp_up", start=..., end=...)` on the lead or pad itself | the part becomes the riser |
+| Roll | hat/shaker 16ths -> 32nds over the last 2 bars, velocity 40 -> 127 (`live_clip_write_pattern`) | acceleration |
+| Kick roll | last 2 bars: 8ths -> 16ths, velocity rising | heartbeat before the drop |
+| **Gasp** | silence on **every** track for the last 1-2 beats — including arps and held pads (delete or shorten those clips) | the silence that makes the hit land |
+| Impact | crash + kick (velocity 115+) exactly on the downbeat | the exclamation mark |
+| Sub drop | a 1-bar low note with pitch automation 0 -> -24 semitones over ~3.5 beats | the floor falls away |
+| Melodic pre-cut | pads/leads stop 1-2 bars before the drums do | a staged exit reads as intent |
+| Downlifter | a reversed riser or falling sweep after the boundary | settling into the new section |
+
+**The rule you can measure: a drop only hits if the moment before it is smaller.** Loop the
+last bars of the build, `live_engine_listen(seconds=4, save_as="build")`, then the first bars
+of the drop and `live_engine_compare(before="build")`: the drop must be louder (LUFS and
+peak), and the gasp should dip clearly. If the build is as loud as the drop, take energy out
+of the build (fewer layers, a filter, no kick in its last bar) instead of piling FX onto the
+drop. A gasp that barely dips: some layer kept playing — find it (`live_engine_listen(
+track="all")`) and cut it there too.
+
+| Genre | Transitions |
+|---|---|
+| Techno | no drama: layers enter and leave one at a time over 8-16 bars, filters open slowly, the kick almost never stops (drop it for exactly one bar instead of a gasp). Keep the full riser kit for one moment in the track, if any |
+| House | a filter sweep on the chord loop, an open-hat lift in the last bar, a 1-beat drum cut before the new 8-bar phrase; a short snare fill (4 hits, beats 3-4). Every 8 or 16 bars |
+| Trance / uplifting | the full kit, staged: melodic pre-cut (2 bars) -> 8-bar riser + kick roll + shaker crescendo -> gasp (1-2 beats) -> impact + sub drop -> everything at once. Into the breakdown: all drums out on a downbeat, pad and lead ring on. Drop 2 adds a layer drop 1 lacked |
+| Melodic techno | trance staging, stretched and subtler: 16-bar filter climbs, no impacts, the arp never stops (gap it only at *the* drop) |
+| Drum & bass | switch-ups: a new drum pattern every 16 bars, the last 2 bars a fill (displaced snares, doubled kicks); bass swells into boundaries; drops announced by a bar of drums only or a stab |
+| Trap | hat rolls are the transition (16ths into 32nds/triplets in the last bar), a pitch-rising 808 or riser, a full silent bar before the drop, the 808 gliding into its first note |
+| Ambient | no fills or impacts: crossfades — one pad's volume/filter falls over 8-16 bars while the next rises; boundaries should be inaudible as events |
+
+Section lengths: techno phrases of 16/32 bars (intro 16-32 drums only, DJ-friendly), house
+8/16, trance 8/16/32 (breakdown 16-32 is the emotional core), DnB 16, trap 4/8.
+
+## 19. Sound check before you build
+
+Adapted from hellyee's sound-check skill (MIT). Everything in Live fails loudly except silence:
+a track that makes no sound — an empty drum pad, a filter shut, a fired session clip that
+overrides the arrangement — writes, places and renders without an error. Check before an
+arrangement is built on the parts, after loading any drum rack, and whenever the user says
+something is missing, thin or inaudible.
+
+1. Loop a section where every part plays, `live_transport_play`, then `live_sound_check()`.
+   Per track: `signal` (ok / quiet / silent), the guessed `role`, `health` (a patch strangled by
+   its filter: one band holding 85%+ of the energy; nothing above 2 kHz; no transients on a
+   pluck or drum) and every filter cutoff against the role's working floor (bass and pads
+   ~1.5 kHz, keys, leads and vocals ~3 kHz).
+2. **A silent track: never raise the fader first.** Work down `problems`: no instrument? a
+   drum note on an empty pad (`live_drumrack_overview` — factory kits often fill only 36-51)?
+   muted, or another track soloed? does the section contain its clip? 'Back to Arrangement'
+   (`live_transport_set(back_to_arranger=false)`)? a closed filter? Only a part that is
+   genuinely quiet is a level problem: raise velocities or the device output, then the fader.
+3. Read `order` as a mix: for four-on-the-floor, kick on top, bass under it, then lead,
+   percussion, pads. Upside down = a balance problem before 176 bars are written over it.
+4. A strangled preset: open the **lowest** low-pass in the chain (it wins; opening another
+   filter does nothing), or pick another preset. These checks catch *broken*, not *boring* —
+   say the numbers, let the user judge the tone.
+5. After editing a session clip, the arrangement copies are not updated: re-place them
+   (`live_arrangement_duplicate_clip`) and check again. Report what you measured ("hats now
+   -24 LUFS, high band 4%"), not the intention.
+
+## 20. Balance and master by measurement
+
+User: *"balance the mix"*, *"kick should sit on top"*, *"master it for Spotify"*, *"make a club
+version"*. Needs a LiveBridge Engine at the end of each track and on the master (`SKILL.md`
+§4b says how to add them). Mixing first, mastering second; most "weak" masters are
+mix problems.
+
+1. **Sound check** (§19) — nothing silent, nothing strangled.
+2. **Balance**: loop the fullest section, `live_mix_balance(genre="techno")` (or without a
+   genre: kick on top, sub -1, bass -3, snare -3, vocal -2, lead -6, keys -8, percussion -9,
+   pads -10, hats -11, fx -13 LU). It measures every part pre-fader, sets the faders in dB (one
+   undo step per pass), checks again, and trims everything together for 6 dB of master
+   headroom. Unclear roles: pass `roles={"Audio 3": "hats"}`. Start with `apply=false` on the
+   user's own mix and show the plan. Then listen together — targets are a starting point.
+3. **Spectral fixes where they belong**: `bands` in the result says per band whether the
+   excess is shared by 3+ tracks (one master/bus EQ move keeps phase coherent) or owned by 1-2
+   tracks (cut it there, leave the master alone). For a genre's typical balance and loudness,
+   `live_audio_analyze(file_path=<bounce>, genre="techno")` — rules of thumb; a reference
+   track (§8) beats them.
+4. **Master**: loop the loudest section, `live_master_auto(destination="streaming")` (or
+   `"club"`, `"apple"`, `"soundcloud"`, `"demo"`, `lufs=-9`). It reuses the chain or builds EQ
+   Eight -> Glue Compressor -> Limiter before the master's Engine (never a second limiter after
+   a plug-in one), sets the ceiling, trims the faders if the mix is too hot, then raises the
+   limiter gain step by step until the integrated loudness is on target. It stops early when the
+   crest factor collapses (the punch goes) — then fix the mix instead (kick/bass balance, fewer
+   layers in the drop). With `loud_bar=` and `quiet_bar=` it also checks that the drop and the
+   breakdown stay apart and backs off if limiting squashed them together.
+5. **Glue threshold** is the user's step (its gain-reduction meter is not readable): 1-3 dB on
+   the loudest section. One master can't serve streaming *and* club: run it once per
+   destination (a -8 LUFS club master is turned down on Spotify with its transients crushed).
+   Export is the user's (24-bit WAV; dither only for 16-bit).

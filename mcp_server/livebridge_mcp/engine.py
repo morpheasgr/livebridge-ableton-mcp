@@ -28,8 +28,8 @@ from typing import Any
 from .audio_analysis import BANDS, _flags
 from .config import config_dir
 
-__all__ = ["EngineError", "capture", "capture_dir", "devices", "engine_dir", "lom_to_max",
-           "parse_rate", "request", "select", "summarize"]
+__all__ = ["EngineError", "capture", "capture_dir", "devices", "engine_dir", "listen",
+           "lom_to_max", "parse_rate", "request", "select", "summarize"]
 
 FIELDS = ("ms_left", "ms_right", "peak_left", "peak_right", "ms_k",
           "band_sub", "band_bass", "band_low_mid", "band_mud", "band_mid", "band_presence",
@@ -370,6 +370,20 @@ def summarize(frames: list[list[float]], fields: list[str] | tuple[str, ...] = F
                             "peak_db": _db(chunk_peak * chunk_peak)})
         result["timeline"] = entries
     return result
+
+
+def listen(device: dict[str, Any], seconds: float, kind: str = "auto",
+           history: bool = False) -> dict[str, Any]:
+    """One device's reading over ``seconds`` (:func:`summarize` plus ``device``)."""
+    answer = request(device, "frames", {"seconds": seconds, "wait": not history},
+                     timeout=seconds + 10.0)
+    if not isinstance(answer, dict):
+        raise EngineError("protocol", "the device sent an unexpected answer")
+    role = answer.get("role") or device.get("role")
+    chosen = kind if kind != "auto" else ("mix" if role == "master" else "stem")
+    result = summarize(answer.get("frames") or [], answer.get("fields") or FIELDS, kind=chosen)
+    return {"device": {"role": role, "track": answer.get("track") or device.get("track")},
+            **result}
 
 
 def wait_for(predicate, timeout: float, interval: float = 0.05) -> bool:
