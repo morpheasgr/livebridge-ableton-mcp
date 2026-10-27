@@ -1,8 +1,15 @@
 <p align="center">
-  <a href="https://valentijnh.github.io/livebridge-ableton-mcp/"><img src="docs/images/banner.png" alt="LiveBridge: make music in Ableton Live by talking to Claude" width="100%"></a>
+  <a href="https://morpheasgr.github.io/livebridge-ableton-mcp/"><img src="docs/images/banner.png" alt="LiveBridge: make music in Ableton Live by talking to Claude" width="100%"></a>
 </p>
 
 <h1 align="center">LiveBridge · Ableton Live MCP server for Claude</h1>
+
+> **This is the `morpheasgr` fork of [valentijnh/livebridge-ableton-mcp](https://github.com/valentijnh/livebridge-ableton-mcp).**
+> It adds the optional Max for Live devices (LiveBridge Engine and LiveBridge MIDI: real-time
+> listening, A/B and masking while playing, captures, live modulation, follow actions, MIDI input,
+> faster automation recording), sample and plug-in search across Live's browser, arrangements that
+> keep their automation, production know-how (genres, Serum 2, workflows), a sound library,
+> generative notes and session memory. Website: <https://morpheasgr.github.io/livebridge-ableton-mcp/>
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
@@ -12,17 +19,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/valentijnh/livebridge-ableton-mcp/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/valentijnh/livebridge-ableton-mcp/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/morpheasgr/livebridge-ableton-mcp/actions/workflows/tests.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Ableton Live 12" src="https://img.shields.io/badge/Ableton%20Live-12-111111">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB">
   <img alt="macOS and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-555555">
   <a href="https://modelcontextprotocol.io"><img alt="Model Context Protocol server" src="https://img.shields.io/badge/MCP-server-D97757"></a>
-  <a href="https://buymeacoffee.com/valentijnh"><img alt="Buy me a coffee" src="https://img.shields.io/badge/buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=black"></a>
+  <a href="https://buymeacoffee.com/valentijnh"><img alt="Buy the original author a coffee" src="https://img.shields.io/badge/buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=black"></a>
 </p>
 
 <p align="center">
-  <a href="https://valentijnh.github.io/livebridge-ableton-mcp/"><b>Website</b></a> ·
+  <a href="https://morpheasgr.github.io/livebridge-ableton-mcp/"><b>Website</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="examples/"><b>Examples</b></a> ·
   <a href="examples/prompts.md"><b>100+ prompts</b></a> ·
@@ -147,14 +154,14 @@ Claude Code. Node.js (`npx`) is only needed for Splice in Claude Desktop's JSON 
 ### macOS
 
 ```bash
-git clone https://github.com/valentijnh/livebridge-ableton-mcp.git LiveBridge && cd LiveBridge
+git clone https://github.com/morpheasgr/livebridge-ableton-mcp.git LiveBridge && cd LiveBridge
 ./installers/install.sh            # or: python3 installers/install.py
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/valentijnh/livebridge-ableton-mcp.git LiveBridge; cd LiveBridge
+git clone https://github.com/morpheasgr/livebridge-ableton-mcp.git LiveBridge; cd LiveBridge
 powershell -ExecutionPolicy Bypass -File installers\install.ps1   # or: py installers\install.py
 ```
 
@@ -341,7 +348,7 @@ spectrum, stereo, tempo and key. Your ears still have the final say.
 **Is it free?**
 LiveBridge is free and open source (MIT). You need Ableton Live 12 and a Claude plan; Splice is
 optional (searching is free, downloads use your Splice credits). If it helps your music, you can
-[buy me a coffee](https://buymeacoffee.com/valentijnh).
+[buy the original author a coffee](https://buymeacoffee.com/valentijnh).
 
 **Does it work on Windows? With Live and Claude on different computers?**
 Yes to both: macOS and Windows, and Claude and Live can run on two computers in your network,
@@ -390,7 +397,7 @@ More in [CONTRIBUTING.md](CONTRIBUTING.md); changes per version in [CHANGELOG.md
 ## Support
 
 LiveBridge is free. If it saves you time or sparks a track, you can
-[buy me a coffee](https://buymeacoffee.com/valentijnh) ☕. A star on GitHub, a bug report or a note
+[buy the original author (@valentijnh) a coffee](https://buymeacoffee.com/valentijnh) ☕. A star on GitHub, a bug report or a note
 about what you made with it helps just as much.
 
 ## License

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://valentijnh.github.io/livebridge-ableton-mcp/sitemap.xml
+Sitemap: https://morpheasgr.github.io/livebridge-ableton-mcp/sitemap.xml
