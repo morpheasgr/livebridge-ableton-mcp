@@ -7,7 +7,11 @@
 // ~/.livebridge/engine/<instance>.json (port, token, role, track), removed when the device
 // goes away, so the MCP server finds every Engine without fixed ports.
 //
-// Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames", "args": {...}}
+// It also records the audio passing through it to a WAV file on request ("capture": the
+// patch's sfrecord~, driven through the "capture" outlet), starting at a given wall-clock
+// time so several devices record the same moment.
+//
+// Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames" | "capture", "args": {...}}
 // Answers:  {"id": 1, "ok": true, "result": {...}} or {"id": 1, "ok": false,
 //           "error": {"type": "bad_args", "message": "..."}}
 
@@ -27,7 +31,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -39,6 +43,9 @@ const FRAME_FIELDS = [
 const HISTORY_SECONDS = 60;
 const MAX_WAIT_SECONDS = 30;
 const MAX_LINE = 64 * 1024;
+const MAX_CAPTURE_SECONDS = 60;
+const MAX_CAPTURE_DELAY_MS = 5000;
+const CAPTURE_NAME = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,119}\.wav$/;
 
 const state = {
   instance: crypto.randomBytes(6).toString("hex"),
@@ -49,10 +56,16 @@ const state = {
   frames: [], // [timestamp_ms, ...values]
   waiters: new Set(),
   port: null,
+  capturing: false,
 };
 
 function registryDir() {
   return process.env.LIVEBRIDGE_ENGINE_DIR || path.join(os.homedir(), ".livebridge", "engine");
+}
+
+// Captures land here; the MCP server reads them from the same folder.
+function captureDir() {
+  return process.env.LIVEBRIDGE_CAPTURE_DIR || path.join(os.homedir(), ".livebridge", "captures");
 }
 
 function registryFile() {
@@ -142,8 +155,94 @@ function hello() {
     name: NAME, version: VERSION, protocol: PROTOCOL, instance: state.instance,
     role: state.role, track: state.track, started: state.started, fields: FRAME_FIELDS,
     frames_buffered: state.frames.length, frame_interval_ms: frameInterval(),
-    history_seconds: HISTORY_SECONDS,
+    history_seconds: HISTORY_SECONDS, capture: Boolean(maxApi), capturing: state.capturing,
   };
+}
+
+// Record `seconds` of the device's audio to <captureDir>/<name>, starting at `at` (epoch ms,
+// default now). Answers once the file is closed.
+function capture(args, reply) {
+  const seconds = Number(args.seconds);
+  const name = String(args.name || "");
+  const at = args.at === undefined ? Date.now() : Number(args.at);
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_CAPTURE_SECONDS) {
+    reply({ type: "bad_args", message: "seconds must be > 0 and <= " + MAX_CAPTURE_SECONDS });
+    return;
+  }
+  if (!CAPTURE_NAME.test(name)) {
+    reply({ type: "bad_args", message: "name must be a plain file name ending in .wav" });
+    return;
+  }
+  const delay = at - Date.now();
+  if (!Number.isFinite(delay) || delay > MAX_CAPTURE_DELAY_MS) {
+    reply({ type: "bad_args", message: "at must be within " + MAX_CAPTURE_DELAY_MS + " ms" });
+    return;
+  }
+  if (!maxApi) {
+    reply({ type: "unsupported", message: "capturing needs the device running in Live" });
+    return;
+  }
+  if (state.capturing) {
+    reply({ type: "busy", message: "this device is already capturing" });
+    return;
+  }
+  const folder = captureDir();
+  try {
+    fs.mkdirSync(folder, { recursive: true });
+  } catch (error) {
+    reply({ type: "io", message: "cannot create " + folder + ": " + error.message });
+    return;
+  }
+  const file = path.join(folder, name);
+  state.capturing = true;
+  // Max takes forward slashes on Windows too ("C:/Users/...")
+  maxApi.outlet("capture", "open", file.split(path.sep).join("/"));
+  let started = null;
+  setTimeout(() => {
+    started = Date.now();
+    maxApi.outlet("capture", 1);
+    setTimeout(() => {
+      maxApi.outlet("capture", 0);
+      const stopped = Date.now();
+      waitForFile(file, 40, () => {
+        state.capturing = false;
+        let size = 0;
+        try {
+          size = fs.statSync(file).size;
+        } catch (error) {
+          size = 0;
+        }
+        if (size <= 44) {
+          reply({ type: "capture_failed", message: "the device wrote no audio to " + file });
+          return;
+        }
+        reply(null, {
+          file_path: file, started: started, seconds: (stopped - started) / 1000,
+          role: state.role, track: state.track, bytes: size,
+        });
+      });
+    }, seconds * 1000);
+  }, Math.max(0, delay));
+}
+
+// sfrecord~ closes the file asynchronously: poll until its size stops changing.
+function waitForFile(file, attempts, done) {
+  let last = -1;
+  const check = (left) => {
+    let size = -1;
+    try {
+      size = fs.statSync(file).size;
+    } catch (error) {
+      size = -1;
+    }
+    if ((size > 44 && size === last) || left <= 0) {
+      done();
+      return;
+    }
+    last = size;
+    setTimeout(() => check(left - 1), 50);
+  };
+  setTimeout(() => check(attempts), 50);
 }
 
 function framesNow(seconds) {
@@ -179,6 +278,8 @@ function handle(request, reply) {
       state.waiters.delete(waiter);
       answer(waiter.collected);
     }, seconds * 1000);
+  } else if (request.cmd === "capture") {
+    capture(args, reply);
   } else {
     reply({ type: "unknown_command", message: "unknown command " + JSON.stringify(request.cmd) });
   }
@@ -272,4 +373,4 @@ function start() {
 
 start();
 
-module.exports = { addFrame, setContext, FRAME_FIELDS, state };
+module.exports = { addFrame, setContext, capture, FRAME_FIELDS, state };

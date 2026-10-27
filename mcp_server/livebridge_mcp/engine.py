@@ -18,7 +18,9 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import socket
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -26,7 +28,8 @@ from typing import Any
 from .audio_analysis import BANDS, _flags
 from .config import config_dir
 
-__all__ = ["EngineError", "devices", "engine_dir", "request", "summarize"]
+__all__ = ["EngineError", "capture", "capture_dir", "devices", "engine_dir", "request",
+           "select", "summarize"]
 
 FIELDS = ("ms_left", "ms_right", "peak_left", "peak_right", "ms_k",
           "band_sub", "band_bass", "band_low_mid", "band_mud", "band_mid", "band_presence",
@@ -47,6 +50,13 @@ class EngineError(RuntimeError):
 def engine_dir() -> Path:
     override = os.environ.get("LIVEBRIDGE_ENGINE_DIR", "").strip()
     return Path(override).expanduser() if override else config_dir() / "engine"
+
+
+def capture_dir() -> Path:
+    """Where the devices write captures (``LIVEBRIDGE_CAPTURE_DIR`` moves it; engine.js reads
+    the same variable)."""
+    override = os.environ.get("LIVEBRIDGE_CAPTURE_DIR", "").strip()
+    return Path(override).expanduser() if override else config_dir() / "captures"
 
 
 def request(device: dict[str, Any], cmd: str, args: dict[str, Any] | None = None,
@@ -128,6 +138,94 @@ def choose(found: list[dict[str, Any]], track: str | None = None) -> dict[str, A
             return device
     raise EngineError("not_found", f"no Engine on track {track!r} — running on: "
                       + ", ".join(_label(d) for d in found))
+
+
+def select(found: list[dict[str, Any]], tracks: Any = None,
+           master: bool = True) -> list[dict[str, Any]]:
+    """Several devices: ``tracks`` None / "all" = every one (without the master's when
+    ``master`` is false), else a list of track names ("master" for the master's)."""
+    if not found:
+        raise EngineError("not_found", "no LiveBridge Engine is running")
+    if tracks is None or tracks == "all":
+        chosen = [d for d in found if master or d.get("role") != "master"]
+        if not chosen:
+            raise EngineError("not_found", "only the master has an Engine — put one at the end "
+                              "of each track to compare")
+        return chosen
+    names = [tracks] if isinstance(tracks, str) else list(tracks)
+    chosen = []
+    for name in names:
+        device = choose(found, str(name))
+        if device not in chosen:
+            chosen.append(device)
+    return chosen
+
+
+def each(chosen: list[dict[str, Any]], call) -> list[Any]:
+    """``call(device)`` for every device at the same time; an EngineError becomes the
+    result for that device."""
+    results: list[Any] = [None] * len(chosen)
+
+    def run(i: int, device: dict[str, Any]) -> None:
+        try:
+            results[i] = call(device)
+        except EngineError as exc:
+            results[i] = exc
+
+    threads = [threading.Thread(target=run, args=(i, d), daemon=True)
+               for i, d in enumerate(chosen)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    return results
+
+
+_KEEP_CAPTURES_S = 7 * 24 * 3600
+
+
+def _file_label(device: dict[str, Any]) -> str:
+    text = "master" if device.get("role") == "master" else str(device.get("track") or "track")
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", text).strip("-")[:40] or "track"
+
+
+def prune_captures(now: float | None = None) -> None:
+    """Delete captures older than a week (only files this module named)."""
+    now = time.time() if now is None else now
+    try:
+        for path in capture_dir().glob("lb-*.wav"):
+            try:
+                if now - path.stat().st_mtime > _KEEP_CAPTURES_S:
+                    path.unlink()
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
+def capture(chosen: list[dict[str, Any]], seconds: float,
+            lead_ms: int = 400) -> list[dict[str, Any] | EngineError]:
+    """Record ``seconds`` on every device in ``chosen``, all starting at the same moment
+    (``lead_ms`` from now). Returns each device's answer ({file_path, seconds, role, track,
+    started}) or its EngineError."""
+    prune_captures()
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    at = int(time.time() * 1000) + lead_ms
+    names: set[str] = set()
+
+    def name_for(device: dict[str, Any]) -> str:
+        base = f"lb-{stamp}-{_file_label(device)}"
+        name, n = base + ".wav", 2
+        while name in names or (capture_dir() / name).exists():
+            name, n = f"{base}-{n}.wav", n + 1
+        names.add(name)
+        return name
+
+    plan = [(device, name_for(device)) for device in chosen]
+    by_device = {id(device): name for device, name in plan}
+    return each(chosen, lambda device: request(
+        device, "capture", {"seconds": seconds, "name": by_device[id(device)], "at": at},
+        timeout=seconds + lead_ms / 1000.0 + 10.0))
 
 
 def _label(device: dict[str, Any]) -> str:

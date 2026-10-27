@@ -14,6 +14,14 @@ the MCP server package and the installer have their own version numbers. `live_s
   it registers in `~/.livebridge/engine/`; the Remote Script is unchanged. Built from source by
   `max_for_live/build.py`; the installer copies it into the User Library
   (`--no-engine` skips it). See `docs/ENGINE.md`.
+- **Engine on tracks: A/B, captures and live masking** (`live_engine_compare`,
+  `live_engine_capture`, `live_engine_masking`; device 1.1.0): put the Engine at the end of
+  tracks too. `live_engine_listen(save_as=...)` + `live_engine_compare` is the A/B check of a
+  change while the song loops; `live_engine_capture` records several devices to WAV at the same
+  moment (`~/.livebridge/captures`, kept a week); `live_engine_masking` captures every track
+  device and runs the masking analysis at fader level, skipping muted tracks;
+  `live_engine_listen(track="all")` reads every device over one window. The device now also
+  reports which track it is on when Node for Max starts after the device.
 - **Production knowledge for Claude**, next to the skill and served as MCP resources:
   `GENRES.md` (`livebridge://genres`: drum patterns, bass lines, chords and sounds for techno,
   hardgroove, house, UK and speed garage, trance, bass music, synthwave, acid, ambient and

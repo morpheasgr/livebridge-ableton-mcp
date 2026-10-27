@@ -97,6 +97,7 @@ SAMPLE_ARGS = {
                                        {"track": "Vocals", "slot": 0, "name": "Copy"}]},
     "live_clip_note_chance": {"track": "Bass", "slot": 0, "probability": 0.8},
     "live_clip_write_euclid": {"track": "Drums", "slot": 3, "rhythms": {"kick": "4/16"}},
+    "live_engine_compare": {"before": "before"},
     "live_memory_note": {"text": "consistency test", "project": "Smoke"},
     "live_memory_update": {"id": 1, "done": True},
     "live_memory_forget": {"id": 1},
@@ -264,6 +265,7 @@ def test_every_tool_runs_end_to_end(name, tcp_bridge, song, tmp_path, monkeypatc
     monkeypatch.setenv("LIVEBRIDGE_LIVE_DATABASE", str(tmp_path / "no Live database"))
     # Engine tools: no running LiveBridge Engine device
     monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path / "engine"))
+    monkeypatch.setenv("LIVEBRIDGE_CAPTURE_DIR", str(tmp_path / "captures"))
     app = _APP
     token = ""
     if name in NEEDS_TOKEN:

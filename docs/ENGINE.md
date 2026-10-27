@@ -2,16 +2,23 @@
 
 LiveBridge talks to Live through a Python Remote Script, and Live's Python API cannot hear audio.
 **LiveBridge Engine** is an optional Max for Live audio effect that can: put it on the master
-track and Claude reads loudness, peaks, spectral balance and stereo image *while the song
-plays*, without bouncing anything.
+track (and at the end of any track you want Claude to hear on its own) and Claude reads
+loudness, peaks, spectral balance and stereo image *while the song plays*, compares before and
+after a change, records what it hears and finds masking between tracks — without bouncing.
 
 | Tool | What it does |
 |---|---|
 | `live_engine_status` | Which Engine devices run, where (master or a track) and whether audio frames arrive |
-| `live_engine_listen` | Listen for `seconds` (or read the last `seconds` with `history=true`): momentary / short-term / window LUFS, peak, RMS, crest factor, 8-band balance, stereo correlation, width, width below 120 Hz, mix flags, optional per-second `timeline` |
+| `live_engine_listen` | Listen for `seconds` (or read the last `seconds` with `history=true`): momentary / short-term / window LUFS, peak, RMS, crest factor, 8-band balance, stereo correlation, width, width below 120 Hz, mix flags, optional per-second `timeline`; `track="all"` reads every device over one window; `save_as` keeps the reading for an A/B |
+| `live_engine_compare` | A/B: a saved reading against a second one or what plays now on the same device — deltas, better/worse, flags resolved or new |
+| `live_engine_capture` | Record several devices to WAV at the same moment (`~/.livebridge/captures`, kept a week) for `live_audio_analyze`, `live_audio_compare`, `live_sample_import` |
+| `live_engine_masking` | Capture every track device at once and run the masking analysis of `live_audio_masking` at fader level (muted / -inf tracks left out) |
 
-Everything else in LiveBridge works without the device; without it these two tools say how to
+Everything else in LiveBridge works without the device; without it these tools say how to
 add it.
+
+**On tracks**, put the Engine **last** in the chain: it hears the track after its effects but
+before the fader, pan and mute (`live_engine_masking` applies the fader level itself).
 
 ## Install
 
@@ -19,7 +26,8 @@ Needs Max for Live (Live Suite, or Standard with the add-on). The installer copi
 `<User Library>/Presets/Audio Effects/Max Audio Effect/LiveBridge Engine/` (`--no-engine` skips
 it; the uninstaller removes it, `--keep-engine` keeps it). In Live's browser: **User Library >
 Presets > Audio Effects > Max Audio Effect > LiveBridge Engine** — drag it onto the master
-track. It passes audio through untouched; its status line reads "ready", then "master" (or the track name) once it knows where it sits.
+track. It passes audio through untouched; its status line reads "ready", then "master" (or
+the track name) once it knows where it sits.
 
 Manual install: copy the folder `max_for_live/LiveBridge Engine/` (all four files: the `.amxd`,
 `engine.js`, `context.js`, `lb_engine.gendsp`) anywhere Live's browser can see, keeping them
@@ -52,8 +60,11 @@ together.
   server when nothing answers.
 - **Protocol**: one JSON object per line, `{"id", "token", "cmd", "args"}` ->
   `{"id", "ok", "result" | "error": {"type", "message"}}`. Commands: `hello` (role, track,
-  version, frames buffered) and `frames` (`seconds` ≤ 60, `wait`: true = collect from now on,
-  false = the last `seconds`).
+  version, frames buffered), `frames` (`seconds` ≤ 60, `wait`: true = collect from now on,
+  false = the last `seconds`) and `capture` (`seconds` ≤ 60, `name`: a plain `.wav` file name
+  in the capture folder, `at`: start time in epoch ms, at most 5 s ahead — the MCP server
+  gives every device the same `at`). Captures are written by the patch's `sfrecord~`
+  (`open <path>`, `1`, `0`); `LIVEBRIDGE_CAPTURE_DIR` moves the folder.
 - **Host side** (`mcp_server/livebridge_mcp/engine.py`): turns frames into readings. LUFS is
   K-weighted and averaged over the window, excluding frames below -70 LUFS (no relative gate);
   the peak is a sample peak, so values can differ from a mastering meter by a fraction of a dB.
@@ -77,6 +88,5 @@ readings), checks the patch wiring, and runs `engine.js` under Node with a stand
 
 ## Roadmap
 
-The same device grows in later steps: per-track listening (masking, A/B while playing), audio
-capture, live parameter modulation, transport-synced follow actions; a separate **LiveBridge
-MIDI** device handles MIDI input.
+Next for the same device: live parameter modulation and transport-synced follow actions; a
+separate **LiveBridge MIDI** device handles MIDI input.

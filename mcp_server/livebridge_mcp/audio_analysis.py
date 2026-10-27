@@ -458,8 +458,10 @@ def masking(sources: list[dict[str, Any]], start: float = 0.0,
     """Where parts fight for the same frequencies at the same time.
 
     Args:
-        sources: [{"name": label, "path": audio file}] — 2 to 8 bounces of the SAME time range
-            (e.g. `live_record_resample` of each track over the same bars), aligned at 0 s.
+        sources: [{"name": label, "path": audio file, "gain_db"?}] — 2 to 8 bounces of the
+            SAME time range (e.g. `live_record_resample` of each track over the same bars),
+            aligned at 0 s. ``gain_db`` is added to a part's levels (a pre-fader capture
+            heard at its fader level).
         start, duration: window in seconds.
         top: bands reported per pair.
 
@@ -473,6 +475,8 @@ def masking(sources: list[dict[str, Any]], start: float = 0.0,
     mats, parts, notes = [], [], []
     for source in sources:
         levels, seconds = _band_matrix(source["path"], start, duration)
+        if source.get("gain_db"):
+            levels = levels + float(source["gain_db"])
         mats.append(levels)
         loudest = int(np.argmax(np.max(levels, axis=1)))
         parts.append({"name": source["name"], "duration": seconds,

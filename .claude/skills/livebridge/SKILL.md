@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~187 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~190 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -179,8 +179,14 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   `live_transport_play()` then `live_engine_listen(seconds=4)` -> momentary/short-term LUFS,
   peak, crest, band balance, correlation, `low_end_width` and the same `flags`. Right after
   playback, `live_engine_listen(history=True, seconds=30)` answers at once from the last minute.
-  Use it for quick before/after checks of a mix move; bounce + `live_audio_analyze` for tempo,
-  key and the energy curve. No device -> the tool says how to add it; don't insist.
+  `track="all"` reads every device over the same window (track balance).
+  - *A/B*: loop the section, `live_engine_listen(seconds=4, save_as="before")`, make the
+    change, `live_engine_compare(before="before")` -> what changed, better/worse.
+  - *Masking while playing*: with an Engine at the end of each track to check,
+    `live_engine_masking(seconds=8)` (fader levels included, muted tracks skipped).
+  - *Capture*: `live_engine_capture(seconds=8, tracks=["master"])` -> WAV paths for
+    `live_audio_analyze` (tempo, key, energy), `live_audio_compare` or `live_sample_import`.
+  No device -> the tool says how to add it; don't insist.
 
 ## 4c. Remember, keep sounds, generate, compare
 

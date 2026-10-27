@@ -245,7 +245,10 @@ def engine_patcher() -> dict:
         _box("obj-thisdevice", "live.thisdevice", [440.0, 220.0, 90.0, 22.0], 1, 3,
              ["bang", "int", "int"]),
         _box("obj-context", "js context.js", [440.0, 260.0, 90.0, 22.0], 1, 1),
-        _box("obj-route", "route status log context", [120.0, 340.0, 150.0, 22.0], 1, 4),
+        _box("obj-route", "route status log context capture", [120.0, 340.0, 200.0, 22.0],
+             1, 5),
+        # recording for captures: "open <path>", 1 (start), 0 (stop and close) from engine.js
+        _box("obj-sfrecord", "sfrecord~ 2", [20.0, 380.0, 80.0, 22.0], 2, 1, ["signal"]),
         _box("obj-set", "prepend set", [120.0, 380.0, 80.0, 22.0], 1, 1),
         _box("obj-print", "print LiveBridgeEngine", [240.0, 380.0, 140.0, 22.0], 1, 0),
         {"box": {"id": "obj-status", "maxclass": "message", "text": "starting...",
@@ -265,7 +268,9 @@ def engine_patcher() -> dict:
         _line("obj-thisdevice", 0, "obj-context", 0), _line("obj-context", 0, "obj-node", 0),
         _line("obj-node", 0, "obj-route", 0), _line("obj-route", 0, "obj-set", 0),
         _line("obj-set", 0, "obj-status", 0), _line("obj-route", 1, "obj-print", 0),
-        _line("obj-route", 2, "obj-context", 0), _line("obj-route", 3, "obj-print", 0),
+        _line("obj-route", 2, "obj-context", 0), _line("obj-route", 3, "obj-sfrecord", 0),
+        _line("obj-route", 4, "obj-print", 0),
+        _line("obj-plugin", 0, "obj-sfrecord", 0), _line("obj-plugin", 1, "obj-sfrecord", 1),
     ]
     # metro -> trigger fires right to left: every snapshot~ reports into the pack, the
     # leftmost (pack's hot inlet) last, so one complete frame leaves per tick

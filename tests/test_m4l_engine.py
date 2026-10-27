@@ -201,10 +201,42 @@ require("readline").createInterface({ input: process.stdin }).on("line", (line) 
 });
 """
 MAX_API_STUB = r"""
+// Stand-in for Max: outlets are logged to OUTLET_LOG; "capture" messages act like the patch's
+// sfrecord~ ("open <path>", 1, 0) and write a stereo WAV holding a STUB_FREQ Hz sine.
+const fs = require("fs");
+const recorder = { file: null, started: 0 };
+
+function writeWav(file, seconds) {
+  const rate = 44100, frames = Math.round(seconds * rate), freq = Number(process.env.STUB_FREQ);
+  const data = Buffer.alloc(frames * 4);
+  for (let n = 0; n < frames; n++) {
+    const v = Math.round(0.5 * 32767 * Math.sin(2 * Math.PI * freq * n / rate));
+    data.writeInt16LE(v, n * 4);
+    data.writeInt16LE(v, n * 4 + 2);
+  }
+  const head = Buffer.alloc(44);
+  head.write("RIFF", 0); head.writeUInt32LE(36 + data.length, 4); head.write("WAVE", 8);
+  head.write("fmt ", 12); head.writeUInt32LE(16, 16); head.writeUInt16LE(1, 20);
+  head.writeUInt16LE(2, 22); head.writeUInt32LE(rate, 24); head.writeUInt32LE(rate * 4, 28);
+  head.writeUInt16LE(4, 32); head.writeUInt16LE(16, 34); head.write("data", 36);
+  head.writeUInt32LE(data.length, 40);
+  fs.writeFileSync(file, Buffer.concat([head, data]));
+}
+
 module.exports = {
   addHandler: (name, fn) => { global.__maxHandlers[name] = fn; },
   outlet: (...args) => {
-    require("fs").appendFileSync(process.env.OUTLET_LOG, JSON.stringify(args) + "\n");
+    fs.appendFileSync(process.env.OUTLET_LOG, JSON.stringify(args) + "\n");
+    if (args[0] !== "capture") {
+      return;
+    }
+    if (args[1] === "open") {
+      recorder.file = args[2];
+    } else if (args[1] === 1) {
+      recorder.started = Date.now();
+    } else if (args[1] === 0 && recorder.file && process.env.STUB_FREQ !== "none") {
+      writeWav(recorder.file, (Date.now() - recorder.started) / 1000);
+    }
   },
   post: () => {},
 };
@@ -212,7 +244,9 @@ module.exports = {
 
 
 @pytest.fixture
-def running_engine(tmp_path, monkeypatch):
+def engines(tmp_path, monkeypatch):
+    """Start engine.js processes (Node, stand-in max-api) sharing one registry and capture
+    folder: ``start(freq=None)`` -> (process, send, outlets log)."""
     if NODE is None:
         pytest.skip("node is not installed")
     stub = tmp_path / "node_modules" / "max-api"
@@ -220,29 +254,47 @@ def running_engine(tmp_path, monkeypatch):
     (stub / "index.js").write_text(MAX_API_STUB, encoding="utf-8")
     harness = tmp_path / "harness.js"
     harness.write_text(HARNESS, encoding="utf-8")
-    registry = tmp_path / "engine"
-    env = dict(os.environ, NODE_PATH=str(tmp_path / "node_modules"),
-               LIVEBRIDGE_ENGINE_DIR=str(registry), OUTLET_LOG=str(tmp_path / "outlets.log"))
-    process = subprocess.Popen([NODE, str(harness), str(ENGINE_JS)], stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-                               text=True)
+    registry, captures = tmp_path / "engine", tmp_path / "captures"
     monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(registry))
+    monkeypatch.setenv("LIVEBRIDGE_CAPTURE_DIR", str(captures))
+    started = []
 
-    def send(*message):
-        process.stdin.write(json.dumps(list(message)) + "\n")
-        process.stdin.flush()
+    def start(freq=None):
+        outlets = tmp_path / f"outlets{len(started)}.log"
+        env = dict(os.environ, NODE_PATH=str(tmp_path / "node_modules"),
+                   LIVEBRIDGE_ENGINE_DIR=str(registry), LIVEBRIDGE_CAPTURE_DIR=str(captures),
+                   OUTLET_LOG=str(outlets), STUB_FREQ=str(freq or "none"))
+        before = set(registry.glob("*.json"))
+        process = subprocess.Popen([NODE, str(harness), str(ENGINE_JS)], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                                   text=True)
+        started.append(process)
 
-    try:
-        assert engine.wait_for(lambda: list(registry.glob("*.json")), 10), \
+        def send(*message):
+            process.stdin.write(json.dumps(list(message)) + "\n")
+            process.stdin.flush()
+
+        assert engine.wait_for(lambda: set(registry.glob("*.json")) - before, 10), \
             process.stderr.read() if process.poll() is not None else "no registry file"
-        yield process, send, registry, tmp_path / "outlets.log"
+        return process, send, outlets
+
+    start.registry, start.captures = registry, captures
+    try:
+        yield start
     finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(5)
-            except subprocess.TimeoutExpired:
-                process.kill()
+        for process in started:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+
+
+@pytest.fixture
+def running_engine(engines):
+    process, send, outlets = engines()
+    return process, send, engines.registry, outlets
 
 
 TONE_FRAME = [0.125, 0.125, 0.5, 0.5, 0.25, 1e-6, 1e-6, 1e-5, 1e-4, 0.12, 1e-4, 1e-6, 1e-7,
@@ -324,3 +376,149 @@ def test_stale_registry_files_are_removed(tmp_path, monkeypatch):
                      encoding="utf-8")
     (tmp_path / "junk.json").write_text("{not json", encoding="utf-8")
     assert engine.devices() == [] and not stale.exists()
+
+
+# ----------------------------------------------------------------------------- step 2: several
+# devices, captures, live masking, A/B
+
+def _placed(engines, role, track, freq=None):
+    process, send, outlets = engines(freq)
+    send("context", role, *track.split())
+    return process, send
+
+
+def _wait_roles(count):
+    assert engine.wait_for(lambda: len([d for d in engine.devices()
+                                        if d.get("role") != "unknown"]) == count, 5)
+
+
+def _feed(send, frame, count=12, pause=0.02):
+    for _ in range(count):
+        send("frame", *frame)
+        time.sleep(pause)
+
+
+def test_listen_to_all_devices_and_compare(engines):
+    _process, master = _placed(engines, "master", "Main")
+    _process, bass = _placed(engines, "track", "Bass")
+    _wait_roles(2)
+    quiet = [v / 4 for v in TONE_FRAME]
+    for _ in range(12):
+        master.__call__("frame", *TONE_FRAME)
+        bass.__call__("frame", *quiet)
+        time.sleep(0.02)
+    app = create_app(BridgeClient(host="127.0.0.1", port=9, timeout=0.5))
+    both = call_tool(app, "live_engine_listen", {"track": "all", "history": True,
+                                                 "seconds": 5})
+    assert [d["device"] for d in both["devices"]] == [
+        {"role": "master", "track": "Main"}, {"role": "track", "track": "Bass"}]
+    louder, softer = (d["loudness"]["momentary_lufs"] for d in both["devices"])
+    assert louder - softer == pytest.approx(6.0, abs=0.2)
+    assert call_tool(app, "live_engine_listen", {"track": "all", "save_as": "x"})["type"] \
+        == "bad_args"
+
+    saved = call_tool(app, "live_engine_listen", {"track": "bass", "history": True,
+                                                  "seconds": 5, "save_as": "before"})
+    assert saved["saved_as"] == "before"
+    feeder = threading.Thread(target=_feed, args=(bass, TONE_FRAME, 10, 0.05))
+    feeder.start()
+    compared = call_tool(app, "live_engine_compare", {"before": "before", "seconds": 0.45})
+    feeder.join()
+    assert compared["after"]["device"] == {"role": "track", "track": "Bass"}
+    assert compared["comparison"]["delta"]["lufs"] == pytest.approx(6.0, abs=0.3)
+    assert any(c.startswith("loudness (LUFS) +6") for c in compared["comparison"]["changes"])
+    assert compared["saved"] == ["before"]
+    again = call_tool(app, "live_engine_compare", {"before": "before", "after": "before"})
+    assert again["comparison"]["changes"] == ["no measurable change"]
+    missing = call_tool(app, "live_engine_compare", {"before": "nope"})
+    assert missing["type"] == "not_found" and "before" in missing["error"]
+
+
+def test_capture_records_every_device_at_the_same_moment(engines):
+    _placed(engines, "master", "Main", freq=440)
+    _placed(engines, "track", "Bass", freq=80)
+    _wait_roles(2)
+    found = engine.devices()
+    answers = engine.capture(found, 0.5)
+    assert all(isinstance(a, dict) for a in answers), answers
+    assert abs(answers[0]["started"] - answers[1]["started"]) < 100
+    names = [Path(a["file_path"]).name for a in answers]
+    assert names[0].startswith("lb-") and names[0].endswith("-master.wav")
+    assert names[1].endswith("-Bass.wav")
+    assert all(Path(a["file_path"]).parent == engines.captures for a in answers)
+
+    app = create_app(BridgeClient(host="127.0.0.1", port=9, timeout=0.5))
+    result = call_tool(app, "live_engine_capture", {"seconds": 0.5, "tracks": ["Bass"]})
+    (only,) = result["captures"]
+    assert only["device"] == {"role": "track", "track": "Bass"}
+    assert only["seconds"] == pytest.approx(0.5, abs=0.1)
+    sf = pytest.importorskip("soundfile")
+    data, rate = sf.read(only["file_path"])
+    assert data.shape[1] == 2 and len(data) / rate == pytest.approx(0.5, abs=0.1)
+
+    # the device refuses names with folders, overlong waits and a second capture at once
+    device = engine.choose(engine.devices(), "Bass")
+    for args in ({"seconds": 1, "name": "../x.wav"}, {"seconds": 1, "name": "a.txt"},
+                 {"seconds": 0, "name": "a.wav"}, {"seconds": 1, "name": "a.wav",
+                                                    "at": time.time() * 1000 + 60000}):
+        with pytest.raises(engine.EngineError) as refused:
+            engine.request(device, "capture", args)
+        assert refused.value.type == "bad_args", args
+    first = threading.Thread(target=engine.request, args=(device, "capture",
+                                                           {"seconds": 0.6, "name": "a.wav"}))
+    first.start()
+    time.sleep(0.2)
+    with pytest.raises(engine.EngineError) as busy:
+        engine.request(device, "capture", {"seconds": 0.5, "name": "b.wav"})
+    first.join()
+    assert busy.value.type == "busy"
+    assert call_tool(app, "live_engine_capture", {"seconds": 0.1})["type"] == "bad_args"
+    assert call_tool(app, "live_engine_capture", {"tracks": ["Drums"]})["type"] == "not_found"
+
+
+def test_capture_failure_is_reported(engines):
+    _placed(engines, "track", "Bass", freq=None)              # writes no file
+    _wait_roles(1)
+    app = create_app(BridgeClient(host="127.0.0.1", port=9, timeout=0.5))
+    failed = call_tool(app, "live_engine_capture", {"seconds": 0.5})
+    assert failed["type"] == "invalid_state" and "no audio" in failed["error"]
+
+
+def test_old_captures_are_pruned(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVEBRIDGE_CAPTURE_DIR", str(tmp_path))
+    old, new, other = tmp_path / "lb-old.wav", tmp_path / "lb-new.wav", tmp_path / "mine.wav"
+    for path in (old, new, other):
+        path.write_bytes(b"x")
+    os.utime(old, (time.time() - 8 * 86400,) * 2)
+    os.utime(other, (time.time() - 8 * 86400,) * 2)
+    engine.prune_captures()
+    assert not old.exists() and new.exists() and other.exists()
+
+
+def test_live_masking_uses_fader_levels_and_skips_muted_tracks(engines, tcp_bridge, song):
+    pytest.importorskip("scipy")
+    _placed(engines, "master", "Main", freq=1000)
+    _placed(engines, "track", "Bass", freq=80)
+    _placed(engines, "track", "Drums", freq=80)
+    _placed(engines, "track", "Vocals", freq=3000)
+    _wait_roles(4)
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    song.tracks[1].mute = True                                # Vocals
+    result = call_tool(app, "live_engine_masking", {"seconds": 2})
+    assert "Vocals is muted — left out." in result["notes"]
+    (pair,) = result["pairs"]
+    assert sorted(pair["parts"]) == ["Bass", "Drums"] and pair["score"] >= 50
+    assert pair["bands"][0]["region"] in ("sub", "bass")
+    assert len(result["captures"]) == 2
+
+    # Drums 18 dB down at its fader (0.4): the 80 Hz overlap is no longer "close in level"
+    song.tracks[1].mute = False
+    song.tracks[2].mixer_device.volume.value = 0.4
+    spread = call_tool(app, "live_engine_masking", {"seconds": 2, "tracks": ["Bass", "Drums",
+                                                                             "Vocals"]})
+    scores = {tuple(sorted(p["parts"])): p["score"] for p in spread["pairs"]}
+    assert scores[("Bass", "Drums")] < pair["score"]
+    assert scores[("Bass", "Vocals")] < 10
+
+    assert call_tool(app, "live_engine_masking", {"tracks": ["Bass"]})["type"] == "bad_args"
+    assert call_tool(app, "live_engine_masking", {"seconds": 1})["type"] == "bad_args"
