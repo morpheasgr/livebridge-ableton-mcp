@@ -13,7 +13,7 @@
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
-  197 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
+  199 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
   macOS and Windows · every Live 12 edition · Max for Live optional · MIT licensed
 </p>
@@ -89,14 +89,16 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 
 ## Why LiveBridge
 
-- **All of Live that its API allows**, not just transport and notes: 197 tools backed by 200
+- **All of Live that its API allows**, not just transport and notes: 199 tools backed by 200
   commands, plus direct access to the Live Object Model for anything else.
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
   progression, humanize/swing/groove, section layouts, filter sweeps and LFOs, mixing in dB.
 - **Ears:** a music-theory check (key, chords, clashes between parts), audio analysis of
-  bounces (LUFS, spectrum, stereo, tempo, key, masking between parts, before/after), optionally
-  against a reference track — and with the LiveBridge Engine, live while the song plays.
+  bounces (LUFS, spectrum, stereo, tempo, key, masking between parts, before/after), technical
+  problems (clipping, DC offset, polarity, hum, noise, resonances with an EQ bell to fix them),
+  phase and timing between layers (kick vs sub), optionally against a reference track — and
+  with the LiveBridge Engine, live while the song plays.
 - **Your whole sample library:** everything Live's browser lists under Samples, searchable by
   words and Live's own tags, most used first, "sounds like this one", plus installed plug-ins.
 - **Arrangements keep their automation:** scenes laid out as a song keep their clip envelopes
@@ -126,7 +128,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
  ┌───────────────────────────┐   TCP JSON lines :9880    ┌──────────────────────────────────┐
  │ livebridge-mcp            │ ────────────────────────▶ │ Ableton Live 12                  │
  │ MCP server (Python ≥3.10) │ ◀──────────────────────── │  └ LiveBridge Remote Script      │
- │ 197 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
+ │ 199 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
  │ client, LAN discovery     │ ◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │     runs every command on Live's │
  └───────────────────────────┘                           │     main thread, 1 undo step each)│
                                                          └──────────────────────────────────┘
@@ -255,7 +257,7 @@ Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and 
 
 ## Tools
 
-197 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
+199 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
 full reference (every tool with its arguments and defaults, and every bridge command with the tool
 that runs it) is [docs/TOOLS.md](docs/TOOLS.md), generated from the code by
 `installers/gen_tools_doc.py`; Claude reads the full docstrings at runtime.
@@ -280,7 +282,7 @@ colours are a palette index, `"#RRGGBB"`, `[r, g, b]` or a name.
 | Sample search | `live_sample_search`, `live_sample_tags`, `live_sample_duplicates`, `live_sample_index`, `live_plugin_search` | Everything Live's browser shows under Library > Samples (Core Library, packs, User Library, your added folders) by words and Live's browser tags ("Drums\|Kick", "Character\|Punchy"), most used first, "sounds like this one" (Live's audio features), identical-audio duplicates, Live's browser categories, several searches per call (a whole kit), every installed plug-in; absolute paths — [details](docs/SAMPLE_SEARCH.md) |
 | Samples & Splice | `live_sample_import/upload/list`, `live_drumrack_set_pad/convert`, `live_splice_import_downloaded` | Files from disk (or from Claude's machine in LAN mode) into slots, the arrangement, Simpler or drum pads |
 | Automation | `live_automation_write/shape/get/copy/clear/state`, `live_automation_record` | Envelopes and LFO shapes in session clips; arrangement automation recorded in real time |
-| Analysis | `live_theory_analyze`, `live_audio_analyze`, `live_audio_masking`, `live_audio_compare` | Key, chords, clashes between MIDI parts; LUFS, spectral balance, stereo, tempo, key and energy curve of audio (optional `audio` extra), compared with a reference track; which parts mask each other in which bands; before/after checks of a change |
+| Analysis | `live_theory_analyze`, `live_audio_analyze`, `live_audio_masking`, `live_audio_compare`, `live_audio_problems`, `live_audio_align` | Key, chords, clashes between MIDI parts; LUFS, spectral balance, stereo, tempo, key and energy curve of audio (optional `audio` extra), compared with a reference track; which parts mask each other in which bands; before/after checks of a change; technical problems (clipping, DC, polarity, hum, noise, resonances with an EQ suggestion); kick/bass phase and timing between layers |
 | Max for Live: listening, modulation, follow actions, MIDI | `live_engine_status`, `live_engine_listen`, `live_engine_compare`, `live_engine_capture`, `live_engine_masking`, `live_engine_modulate`, `live_engine_unmodulate`, `live_engine_follow`, `live_engine_unfollow`, `live_midi_played`, `live_midi_play`, `live_midi_stop` | Optional LiveBridge Engine Max for Live device on the master and at the end of tracks: live LUFS (momentary/short-term), peaks, crest, 8-band balance, stereo correlation and low-end width while the song plays; A/B checks of a change, WAV captures of several tracks at once and live masking between tracks — no bouncing; tempo-synced LFOs and step sequences on any parameter without writing automation; follow actions on tracks and scenes (weighted next/other/random/jump, chance, seed); with the LiveBridge MIDI device, what you just played as clip-ready notes and phrases played live into an instrument — [details](docs/ENGINE.md) |
 | Generative | `live_clip_write_euclid`, `live_clip_note_chance` | Euclidean rhythms and polymeters; per-note play probability and velocity variation |
 | Sound library | `live_sound_save/load/list/delete` | Keep a designed sound (Serum 2 included) and recall it later or on another instance |

@@ -478,3 +478,131 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         return {"before": {k: results[0][k] for k in keep if k in results[0]},
                 "after": {k: results[1][k] for k in keep if k in results[1]},
                 "comparison": audio_analysis.compare_versions(results[0], results[1])}
+
+    @mcp.tool()
+    def live_audio_problems(
+        source: Any,
+        start: float | None = None,
+        duration: float | None = None,
+    ) -> Any:
+        """Technical problems in a recording, bounce or capture: clipping, DC offset, left and
+        right in opposite polarity (cancels in mono), mains hum (50/60 Hz and harmonics), a
+        high noise floor, and persistent resonances — each with what to do in Live (a
+        resonance comes with an EQ Eight bell: frequency, gain, Q). Run it on a part before
+        mixing it, on a sample before using it, or on the master bounce. Read-only.
+
+        Args:
+            source: A file path, {"file_path", "name"?}, an audio clip {"track", "slot"} or a
+                clip path — e.g. a `live_engine_capture` or `live_record_resample` file.
+            start, duration: Window in seconds (default the whole file, up to 15 minutes).
+
+        Returns:
+            `{file, problems:[{problem: clipping|dc_offset|polarity|hum|noise|resonance,
+            severity, detail, fix, ...measurements; resonance: peaks:[{frequency_hz, note,
+            prominence_db, q, persistence, eq:{frequency_hz, gain_db, q}}]}], notes}`.
+
+        Gotchas: heuristics — distortion, noise or a drone can be intended; a "resonance"
+        that sits on a note name may simply be a note held throughout. Listen before fixing.
+        Needs the `audio` extra.
+        """
+        cmd = "audio.problems"
+        if (start is not None and start < 0) or (duration is not None and duration <= 0):
+            return tool_error("start must be >= 0 and duration > 0 (seconds)", cmd=cmd)
+        found = audio_source(source, "source", cmd)
+        if isinstance(found, dict):
+            return found
+        try:
+            return audio_analysis.problems(found[1], start=start or 0.0, duration=duration)
+        except Exception as exc:  # missing extra, unreadable file
+            return audio_failure(exc, cmd)
+
+    @mcp.tool()
+    def live_audio_align(
+        a: Any,
+        b: Any,
+        band: str = "low",
+        max_ms: float = 20.0,
+        start: float | None = None,
+        duration: float | None = 30.0,
+        apply: bool = False,
+    ) -> Any:
+        """Do two layers line up? The time offset and polarity of part B against part A — a
+        kick against the sub, two layered kicks, a bass DI against its amp, top and bottom
+        snare — and how much louder they sum once aligned (what phase cancellation costs
+        now). Use two bounces/captures of the SAME range (e.g. `live_engine_capture(tracks=
+        ["Kick", "Sub"])`, which records both at the same moment).
+
+        Args:
+            a, b: Each a file path, {"file_path", "name"?} or an audio clip {"track", "slot"}.
+            band: "low" (below 200 Hz, default — kick/bass), "mid" (200 Hz-4 kHz) or "full".
+            max_ms: Largest offset to look for (0.1..100 ms).
+            start, duration: Window in seconds (default the first 30 s).
+            apply: Flip B's polarity in Live when it is inverted — a Utility at the end of
+                B's track with its phase switches on (needs b = {"track", ...}). Timing is
+                reported, not changed: Live's API has no track delay.
+
+        Returns:
+            `{offset_ms (>0: B is late), offset_samples, offset_beats, polarity: same|inverted,
+            correlation:{as_is, aligned}, sum_gain_db, advice, applied?}`.
+
+        Gotchas: needs material where both play (a kick and a sub that never overlap have
+        nothing to compare). A steady low note repeats every period, so very large offsets
+        are ambiguous — keep max_ms small. Needs the `audio` extra.
+        """
+        cmd = "audio.align"
+        if band not in ("low", "mid", "full"):
+            return tool_error("band must be low, mid or full", cmd=cmd)
+        if not 0.1 <= max_ms <= 100.0:
+            return tool_error("max_ms must be 0.1..100", cmd=cmd)
+        if (start is not None and start < 0) or (duration is not None and duration <= 0):
+            return tool_error("start must be >= 0 and duration > 0 (seconds)", cmd=cmd)
+        if apply and not (isinstance(b, dict) and b.get("track") is not None):
+            return tool_error("apply needs b as {\"track\", \"slot\"} (the track to fix)",
+                              cmd=cmd)
+        paths = []
+        for label, spec in (("a", a), ("b", b)):
+            found = audio_source(spec, label, cmd)
+            if isinstance(found, dict):
+                return found
+            paths.append(found[1])
+        try:
+            result = audio_analysis.align(paths[0], paths[1], band=band, max_ms=max_ms,
+                                          start=start or 0.0, duration=duration)
+        except Exception as exc:  # missing extra, unreadable file
+            return audio_failure(exc, cmd)
+        state = bridge_call(bridge, "transport.get")
+        if isinstance(state, dict) and not _is_error(state) and state.get("tempo") and \
+                "offset_ms" in result:
+            result["offset_beats"] = round(result["offset_ms"] / 1000.0 *
+                                           float(state["tempo"]) / 60.0, 5)
+        if apply and result.get("polarity") == "inverted":
+            result["applied"] = flip_polarity(b["track"], cmd)
+        elif apply:
+            result["applied"] = {"note": "polarity already matches: nothing changed"}
+        return result
+
+    def flip_polarity(track: Any, cmd: str) -> dict[str, Any]:
+        """A Utility at the end of ``track`` with every phase-invert switch on."""
+        device = bridge_call(bridge, "devices.insert", {"name": "Utility", "track": track})
+        if _is_error(device) or not isinstance(device, dict) or not device.get("path"):
+            return {"error": "could not add a Utility: %s" % (
+                device.get("error") if isinstance(device, dict) else device)}
+        names: list[str] = []
+        for word in ("inv", "phase", "phz"):
+            listing = bridge_call(bridge, "devices.parameters", {
+                "track": track, "device": device["path"], "filter": word,
+                "detail": "minimal"})
+            if isinstance(listing, dict) and not _is_error(listing):
+                names = [str(p.get("name")) for p in listing.get("parameters") or []
+                         if isinstance(p, dict)]
+            if names:
+                break
+        if not names:
+            return {"device": device.get("path"), "note": "Utility added, but its phase "
+                    "switches were not found by name — switch both on by hand"}
+        changed = bridge_call(bridge, "devices.set_parameters", {
+            "track": track, "device": device["path"],
+            "values": {name: 1 for name in names}})
+        if _is_error(changed):
+            return {"device": device.get("path"), "error": changed.get("error")}
+        return {"device": device.get("path"), "switched_on": names}

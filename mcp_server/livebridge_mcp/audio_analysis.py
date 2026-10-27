@@ -587,3 +587,347 @@ def compare_versions(before: dict[str, Any], after: dict[str, Any]) -> dict[str,
     return {"delta": delta, "changes": changes or ["no measurable change"],
             "resolved_flags": sorted(flags_a - flags_b), "new_flags": sorted(flags_b - flags_a),
             "notes": notes}
+
+
+# ------------------------------------------------------------------- technical problems
+
+_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+_CLIP_LEVEL = 0.999            # |sample| at or above this counts as full scale
+_CLIP_RUN = 3                  # consecutive full-scale samples = a clipped stretch
+_DC_LIMIT_DB = -60.0           # DC offset above this (dBFS) is worth fixing
+_POLARITY_CORR = -0.5          # L/R correlation below this: one side is upside down
+_HUM_PROMINENCE_DB = 12.0      # hum line above its neighbourhood
+_RES_PROMINENCE_DB = 9.0       # long-term spectral peak above the smoothed spectrum
+_RES_PERSISTENCE = 0.6         # share of the time a resonance must be there
+_RES_RANGE = (60.0, 14000.0)
+_BLOCK_S = 0.05                # noise floor: 50 ms blocks
+
+
+def _note_name(freq: float) -> str:
+    """Live's note name (C3 = middle C) of the nearest note, with the cents off it."""
+    midi = 69.0 + 12.0 * math.log2(freq / 440.0)
+    nearest = int(round(midi))
+    cents = int(round((midi - nearest) * 100))
+    name = f"{_NOTE_NAMES[nearest % 12]}{nearest // 12 - 2}"
+    return name if abs(cents) < 10 else f"{name} {cents:+d} ct"
+
+
+def _runs(mask: Any) -> list[tuple[int, int]]:
+    """(start, length) of the runs of True in a 1-D boolean array."""
+    np, _signal, _sf, _pyln = _deps()
+    edges = np.diff(np.concatenate(([0], mask.astype(np.int8), [0])))
+    starts, ends = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
+    return list(zip(starts.tolist(), (ends - starts).tolist()))
+
+
+def _clipping(data: Any, rate: int) -> dict[str, Any] | None:
+    np, _signal, _sf, _pyln = _deps()
+    stretches, worst, first = 0, 0, None
+    for channel in range(data.shape[1]):
+        for start, length in _runs(np.abs(data[:, channel]) >= _CLIP_LEVEL):
+            if length >= _CLIP_RUN:
+                stretches += 1
+                worst = max(worst, length)
+                first = start if first is None else min(first, start)
+    if not stretches:
+        return None
+    return {"problem": "clipping", "severity": "significant" if stretches > 10 else "moderate",
+            "stretches": stretches, "longest_samples": worst,
+            "first_at_s": round(first / rate, 2),
+            "detail": f"{stretches} stretch(es) of full-scale samples, the longest {worst} "
+                      f"samples (first at {first / rate:.2f} s)",
+            "fix": "Lower the gain before the clipping stage (track volume, the device that "
+                   "drives it, or the master limiter's input) and bounce again; flattened "
+                   "peaks cannot be restored."}
+
+
+def _dc_offset(data: Any) -> dict[str, Any] | None:
+    np, _signal, _sf, _pyln = _deps()
+    offsets = [float(np.mean(data[:, c], dtype=np.float64)) for c in range(data.shape[1])]
+    worst = max(abs(o) for o in offsets)
+    if worst <= 0 or _db(worst) <= _DC_LIMIT_DB:
+        return None
+    return {"problem": "dc_offset", "severity": "moderate" if _db(worst) > -40 else "minor",
+            "offset_db": _db(worst), "per_channel": [round(o, 6) for o in offsets],
+            "detail": f"the waveform sits off zero by {_db(worst)} dBFS (wasted headroom, "
+                      "clicks at cuts)",
+            "fix": "A high-pass (EQ Eight band 1 at 20-30 Hz) or Utility's DC filter on the "
+                   "track removes it."}
+
+
+def _polarity(data: Any) -> dict[str, Any] | None:
+    np, _signal, _sf, _pyln = _deps()
+    if data.shape[1] < 2:
+        return None
+    left, right = data[:, 0].astype(np.float64), data[:, 1].astype(np.float64)
+    energy = math.sqrt(float(np.dot(left, left)) * float(np.dot(right, right)))
+    if energy <= 1e-12:
+        return None
+    corr = float(np.dot(left, right)) / energy
+    if corr >= _POLARITY_CORR:
+        return None
+    return {"problem": "polarity", "severity": "significant", "correlation": round(corr, 2),
+            "detail": f"left and right are mostly opposite (correlation {corr:.2f}): the part "
+                      "cancels in mono — on club systems and phones",
+            "fix": "Flip one side: Utility's phase invert on one channel (left or right), "
+                   "then check correlation again."}
+
+
+def _spectrum_db(mono: Any, rate: int, nperseg: int) -> tuple[Any, Any]:
+    np, signal, _sf, _pyln = _deps()
+    nperseg = min(nperseg, max(256, len(mono)))
+    freqs, power = signal.welch(mono, fs=rate, nperseg=nperseg, noverlap=nperseg // 2)
+    return freqs, 10.0 * np.log10(np.maximum(power, 1e-20))
+
+
+def _hum(mono: Any, rate: int) -> dict[str, Any] | None:
+    """Mains hum: narrow lines at 50 or 60 Hz AND their harmonics, standing out of their
+    neighbourhood — measured on the quietest stretches, where the music hides it least."""
+    np, _signal, _sf, _pyln = _deps()
+    block = int(rate * 0.5)
+    if len(mono) < block * 4:
+        quiet = mono
+    else:
+        blocks = len(mono) // block
+        levels = [float(np.mean(mono[i * block:(i + 1) * block] ** 2)) for i in range(blocks)]
+        order = np.argsort(levels)[:max(4, blocks // 4)]
+        quiet = np.concatenate([mono[i * block:(i + 1) * block] for i in sorted(order)])
+    freqs, spec = _spectrum_db(quiet, rate, 1 << 15)
+    best = None
+    for base in (50.0, 60.0):
+        lines = []
+        for harmonic in (1, 2, 3):
+            f = base * harmonic
+            if f >= rate / 2:
+                continue
+            at = (freqs > f - 1.5) & (freqs < f + 1.5)
+            around = ((freqs > f - 12) & (freqs < f - 4)) | ((freqs > f + 4) & (freqs < f + 12))
+            if not at.any() or not around.any():
+                continue
+            prominence = float(np.max(spec[at]) - np.median(spec[around]))
+            lines.append((f, prominence))
+        strong = [f for f, p in lines if p >= _HUM_PROMINENCE_DB]
+        if len(strong) >= 2 and (best is None or len(strong) > len(best[1])):
+            best = (base, strong, max(p for _f, p in lines))
+    if best is None:
+        return None
+    base, strong, prominence = best
+    return {"problem": "hum", "severity": "moderate", "frequency_hz": base,
+            "harmonics_hz": strong, "prominence_db": round(prominence, 1),
+            "detail": f"narrow lines at {', '.join(f'{f:g}' for f in strong)} Hz — mains hum "
+                      f"({base:g} Hz power), strongest where the music is quiet",
+            "fix": f"Narrow EQ Eight notches (Q 30+) at {', '.join(f'{f:g}' for f in strong)} "
+                   "Hz on the source track; better, re-record or use a ground-lift DI."}
+
+
+def _noise_floor(mono: Any, rate: int) -> dict[str, Any] | None:
+    np, _signal, _sf, _pyln = _deps()
+    block = max(1, int(rate * _BLOCK_S))
+    blocks = len(mono) // block
+    if blocks < 20:
+        return None
+    rms = np.sqrt(np.mean(mono[:blocks * block].reshape(blocks, block) ** 2, axis=1))
+    levels = 20.0 * np.log10(np.maximum(rms, 1e-10))
+    low, high = float(np.percentile(levels, 10)), float(np.percentile(levels, 90))
+    if high - low < 10.0 or low < -100.0:
+        return None                      # no quiet passages to measure a floor in
+    severity = "moderate" if low > -50.0 else "minor" if low > -60.0 else None
+    if severity is None:
+        return None
+    return {"problem": "noise", "severity": severity, "floor_db": round(low, 1),
+            "snr_db": round(high - low, 1),
+            "detail": f"the quiet passages sit at {low:.1f} dBFS ({high - low:.1f} dB below "
+                      "the loud ones): audible hiss or room noise",
+            "fix": "A gate or expander on the track, or cleaner source material."}
+
+
+def _resonances(mono: Any, rate: int, top: int = 5) -> list[dict[str, Any]]:
+    """Narrow peaks of the long-term spectrum that stand out of the smoothed spectrum AND are
+    there most of the time (a ringing resonance, not a passing note)."""
+    np, signal, _sf, _pyln = _deps()
+    freqs, spec = _spectrum_db(mono, rate, 8192)
+    logf = np.log2(np.maximum(freqs, 1.0))
+    smooth = np.empty_like(spec)
+    for i in range(len(freqs)):                   # median over 1/3 octave around each bin
+        window = np.abs(logf - logf[i]) <= 1.0 / 6.0
+        smooth[i] = np.median(spec[window])
+    residual = spec - smooth
+    in_range = (freqs >= _RES_RANGE[0]) & (freqs <= min(_RES_RANGE[1], rate / 2 * 0.9))
+    peaks, props = signal.find_peaks(np.where(in_range, residual, -99.0),
+                                     height=_RES_PROMINENCE_DB, distance=4)
+    if not len(peaks):
+        return []
+    # persistence: the peak bin above its neighbourhood in most short frames
+    nper = 8192 if len(mono) >= 8192 else max(256, len(mono))
+    _f, _t, frames = signal.stft(mono, fs=rate, nperseg=nper, noverlap=nper // 2)
+    frame_db = 20.0 * np.log10(np.maximum(np.abs(frames), 1e-10))
+    found = []
+    for index, height in sorted(zip(peaks.tolist(), props["peak_heights"].tolist()),
+                                key=lambda item: -item[1]):
+        freq = float(freqs[index])
+        if 0 < index < len(spec) - 1:                 # parabolic interpolation of the peak
+            a0, a1, a2 = spec[index - 1], spec[index], spec[index + 1]
+            denominator = a0 - 2 * a1 + a2
+            if abs(denominator) > 1e-12:
+                freq += float(0.5 * (a0 - a2) / denominator) * float(freqs[1] - freqs[0])
+        neighbours = (np.abs(logf - logf[index]) <= 1.0 / 6.0) & \
+            (np.abs(logf - logf[index]) > 1.0 / 24.0)
+        f_bin = int(np.argmin(np.abs(_f - freq)))
+        n_bins = (np.abs(np.log2(np.maximum(_f, 1.0)) - math.log2(freq)) <= 1.0 / 6.0) & \
+            (np.abs(np.log2(np.maximum(_f, 1.0)) - math.log2(freq)) > 1.0 / 24.0)
+        if not n_bins.any() or not neighbours.any():
+            continue
+        above = frame_db[f_bin] - np.median(frame_db[n_bins], axis=0)
+        loud = frame_db[f_bin] > np.max(frame_db) - 60.0
+        persistence = float(np.mean((above > _RES_PROMINENCE_DB / 2) & loud))
+        if persistence < _RES_PERSISTENCE:
+            continue
+        # width at half the prominence -> Q
+        half = height / 2.0
+        lo = index
+        while lo > 0 and residual[lo] > half:
+            lo -= 1
+        hi = index
+        while hi < len(residual) - 1 and residual[hi] > half:
+            hi += 1
+        width = max(float(freqs[hi] - freqs[lo]), float(freqs[1] - freqs[0]))
+        q = round(min(max(freq / width, 0.7), 18.0), 1)
+        cut = round(-min(height / 2.0, 9.0), 1)
+        found.append({"frequency_hz": round(freq, 1), "note": _note_name(freq),
+                      "prominence_db": round(float(height), 1), "q": q,
+                      "persistence": round(persistence, 2),
+                      "eq": {"frequency_hz": round(freq, 1), "gain_db": cut, "q": q}})
+        if len(found) >= top:
+            break
+    return found
+
+
+def problems(path: str, start: float = 0.0, duration: float | None = None) -> dict[str, Any]:
+    """Technical problems of an audio file: clipping, DC offset, polarity between the
+    channels, mains hum, a high noise floor and persistent resonances (with an EQ suggestion
+    each). Heuristics — they point at what to listen to, they do not judge intent."""
+    np, signal, _sf, _pyln = _deps()
+    data, rate, meta = _load(path, start, duration)
+    if not data.size:
+        return {"file": meta, "problems": [], "notes": ["the file is empty"]}
+    mono = np.mean(data, axis=1, dtype=np.float32)
+    left_right = data.astype(np.float32)
+    if data.shape[1] > 1:
+        # a stereo-cancelling part would vanish in the downmix: analyse the louder side
+        side_energy = [float(np.mean(data[:, c] ** 2)) for c in range(data.shape[1])]
+        if float(np.mean(mono ** 2)) < 0.1 * max(side_energy):
+            mono = data[:, int(np.argmax(side_energy))].astype(np.float32)
+    found = [item for item in (_clipping(left_right, rate), _dc_offset(data), _polarity(data),
+                               _hum(mono, rate), _noise_floor(mono, rate)) if item]
+    resonances = _resonances(mono, rate)
+    if resonances:
+        listed = ", ".join(f"{r['frequency_hz']:g} Hz ({r['note']})" for r in resonances[:3])
+        found.append({"problem": "resonance", "severity": "minor" if all(
+            r["prominence_db"] < 12 for r in resonances) else "moderate",
+            "peaks": resonances,
+            "detail": f"persistent narrow peaks at {listed}: a ringing resonance — or a note "
+                      "that holds through the whole stretch (a drone, a pad's root): listen "
+                      "before cutting",
+            "fix": "EQ Eight bells with the suggested frequency / gain / Q (each peak's "
+                   "`eq`), on the track that rings."})
+    order = {"significant": 0, "moderate": 1, "minor": 2}
+    found.sort(key=lambda item: order.get(item.get("severity"), 3))
+    notes = ["Heuristics: they show where to listen; distortion, noise or a drone can be "
+             "intentional."]
+    if not found:
+        notes.insert(0, "No technical problems found.")
+    return {"file": meta, "problems": found, "notes": notes}
+
+
+# ------------------------------------------------------------------- layer alignment
+
+def _band_limited(mono: Any, rate: int, band: str) -> Any:
+    np, signal, _sf, _pyln = _deps()
+    if band == "low":
+        sos = signal.butter(4, 200.0, btype="lowpass", fs=rate, output="sos")
+        return signal.sosfiltfilt(sos, mono)
+    if band == "mid":
+        sos = signal.butter(4, [200.0, 4000.0], btype="bandpass", fs=rate, output="sos")
+        return signal.sosfiltfilt(sos, mono)
+    return mono
+
+
+def align(path_a: str, path_b: str, band: str = "low", max_ms: float = 20.0,
+          start: float = 0.0, duration: float | None = 30.0) -> dict[str, Any]:
+    """Time offset and polarity of part B against part A (two bounces of the same range):
+    the delay that best lines B up with A (cross-correlation with phase weighting), whether B
+    is upside down, and how much the two sum louder once aligned (the low end lost to phase).
+
+    ``band``: "low" (below 200 Hz — kick and bass), "mid" (200 Hz-4 kHz) or "full"."""
+    np, signal, _sf, _pyln = _deps()
+    a, rate_a, meta_a = _load(path_a, start, duration)
+    b, rate_b, meta_b = _load(path_b, start, duration)
+    if rate_a != rate_b:
+        factor = math.gcd(rate_a, rate_b)
+        b = signal.resample_poly(b, rate_a // factor, rate_b // factor, axis=0)
+    rate = rate_a
+    x = _band_limited(np.mean(a, axis=1, dtype=np.float64), rate, band)
+    y = _band_limited(np.mean(b, axis=1, dtype=np.float64), rate, band)
+    n = min(len(x), len(y))
+    if n < rate // 10:
+        raise ValueError("the parts are shorter than 0.1 s")
+    x, y = x[:n], y[:n]
+    ex, ey = float(np.dot(x, x)), float(np.dot(y, y))
+    if ex <= 1e-12 or ey <= 1e-12:
+        return {"a": meta_a, "b": meta_b, "band": band, "silent": True,
+                "notes": ["one of the parts is silent in this band"]}
+    size = 1 << int(math.ceil(math.log2(2 * n)))
+    cross = np.fft.irfft(np.fft.rfft(x, size) * np.conj(np.fft.rfft(y, size)), size)
+    norm = math.sqrt(ex * ey)
+    limit = max(1, int(rate * max_ms / 1000.0))
+    lags = np.arange(-limit, limit + 1)                # r[k] = sum x[i+k] y[i]
+    corr = cross[lags % size] / norm
+    strength = np.abs(corr)
+    # the strongest match; among near-equal ones (a steady low note repeats every period, and
+    # half a period looks like a polarity flip) the smallest shift
+    peaks = [i for i in range(1, len(strength) - 1)
+             if strength[i] >= strength[i - 1] and strength[i] >= strength[i + 1]]
+    peaks = peaks or [int(np.argmax(strength))]
+    top = max(strength[i] for i in peaks)
+    best = min((i for i in peaks if strength[i] >= 0.9 * top), key=lambda i: abs(lags[i]))
+    shift = 0.0
+    if 0 < best < len(strength) - 1:                   # sub-sample: parabola through the peak
+        a0, a1, a2 = strength[best - 1], strength[best], strength[best + 1]
+        denominator = a0 - 2 * a1 + a2
+        if abs(denominator) > 1e-12:
+            shift = float(0.5 * (a0 - a2) / denominator)
+    lag = int(lags[best])                              # x[i+lag] ~ y[i]: B late by -lag
+    corr_best = float(corr[best])
+    corr_zero = float(corr[limit])
+    inverted = corr_best < 0
+    offset_ms = -(lag + shift) * 1000.0 / rate         # >0: B is late by this much
+
+    def summed(shift: int, sign: float) -> float:
+        if shift >= 0:
+            s = x[shift:] + sign * y[:n - shift]
+        else:
+            s = x[:n + shift] + sign * y[-shift:]
+        return float(np.mean(s ** 2))
+
+    before = summed(0, 1.0)
+    after = summed(lag, -1.0 if inverted else 1.0)
+    gain_db = round(10.0 * math.log10(max(after, 1e-20) / max(before, 1e-20)), 1)
+    advice = []
+    if inverted:
+        advice.append("B is upside down against A: flip B's polarity (Utility, both phase "
+                      "invert switches).")
+    if abs(offset_ms) >= 0.2:
+        direction = "late" if offset_ms > 0 else "early"
+        advice.append(f"B is {abs(offset_ms):.2f} ms {direction} against A: move B "
+                      f"{'earlier' if offset_ms > 0 else 'later'} by that much (MIDI: shift its "
+                      "notes; audio: nudge the clip or use the track header's Track Delay).")
+    if gain_db >= 1.0:
+        advice.append(f"Aligned, the two sum {gain_db} dB louder in this band — that is what "
+                      "phase currently cancels.")
+    elif not advice:
+        advice.append("Already aligned: no useful offset or polarity flip in this band.")
+    return {"a": meta_a, "b": meta_b, "band": band, "offset_ms": round(offset_ms, 3),
+            "offset_samples": -lag, "polarity": "inverted" if inverted else "same",
+            "correlation": {"as_is": round(corr_zero, 2),
+                            "aligned": round(abs(corr_best), 2)},
+            "sum_gain_db": gain_db, "advice": advice}

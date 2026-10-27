@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LiveBridge · Ableton Live MCP server for Claude</title>
-<meta name="description" content="Make music in Ableton Live 12 by talking to Claude. Free, open-source MCP server with 197 tools: beats, chords, Serum 2, automation, arrangement, Splice.">
+<meta name="description" content="Make music in Ableton Live 12 by talking to Claude. Free, open-source MCP server with 199 tools: beats, chords, Serum 2, automation, arrangement, Splice.">
 <meta name="keywords" content="Ableton Live MCP, Ableton MCP server, Claude Ableton, AI music production, Model Context Protocol, Ableton Live 12, Serum 2, Splice, Remote Script, Claude Code, Claude Desktop">
 <link rel="canonical" href="https://morpheasgr.github.io/livebridge-ableton-mcp/">
 <meta name="theme-color" content="#0b0d12">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="LiveBridge">
 <meta property="og:title" content="LiveBridge · Make music in Ableton Live by talking to Claude">
-<meta property="og:description" content="Free, open-source MCP server with 197 tools for Ableton Live 12: beats, chords, Serum 2, automation, arrangement, mixing and Splice samples. macOS and Windows.">
+<meta property="og:description" content="Free, open-source MCP server with 199 tools for Ableton Live 12: beats, chords, Serum 2, automation, arrangement, mixing and Splice samples. macOS and Windows.">
 <meta property="og:url" content="https://morpheasgr.github.io/livebridge-ableton-mcp/">
 <meta property="og:image" content="https://morpheasgr.github.io/livebridge-ableton-mcp/assets/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -23,7 +23,7 @@
 <meta property="og:image:alt" content="LiveBridge: make music in Ableton Live by talking to Claude">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="LiveBridge · Ableton Live MCP server for Claude">
-<meta name="twitter:description" content="Make music in Ableton Live 12 by talking to Claude. 197 tools, macOS and Windows, free and open source.">
+<meta name="twitter:description" content="Make music in Ableton Live 12 by talking to Claude. 199 tools, macOS and Windows, free and open source.">
 <meta name="twitter:image" content="https://morpheasgr.github.io/livebridge-ableton-mcp/assets/social-preview.png">
 
 <link rel="stylesheet" href="assets/site.css">
@@ -113,7 +113,7 @@
     <div>
       <span class="eyebrow"><span class="dot"></span> Ableton Live 12 · MCP server · free and open source</span>
       <h1>Make music in Ableton Live by <span class="grad">talking to Claude</span>.</h1>
-      <p class="lede">LiveBridge gives Claude <strong>197 tools</strong> for Ableton Live: beats and basslines,
+      <p class="lede">LiveBridge gives Claude <strong>199 tools</strong> for Ableton Live: beats and basslines,
         chords and arps, Serum 2 sound design, automation, song structure, mixing, your whole sample
         library and Splice. With the optional Max for Live devices, Claude also listens while the song
         plays, moves parameters in time and plays along. You describe the music; Claude builds it in
@@ -242,7 +242,7 @@
       <div class="feature" style="--c: var(--orange)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
         <h3>All of Live</h3>
-        <p>197 tools backed by 200 commands: transport, tracks, clips, notes, devices, racks, browser, automation, arrangement, routing, recording. Plus the full Live Object Model for anything else.</p>
+        <p>199 tools backed by 200 commands: transport, tracks, clips, notes, devices, racks, browser, automation, arrangement, routing, recording. Plus the full Live Object Model for anything else.</p>
       </div>
       <div class="feature" style="--c: var(--violet)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
@@ -252,7 +252,7 @@
       <div class="feature" style="--c: var(--cyan)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12h2l3-7 4 14 4-10 3 5h4"/></svg></div>
         <h3>Ears</h3>
-        <p>A music-theory check (key, chords, clashes between parts), audio analysis of bounces (LUFS, spectrum, stereo, tempo, key, masking between parts, before/after), and with the LiveBridge Engine device, all of it live while the song plays.</p>
+        <p>A music-theory check (key, chords, clashes between parts), audio analysis of bounces (LUFS, spectrum, stereo, tempo, key, masking between parts, before/after), technical problems (clipping, hum, polarity, resonances with the EQ cut to fix them), kick-and-sub phase alignment, and with the LiveBridge Engine device, all of it live while the song plays.</p>
       </div>
       <div class="feature" style="--c: var(--orange)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 12 16 7"/><path d="M12 2v2M22 12h-2M4 12H2"/></svg></div>
@@ -355,7 +355,7 @@
     <div class="flow">
       <div class="node"><small>Your AI app</small><h3>Claude</h3><p>Claude Code, Claude Desktop or any MCP client. Splice's MCP server can sit next to it.</p></div>
       <div class="arrow"><div><span>⇄</span>MCP · stdio</div></div>
-      <div class="node"><small>livebridge-mcp</small><h3>MCP server</h3><p>197 validated tools, a reconnecting client and network discovery. Python 3.10+.</p></div>
+      <div class="node"><small>livebridge-mcp</small><h3>MCP server</h3><p>199 validated tools, a reconnecting client and network discovery. Python 3.10+.</p></div>
       <div class="arrow"><div><span>⇄</span>TCP · JSON · token</div></div>
       <div class="node"><small>Inside Ableton Live</small><h3>Remote Script</h3><p>Runs every command on Live's main thread against the Live Object Model. One undo step each. Optional: the LiveBridge Engine and LiveBridge MIDI devices.</p></div>
     </div>
@@ -407,7 +407,7 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
 
 <section id="tools" class="alt" aria-labelledby="tools-title">
   <div class="wrap">
-    <h2 id="tools-title">197 tools, 27 areas</h2>
+    <h2 id="tools-title">199 tools, 27 areas</h2>
     <p class="sub">Named <code>live_&lt;area&gt;_&lt;verb&gt;</code>, validated before anything changes,
       and forgiving about input: tracks by name, positions as <code>17.1.1</code>, values the way the
       knob shows them (<code>"-6 dB"</code>, <code>"1/8"</code>, <code>"800 Hz"</code>).</p>
@@ -431,7 +431,7 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
       <div class="area">Sample and plug-in search <b>5</b></div>
       <div class="area">Splice <b>3</b></div>
       <div class="area">Automation <b>9</b></div>
-      <div class="area">Theory and audio analysis <b>4</b></div>
+      <div class="area">Theory and audio analysis <b>6</b></div>
       <div class="area">Generative notes <b>2</b></div>
       <div class="area">Sound library <b>4</b></div>
       <div class="area">Session memory <b>4</b></div>
@@ -460,6 +460,8 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
       <div class="prompt"><span>Find a punchy kick in my library and load it onto C1.</span><button type="button" data-copy>Copy</button></div>
       <div class="prompt"><span>Listen to the drop: is the low end mono, and how loud is it?</span><button type="button" data-copy>Copy</button></div>
       <div class="prompt"><span>Wobble the bass filter every 1/8 note while I listen.</span><button type="button" data-copy>Copy</button></div>
+      <div class="prompt"><span>Are my kick and sub in phase? Fix it if not.</span><button type="button" data-copy>Copy</button></div>
+      <div class="prompt"><span>Check the vocal recording for hum, clipping and ringing frequencies.</span><button type="button" data-copy>Copy</button></div>
       <div class="prompt"><span>I just played a riff — turn it into a clip and add a bassline under it.</span><button type="button" data-copy>Copy</button></div>
     </div>
     <p class="more"><a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/examples/prompts.md">100+ more prompts →</a></p>
