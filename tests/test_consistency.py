@@ -91,6 +91,18 @@ SAMPLE_ARGS = {
     "live_arrangement_copy_range": {"start": 0, "end": 8, "destination": 64},
     "live_arrangement_resize_clip": {"track": "Bass", "index": 0, "length": 8},
     "live_audio_analyze": {"track": "Vocals", "slot": 0},
+    "live_audio_compare": {"before": {"track": "Vocals", "slot": 0},
+                           "after": {"track": "Vocals", "slot": 0}},
+    "live_audio_masking": {"sources": [{"track": "Vocals", "slot": 0},
+                                       {"track": "Vocals", "slot": 0, "name": "Copy"}]},
+    "live_clip_note_chance": {"track": "Bass", "slot": 0, "probability": 0.8},
+    "live_clip_write_euclid": {"track": "Drums", "slot": 3, "rhythms": {"kick": "4/16"}},
+    "live_memory_note": {"text": "consistency test", "project": "Smoke"},
+    "live_memory_update": {"id": 1, "done": True},
+    "live_memory_forget": {"id": 1},
+    "live_sound_save": {"name": "Smoke", "track": "Bass", "device": "Operator"},
+    "live_sound_load": {"name": "Smoke", "track": "Bass", "device": "Operator"},
+    "live_sound_delete": {"name": "Smoke"},
     "live_automation_overview": {"track": "Bass"},
     "live_automation_get": {"parameter": "Volume", "track": "Bass", "slot": 0},
     "live_automation_write": {"parameter": "Volume", "track": "Bass", "slot": 0,
@@ -243,9 +255,11 @@ ALLOWED_ERRORS = {"not_found", "invalid_state", "unsupported", "bad_args"}
 # --------------------------------------------------------------------------- every tool
 
 @pytest.mark.parametrize("name", TOOL_NAMES)
-def test_every_tool_runs_end_to_end(name, tcp_bridge, song, tmp_path):
+def test_every_tool_runs_end_to_end(name, tcp_bridge, song, tmp_path, monkeypatch):
     if name in SKIP:
         pytest.skip(SKIP[name])
+    # sound library and session memory: never the user's real ~/.livebridge
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
     app = _APP
     token = ""
     if name in NEEDS_TOKEN:

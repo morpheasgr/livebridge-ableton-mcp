@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
-  168 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
+  180 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
   macOS and Windows · every Live 12 edition · no Max for Live · MIT licensed
 </p>
@@ -79,7 +79,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 
 ## Why LiveBridge
 
-- **All of Live that its API allows**, not just transport and notes: 168 tools backed by 200
+- **All of Live that its API allows**, not just transport and notes: 180 tools backed by 200
   commands, plus direct access to the Live Object Model for anything else.
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
@@ -105,7 +105,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
  ┌───────────────────────────┐   TCP JSON lines :9880    ┌──────────────────────────────────┐
  │ livebridge-mcp            │ ────────────────────────▶ │ Ableton Live 12                  │
  │ MCP server (Python ≥3.10) │ ◀──────────────────────── │  └ LiveBridge Remote Script      │
- │ 168 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
+ │ 180 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
  │ client, LAN discovery     │ ◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │     runs every command on Live's │
  └───────────────────────────┘                           │     main thread, 1 undo step each)│
                                                          └──────────────────────────────────┘
@@ -234,7 +234,7 @@ Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and 
 
 ## Tools
 
-168 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
+180 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
 full reference (every tool with its arguments and defaults, and every bridge command with the tool
 that runs it) is [docs/TOOLS.md](docs/TOOLS.md), generated from the code by
 `installers/gen_tools_doc.py`; Claude reads the full docstrings at runtime.
@@ -258,7 +258,10 @@ colours are a palette index, `"#RRGGBB"`, `[r, g, b]` or a name.
 | Browser | `live_browser_search/load/hotswap/preview` | Load anything from Live's browser by name (`category="instrument"`, `"drum_kit"`, `"plugin"` …) |
 | Samples & Splice | `live_sample_import/upload/list`, `live_drumrack_set_pad/convert`, `live_splice_import_downloaded` | Files from disk (or from Claude's machine in LAN mode) into slots, the arrangement, Simpler or drum pads |
 | Automation | `live_automation_write/shape/get/copy/clear/state`, `live_automation_record` | Envelopes and LFO shapes in session clips; arrangement automation recorded in real time |
-| Analysis | `live_theory_analyze`, `live_audio_analyze` | Key, chords, clashes between MIDI parts; LUFS, spectral balance, stereo, tempo, key and energy curve of audio (optional `audio` extra), compared with a reference track |
+| Analysis | `live_theory_analyze`, `live_audio_analyze`, `live_audio_masking`, `live_audio_compare` | Key, chords, clashes between MIDI parts; LUFS, spectral balance, stereo, tempo, key and energy curve of audio (optional `audio` extra), compared with a reference track; which parts mask each other in which bands; before/after checks of a change |
+| Generative | `live_clip_write_euclid`, `live_clip_note_chance` | Euclidean rhythms and polymeters; per-note play probability and velocity variation |
+| Sound library | `live_sound_save/load/list/delete` | Keep a designed sound (Serum 2 included) and recall it later or on another instance |
+| Session memory | `live_memory_note/recall/update/forget` | Decisions, open ideas and the user's preferences, remembered across sessions |
 | View | `live_view_select/show/navigate/selection` | Show what Claude works on, follow the user's selection |
 | Escape hatches | `live_lom_get/set/call/describe/children`, `live_eval_python`, `live_commands`, `live_command_call`, `live_command_batch`, `live_dialog_get/press` | Anything else in the Live Object Model; any bridge command without a curated tool; many commands as one undo step; Live's dialogs |
 

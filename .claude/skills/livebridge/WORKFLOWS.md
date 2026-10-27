@@ -82,12 +82,16 @@ User: *"Write a bassline for my chords"*, *"give me a counter-melody"*, *"what c
    (`live_clip_transform_notes(fit_scale=true)` or `live_clip_modify_notes`).
 5. **Let them hear it**: fire the scene (`live_scene_fire`) only if they asked you to play; say
    which slot holds which variant.
-6. **Develop what they keep**: variations for later sections (`live_clip_duplicate_notes` with
+6. **Remember the choice**: `live_memory_note(text="kept bass B: sparse syncopated line",
+   kind="decision")`, and leave rejected directions out of later suggestions.
+7. **Develop what they keep**: variations for later sections (`live_clip_duplicate_notes` with
    `transpose_steps=`, `live_clip_transform_notes(invert=..., retrograde=true)`, rhythmic
    displacement with `shift=`), call and response with another part, a reduced version for the
    intro. Ask before deleting the variants they did not pick.
 
 Leave the **lead melody** to the user unless they ask for one; offer a motif to react to instead.
+For movement without writing variations, give hats, ghosts and percussion a play probability:
+`live_clip_note_chance(probability=[0.5, 0.9], pitch=...)`.
 
 ## 3. Start a project (producer mode)
 
@@ -202,7 +206,13 @@ User: *"it sounds muddy"*, *"the kick and bass fight"*, *"no headroom"*.
 5. **Apply one fix at a time** after the user agrees, set by display text
    (`live_device_set_parameters(values={"1 Frequency A": "120 Hz"})` after reading the names),
    and ask them to listen between fixes. Don't touch the master without asking.
-6. **Re-measure**: bounce again, `live_audio_analyze`, compare with the first measurement.
+   **Masking, measured**: bounce the suspects over the same bars (`live_record_resample(
+   source="Kick", start=..., bars=...)`, then `source="Bass"`, ...) and run
+   `live_audio_masking(sources=[{"track": <bounce track>, "slot": 0, "name": "Kick"}, ...])`:
+   per pair the bands where both are active and close in level, which one is louder there, and
+   a move (side-chain for the low end, a cut on the less important part above it).
+6. **Re-measure**: bounce again and run `live_audio_compare(before=<first bounce>, after=<new
+   bounce>)`: it lists what changed with better/worse verdicts and which mix flags went away.
 
 ## 7. Side-chain
 

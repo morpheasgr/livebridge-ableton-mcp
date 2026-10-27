@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~168 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~180 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -37,6 +37,8 @@ More companions next to this file (also MCP resources), read the one that fits t
 2. `live_set_snapshot` - tempo, signature, tracks (with `path`), devices, clips, scenes, selection.
    Big set? `detail="minimal"` first, then `live_tracks_get` / `live_clip_list` for details.
 3. `live_view_selection` when the user says "this track", "this clip", "the selected device".
+4. `live_memory_recall()` - what was decided and what is still open in this project (matched
+   to the open set) plus the user's general preferences. Mention the open ideas briefly.
 
 Re-snapshot after structural changes: indices shift when tracks, scenes, devices or clips are
 added or removed. Prefer the `path` fields from the latest summary, or names.
@@ -172,6 +174,26 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   - *The user's reference track*: structure (`energy`), loudness and balance to aim for.
   It needs the optional audio libraries (`type: "unsupported"` carries the pip command - relay
   it). It measures; the user's ears decide.
+
+## 4c. Remember, keep sounds, generate, compare
+
+- **Session memory**: after the user keeps or rejects something meaningful, write one short
+  `live_memory_note(text=..., kind="decision")`; open threads ("the drop needs a counter-line")
+  as `kind="idea"`, things about the user ("prefers dry drums") as `kind="preference"`. The first
+  note in a new project needs `project="<name>"` (ask the user for the track's name). Mark ideas
+  done with `live_memory_update(id=..., done=true)`. Don't note every small tweak.
+- **Sound library**: Live's API cannot save presets, so keep sounds the user likes with
+  `live_sound_save(name=..., track=..., device=<path>, tags=[...])` and recall them with
+  `live_sound_load` (same device type). For Serum 2 this also survives a re-expose: save,
+  `live_plugin_expose(...)` with more parameters, then `live_sound_load` on the new device
+  path. `only=["filter"]` takes just part of a sound.
+- **Generative**: `live_clip_write_euclid(rhythms={"kick": "4/16", "rim": "3/8+2", "perc":
+  "5/16"}, bars=...)` for Euclidean rhythms and polymeters; `live_clip_note_chance(probability=
+  [0.5, 0.9], pitch="F#1")` so hats and ghosts vary every loop (downbeats stay certain).
+- **Masking and A/B**: bounce two or more parts over the same bars
+  (`live_record_resample(source=<track>)` each) and run `live_audio_masking(sources=[...])` to
+  see which bands they fight over; after a mix change, bounce again and run
+  `live_audio_compare(before=..., after=...)` to show what improved and what got worse.
 
 ## 5. Instruments, effects, plug-ins, samples, parameters
 

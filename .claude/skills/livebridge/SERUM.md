@@ -34,7 +34,12 @@ what you changed in synth terms ("opened the filter to 1.2 kHz, more unison detu
    (one or two parameters) between listens beat a 30-parameter rewrite.
 6. **Expose first, design second.** Re-exposing (or `replace=true`) restarts the sound from the
    preset or Init, because Live cannot read a plug-in's state. If you need parameters that are
-   not exposed, add them *before* designing, or warn the user that the sound resets.
+   not exposed, add them *before* designing, or carry the sound over: `live_sound_save(name=...,
+   device=<path>)`, re-expose, then `live_sound_load(name=..., device=<new path>)` (the knob
+   values come back; wavetables and routings come from the preset as before).
+7. **Keep what the user likes**: `live_sound_save(name="Dark Reese", device=<path>,
+   tags=["bass", "serum"])`; next session `live_sound_list(tag="serum")` and `live_sound_load`
+   onto a freshly exposed Serum 2.
 
 ## 2. What the API can and cannot change
 

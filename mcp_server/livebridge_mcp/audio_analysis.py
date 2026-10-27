@@ -19,7 +19,8 @@ from typing import Any
 
 from .theory import NOTE_NAMES, detect_key
 
-__all__ = ["MissingDependency", "analyze_file", "compare", "INSTALL_HINT"]
+__all__ = ["MissingDependency", "analyze_file", "compare", "compare_versions", "masking",
+           "INSTALL_HINT"]
 
 INSTALL_HINT = ('pip install "livebridge-mcp[audio]"  (or: pip install numpy scipy soundfile '
                 'pyloudnorm) into the Python environment that runs the LiveBridge MCP server')
@@ -365,3 +366,220 @@ def compare(mix: dict[str, Any], reference: dict[str, Any]) -> dict[str, Any]:
                      "level-match before judging the tone (band values are already relative).")
     diff["notes"] = notes
     return diff
+
+
+# ----------------------------------------------------------------------------- masking
+
+#: Third-octave band centres (Hz) used for masking: 31.5 Hz .. 16 kHz.
+MASKING_CENTRES: tuple[float, ...] = (
+    31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
+    2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000)
+_MASK_RATE = 44100
+_MASK_HOP_S = 0.05
+_MASK_CHUNK = 400       # STFT frames per chunk (~20 s): bounds memory on long files
+_ACTIVE_DB = 20.0       # a band is "active" in a frame within this many dB of its own peak
+_CLOSE_DB = 8.0         # two parts mask when both are active and this close in level
+_FLOOR_DB = -70.0       # quieter than this (dBFS per band) never counts
+
+
+def _band_matrix(path: str, start: float, duration: float | None) -> tuple[Any, float]:
+    """(bands x frames) level matrix in dB and the file's length in seconds."""
+    np, signal, _sf, _pyln = _deps()
+    data, rate, meta = _load(path, start, duration)
+    mono = np.mean(data, axis=1, dtype=np.float32)
+    del data
+    if rate != _MASK_RATE:
+        factor = math.gcd(rate, _MASK_RATE)
+        mono = signal.resample_poly(mono, _MASK_RATE // factor, rate // factor)
+    nper = 8192
+    hop = int(_MASK_HOP_S * _MASK_RATE)
+    if len(mono) < nper:
+        mono = np.pad(mono, (0, nper - len(mono)))
+    # STFT in chunks of _MASK_CHUNK frames: one transform of 10 minutes would need ~1 GB
+    freqs = np.fft.rfftfreq(nper, 1.0 / _MASK_RATE)
+    selectors = [(freqs >= c / 2 ** (1 / 6)) & (freqs < c * 2 ** (1 / 6))
+                 for c in MASKING_CENTRES]
+    total_frames = (len(mono) - nper) // hop + 1
+    columns = []
+    for first in range(0, total_frames, _MASK_CHUNK):
+        count = min(_MASK_CHUNK, total_frames - first)
+        piece = mono[first * hop:first * hop + nper + (count - 1) * hop]
+        _f, _t, spec = signal.stft(piece, fs=_MASK_RATE, nperseg=nper, noverlap=nper - hop,
+                                   boundary=None, padded=False)
+        power = np.abs(spec) ** 2
+        columns.append(np.array([np.sum(power[sel], axis=0) for sel in selectors]))
+    # scipy scales the STFT by the window sum: a sine of amplitude A reads about A/2
+    levels = 10.0 * np.log10(np.maximum(np.concatenate(columns, axis=1), 1e-20))
+    return levels, meta["duration"]
+
+
+def _energy_share(levels: Any) -> Any:
+    """Each band's share (0..1) of a part's total energy over time."""
+    np, _signal, _sf, _pyln = _deps()
+    power = np.mean(10.0 ** (levels / 10.0), axis=1)
+    return power / max(float(np.sum(power)), 1e-20)
+
+
+def _band_label(centre: float) -> str:
+    return f"{centre / 1000:g} kHz" if centre >= 1000 else f"{centre:g} Hz"
+
+
+def _region(centre: float) -> str:
+    if centre < 63:
+        return "sub"
+    if centre < 160:
+        return "bass"
+    if centre < 315:
+        return "low-mid"
+    if centre < 630:
+        return "mud"
+    if centre < 2500:
+        return "mid"
+    if centre < 6300:
+        return "presence"
+    return "air"
+
+
+def _masking_advice(region: str, louder: str, quieter: str, centre: float) -> str:
+    where = _band_label(centre)
+    if region in ("sub", "bass"):
+        return (f"{louder} and {quieter} both own the low end around {where}: decide who owns "
+                f"the sub — side-chain {quieter} to {louder} (or the other way round), or "
+                f"high-pass the one that should not carry the sub")
+    if region in ("low-mid", "mud"):
+        return (f"cut {quieter} 2-4 dB with a wide bell around {where} (or high-pass it "
+                f"higher); if {quieter} is the important part, cut {louder} instead")
+    return (f"carve a pocket: a 2-3 dB bell cut around {where} on whichever part is less "
+            f"important here, or pan/arrange them apart (play at different moments)")
+
+
+def masking(sources: list[dict[str, Any]], start: float = 0.0,
+            duration: float | None = None, top: int = 3) -> dict[str, Any]:
+    """Where parts fight for the same frequencies at the same time.
+
+    Args:
+        sources: [{"name": label, "path": audio file}] — 2 to 8 bounces of the SAME time range
+            (e.g. `live_record_resample` of each track over the same bars), aligned at 0 s.
+        start, duration: window in seconds.
+        top: bands reported per pair.
+
+    Returns:
+        {"pairs": [{"parts": [a, b], "score" (0..100), "bands": [{"band", "hz", "region",
+        "overlap" (share of time both are active and close in level, 0..1), "louder", "level_db":
+        {a, b}}], "advice": [...]}], "parts": [{name, duration, loudest_band}], "notes": [...]}
+        sorted by score (worst first).
+    """
+    np, _signal, _sf, _pyln = _deps()
+    mats, parts, notes = [], [], []
+    for source in sources:
+        levels, seconds = _band_matrix(source["path"], start, duration)
+        mats.append(levels)
+        loudest = int(np.argmax(np.max(levels, axis=1)))
+        parts.append({"name": source["name"], "duration": seconds,
+                      "loudest_band": _band_label(MASKING_CENTRES[loudest])})
+    frames = min(m.shape[1] for m in mats)
+    if max(m.shape[1] for m in mats) - frames > int(2.0 / _MASK_HOP_S):
+        notes.append("The files differ in length by more than 2 s — bounce every part over "
+                     "the same bars so they line up.")
+    mats = [m[:, :frames] for m in mats]
+    active = []
+    for levels in mats:
+        peak = np.max(levels, axis=1, keepdims=True)
+        active.append((levels >= peak - _ACTIVE_DB) & (levels > _FLOOR_DB))
+    pairs = []
+    for i in range(len(mats)):
+        for j in range(i + 1, len(mats)):
+            a, b = mats[i], mats[j]
+            both = active[i] & active[j] & (np.abs(a - b) <= _CLOSE_DB)
+            overlap = both.mean(axis=1) if frames else np.zeros(len(MASKING_CENTRES))
+            # weight bands by how much they matter to each part (share of its energy there)
+            weight = np.sqrt(_energy_share(a) * _energy_share(b))
+            score = float(np.sum(overlap * weight) / max(float(np.sum(weight)), 1e-20))
+            ranked = sorted(range(len(MASKING_CENTRES)),
+                            key=lambda k: -(overlap[k] * weight[k]))
+            bands, advice = [], []
+            for k in ranked[:top]:
+                if overlap[k] < 0.05:
+                    break
+                mask = both[k]
+                level_a = float(np.mean(a[k][mask])) if mask.any() else float(np.mean(a[k]))
+                level_b = float(np.mean(b[k][mask])) if mask.any() else float(np.mean(b[k]))
+                louder, quieter = ((parts[i]["name"], parts[j]["name"]) if level_a >= level_b
+                                   else (parts[j]["name"], parts[i]["name"]))
+                centre = MASKING_CENTRES[k]
+                region = _region(centre)
+                bands.append({"band": _band_label(centre), "hz": centre, "region": region,
+                              "overlap": round(float(overlap[k]), 2), "louder": louder,
+                              "level_db": {parts[i]["name"]: round(level_a, 1),
+                                           parts[j]["name"]: round(level_b, 1)}})
+                text = _masking_advice(region, louder, quieter, centre)
+                if text not in advice:
+                    advice.append(text)
+            pairs.append({"parts": [parts[i]["name"], parts[j]["name"]],
+                          "score": round(100.0 * score), "bands": bands, "advice": advice})
+    pairs.sort(key=lambda pair: -pair["score"])
+    if pairs and pairs[0]["score"] < 10:
+        notes.append("Little masking: the parts mostly occupy different frequencies or "
+                     "different moments.")
+    return {"pairs": pairs, "parts": parts, "notes": notes}
+
+
+# ------------------------------------------------------------------- before / after
+
+def compare_versions(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """What changed between two analyses of the same music (``analyze_file`` results): the
+    deltas after - before, mix flags that went away or appeared, and a plain verdict per
+    dimension — the "did my change help?" check."""
+    changes: list[str] = []
+    delta: dict[str, Any] = {}
+    loud_a, loud_b = before.get("loudness", {}), after.get("loudness", {})
+    for field, label, good in (("lufs", "loudness (LUFS)", None),
+                               ("true_peak_db", "true peak (dBTP)", -1),
+                               ("crest_db", "crest factor (dB, punch)", 1),
+                               ("loudness_range_lu", "loudness range (LU)", None)):
+        a, b = loud_a.get(field), loud_b.get(field)
+        if a is None or b is None:
+            continue
+        d = round(b - a, 1)
+        delta[field] = d
+        if abs(d) >= (0.5 if field != "true_peak_db" else 0.3):
+            verdict = ""
+            if good is not None:
+                verdict = " (better)" if d * good > 0 else " (worse)"
+            changes.append(f"{label} {'+' if d > 0 else ''}{d}{verdict}")
+    bands_a = before.get("spectrum", {}).get("bands_db", {})
+    bands_b = after.get("spectrum", {}).get("bands_db", {})
+    band_delta = {name: round(bands_b[name] - bands_a[name], 1)
+                  for name in bands_a if name in bands_b}
+    if band_delta:
+        delta["bands_db"] = band_delta
+        ranges = {name: (low, high) for name, low, high, _t in BANDS}
+        for name, d in sorted(band_delta.items(), key=lambda item: -abs(item[1])):
+            if abs(d) >= 1.5:
+                low, high = ranges[name]
+                changes.append(f"{name} ({int(low)}-{int(high)} Hz) {'+' if d > 0 else ''}{d} dB")
+    for field, label in (("width", "stereo width"), ("low_end_width", "low-end width"),
+                         ("correlation", "mono compatibility (correlation)")):
+        a = before.get("stereo", {}).get(field)
+        b = after.get("stereo", {}).get(field)
+        if a is None or b is None:
+            continue
+        d = round(b - a, 2)
+        delta[field] = d
+        if abs(d) >= 0.05:
+            verdict = ""
+            if field == "low_end_width":
+                verdict = " (better)" if d < 0 else " (worse)"
+            elif field == "correlation":
+                verdict = " (better)" if d > 0 else " (worse)"
+            changes.append(f"{label} {'+' if d > 0 else ''}{d}{verdict}")
+    flags_a, flags_b = set(before.get("flags") or []), set(after.get("flags") or [])
+    lufs_change = delta.get("lufs")
+    notes = []
+    if lufs_change is not None and abs(lufs_change) >= 1.0:
+        notes.append(f"The versions differ by {abs(lufs_change)} LU: louder always sounds "
+                     "better — judge tone at matched loudness (band values are already "
+                     "relative to each version's total).")
+    return {"delta": delta, "changes": changes or ["no measurable change"],
+            "resolved_flags": sorted(flags_a - flags_b), "new_flags": sorted(flags_b - flags_a),
+            "notes": notes}

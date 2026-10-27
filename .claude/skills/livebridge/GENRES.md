@@ -47,9 +47,12 @@ live_clip_write_pattern(track="Drums", slot=1, repeat=4, pattern={
     "hat":  "8363|8363|8363|8363", "ride": ".x.x|.x.x|.x.x|.x.x",
     "rim":  "...x|..x.|...x|.x.."})
 ```
-Hypnotic variant: an odd-length percussion loop phasing against the bar. Write a 5-step or
-3-beat cycle into its own clip on a separate track and set `live_clip_set(loop_end=1.25)`
-(5 sixteenths) or `loop_end=3` so it drifts against the 4/4 loop.
+Hypnotic variant: odd-length percussion phasing against the bar. In one clip:
+`live_clip_write_euclid(track="Drums", slot=2, bars=5, rhythms={"kick": "4/16", "rim":
+"2/5", "tom_high": {"hits": 3, "steps": 12, "rotate": 1, "velocity": 80}})` (rows with their
+own cycle lengths drift and come round after 5 bars); or a 5-sixteenth clip on its own track
+with `live_clip_set(loop_end=1.25)`. Then `live_clip_note_chance(probability=[0.6, 0.95],
+pitch="F#1")` on the hats for a loop that never repeats exactly.
 
 **Bass.** 1-3 notes, locked to the kick; timbre moves, pitch doesn't. Range F0-C2.
 - *Sub* (deep/minimal): sine, mono, attack 5 ms, release 50 ms, long notes under the kick.

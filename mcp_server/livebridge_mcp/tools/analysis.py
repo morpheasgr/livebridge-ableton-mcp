@@ -34,6 +34,7 @@ _MODE_ALIASES = {"": "major", "maj": "major", "major": "major", "ionian": "major
                  "m": "minor", "min": "minor", "minor": "minor", "aeolian": "minor",
                  "natural minor": "minor"}
 _AUDIO_TIMEOUT_HINT = "pass start=/duration= (seconds) to analyse a shorter window"
+_MAX_MASKING_SOURCES = 8
 
 
 def _parse_key(text: str) -> dict[str, Any] | None:
@@ -328,3 +329,152 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                    if k in other}
             result["comparison"] = audio_analysis.compare(result, other)
         return result
+
+    def audio_source(spec: Any, label: str, cmd: str) -> tuple[str, str] | dict[str, Any]:
+        """``(display name, local file)`` for a file path or an audio clip address, or an
+        error dict."""
+        name = None
+        if isinstance(spec, dict) and "file_path" in spec:
+            unknown = set(spec) - {"file_path", "name"}
+            if unknown:
+                return tool_error(f"{label}: unknown keys {sorted(unknown)}", cmd=cmd)
+            name, spec = spec.get("name"), spec["file_path"]
+        if isinstance(spec, str) and not spec.startswith("song."):
+            local = _local_file(spec)
+            if local is None:
+                return tool_error(f"{label}: {spec} does not exist on this machine (the one "
+                                  "running the LiveBridge MCP server)", type="not_found", cmd=cmd)
+            return str(name or os.path.splitext(os.path.basename(spec))[0]), local
+        if isinstance(spec, dict) and set(spec) <= {"track", "slot", "clip", "name"}:
+            name = spec.get("name")
+            address = (spec.get("track"), spec.get("slot"), spec.get("clip"))
+        elif isinstance(spec, str):
+            address = (None, None, spec)
+        else:
+            return tool_error(f"{label}: give a file path, {{'file_path', 'name'?}}, an audio "
+                              "clip {'track', 'slot'} or a clip path 'song.tracks[..]...'",
+                              cmd=cmd)
+        error = clip_address(*address, cmd)
+        if error:
+            return error
+        answer = bridge_call(bridge, "clips.get", address_args(*address))
+        if _is_error(answer) or not isinstance(answer, dict):
+            return answer
+        file_path = answer.get("file_path")
+        if not file_path:
+            return tool_error(f"{label}: {answer.get('name') or 'that clip'} is not an audio "
+                              "clip — bounce the track with live_record_resample first",
+                              type="invalid_state", cmd=cmd)
+        local = _local_file(file_path)
+        if local is None:
+            return tool_error(f"{label}: {file_path} is not on this machine (LAN mode: the "
+                              "file lives on the Live computer)", type="not_found", cmd=cmd)
+        track_name = spec.get("track") if isinstance(spec, dict) else None
+        return str(name or track_name or answer.get("name") or "clip"), local
+
+    def audio_failure(exc: Exception, cmd: str) -> dict[str, Any]:
+        if isinstance(exc, audio_analysis.MissingDependency):
+            return tool_error(str(exc), type="unsupported", cmd=cmd)
+        if isinstance(exc, MemoryError):
+            return tool_error("not enough memory — " + _AUDIO_TIMEOUT_HINT,
+                              type="invalid_state", cmd=cmd)
+        return tool_error(f"could not analyse the audio: {exc}", type="invalid_state", cmd=cmd)
+
+    @mcp.tool()
+    def live_audio_masking(
+        sources: list[Any],
+        start: float | None = None,
+        duration: float | None = None,
+        top: int = 3,
+    ) -> Any:
+        """Find where parts fight for the same frequencies at the same time (masking) — the
+        measured answer to "the kick and bass fight", "the vocal gets lost", "it's muddy".
+        Compares 2-8 bounces of the SAME time range band by band (third octaves, 31.5 Hz-16
+        kHz) and reports, per pair, the bands where both are active and close in level, which
+        one is louder there, and what to do. Read-only.
+
+        Args:
+            sources: the parts, each a file path, {"file_path", "name"?} or an audio clip
+                {"track", "slot", "name"?} — e.g. the clips `live_record_resample(source=
+                "Bass")` and `(source="Kick")` made over the same bars. They must start at the
+                same moment (bounce each part over the same range).
+            start, duration: window in seconds (e.g. just the drop).
+            top: bands reported per pair (1..8).
+
+        Returns:
+            `{pairs:[{parts:[a, b], score (0-100, worst first), bands:[{band, hz, region,
+            overlap (0..1 of the time), louder, level_db}], advice:[...]}], parts:[{name,
+            duration, loudest_band}], notes}`.
+
+        Gotchas: masking is only a problem when both parts matter at that frequency — a pad's
+        low end under a bass is usually just cut. Scores above ~30 deserve a look. Bouncing is
+        real time: `live_record_resample` each part (or solo it and bounce the master). Needs
+        the `audio` extra.
+        """
+        cmd = "audio.masking"
+        if not isinstance(sources, list) or not 2 <= len(sources) <= _MAX_MASKING_SOURCES:
+            return tool_error(f"sources must list 2..{_MAX_MASKING_SOURCES} parts", cmd=cmd)
+        if not 1 <= top <= 8:
+            return tool_error("top must be 1..8", cmd=cmd)
+        if (start is not None and start < 0) or (duration is not None and duration <= 0):
+            return tool_error("start must be >= 0 and duration > 0 (seconds)", cmd=cmd)
+        resolved, names = [], set()
+        for index, spec in enumerate(sources):
+            found = audio_source(spec, f"sources[{index}]", cmd)
+            if isinstance(found, dict):
+                return found
+            name, path = found
+            while name in names:
+                name += "'"
+            names.add(name)
+            resolved.append({"name": name, "path": path})
+        try:
+            return audio_analysis.masking(resolved, start=start or 0.0, duration=duration,
+                                          top=top)
+        except Exception as exc:  # missing extra, unreadable file
+            return audio_failure(exc, cmd)
+
+    @mcp.tool()
+    def live_audio_compare(
+        before: Any,
+        after: Any,
+        start: float | None = None,
+        duration: float | None = None,
+    ) -> Any:
+        """Did the change help? Measure two versions of the same music — a bounce before and
+        after a mix move, two Serum patches, the drop with and without the new layer — and
+        report what changed: loudness, true peak, punch (crest), the 8 spectral bands, stereo
+        and low-end width, which mix flags went away and which appeared, with better/worse
+        verdicts where there is a clear direction. Read-only.
+
+        Args:
+            before, after: each a file path, {"file_path", "name"?} or an audio clip {"track",
+                "slot"} (e.g. two `live_record_resample` bounces of the same bars).
+            start, duration: window in seconds, applied to both.
+
+        Returns:
+            `{before:{file, loudness, spectrum, stereo, flags}, after:{...}, comparison:{delta,
+            changes:[plain text], resolved_flags, new_flags, notes}}`.
+
+        Gotchas: bounce both versions over the same range with nothing else changed; a
+        louder version always sounds better, so the band values are relative to each
+        version's total. Needs the `audio` extra.
+        """
+        cmd = "audio.compare"
+        if (start is not None and start < 0) or (duration is not None and duration <= 0):
+            return tool_error("start must be >= 0 and duration > 0 (seconds)", cmd=cmd)
+        results = []
+        for label, spec in (("before", before), ("after", after)):
+            found = audio_source(spec, label, cmd)
+            if isinstance(found, dict):
+                return found
+            try:
+                results.append(audio_analysis.analyze_file(found[1], start=start or 0.0,
+                                                           duration=duration, kind="auto",
+                                                           sections=False))
+            except Exception as exc:  # missing extra, unreadable file
+                return audio_failure(exc, cmd)
+        keep = ("file", "loudness", "spectrum", "stereo", "flags")
+        return {"before": {k: results[0][k] for k in keep if k in results[0]},
+                "after": {k: results[1][k] for k in keep if k in results[1]},
+                "comparison": audio_analysis.compare_versions(results[0], results[1])}

@@ -14,6 +14,20 @@ the MCP server package and the installer have their own version numbers. `live_s
   vocal chain). Adapted in part from the MIT-licensed ableton-mcp-pro and glincker/ableton-skills
   (`THIRD_PARTY_NOTICES.md`).
 - `tests/test_skill_docs.py` checks that every tool and argument the skill files name exists.
+- **12 new tools (180 in total)**, written for LiveBridge from a list of features other Ableton
+  MCP servers offer (no code taken from them):
+  - *Sound library*: `live_sound_save` / `_load` / `_list` / `_delete` keep a device's sound
+    (any device, Serum 2 racks included) in `~/.livebridge/sounds` and put it back later, on
+    another instance, or after `live_plugin_expose` re-exposed a plug-in.
+  - *Generative*: `live_clip_write_euclid` (Euclidean rhythms and polymeters) and
+    `live_clip_note_chance` (per-note play probability and velocity variation).
+  - *Mix analysis*: `live_audio_masking` (which parts fight over which frequency bands, with
+    advice) and `live_audio_compare` (before/after deltas with better/worse verdicts).
+  - *Session memory*: `live_memory_note` / `_recall` / `_update` / `_forget` keep decisions, open
+    ideas and the user's preferences across sessions in `~/.livebridge/memory.json`, matched to
+    the open set by its track names and tempo.
+  `LIVEBRIDGE_LIBRARY` moves the library folder. The new modules are in the `production`
+  toolset.
 
 ## 1.0.0 — 2026-09-23
 
