@@ -37,6 +37,6 @@ jobs:
           cache: pip
           cache-dependency-path: mcp_server/pyproject.toml
       - name: Install the MCP server with test and audio extras
-        run: python -m pip install -e "mcp_server[dev,audio]"
+        run: python -m pip install -e "mcp_server[dev,audio,serum]"
       - name: Run the test suite
         run: python -m pytest -q tests

@@ -377,6 +377,7 @@ def test_full_install_on_macos(tmp_path):
     assert runner.commands("-m venv " + str(venv))
     pip = runner.commands("pip install")[0]
     assert pip[0] == str(venv / "bin" / "python") and pip[-2:] == ["-e", str(REPO / "mcp_server")]
+    assert runner.commands("cbor2")                  # the Serum preset libraries, by default
     exe = str(venv / "bin" / "livebridge-mcp")
 
     # Claude Desktop: merged, nothing clobbered, backup kept

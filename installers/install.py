@@ -81,6 +81,8 @@ MCP_NAME = "livebridge"
 MCP_DIST = "livebridge-mcp"
 #: The optional ``audio`` extra of mcp_server/pyproject.toml (live_audio_analyze).
 AUDIO_PACKAGES = ("numpy>=1.24", "scipy>=1.10", "soundfile>=0.12", "pyloudnorm>=0.1.1")
+#: Optional: the libraries behind the live_preset_* tools (Serum 2 preset files). Small.
+SERUM_PACKAGES = ("cbor2>=5.4", "zstandard>=0.21")
 MCP_MODULE = "livebridge_mcp"
 SPLICE_NAME = "splice"
 SPLICE_URL = "https://mcp.splice.com/mcp"
@@ -1342,6 +1344,14 @@ class Installer(Ops):
             raise InstallError("installing the MCP server failed (exit %d)%s:\n%s"
                                % (result.returncode, hint, tail(result.output)))
         self.info("installed %s (editable) from %s" % (MCP_DIST, MCP_SOURCE))
+        # Optional and small: Serum 2 preset files (live_preset_*). Never fatal.
+        presets = self.run(argv[:-2] + list(SERUM_PACKAGES), timeout=900.0)
+        if presets.ok:
+            self.info("installed the Serum preset libraries (%s)" % ", ".join(SERUM_PACKAGES))
+        else:
+            self.warn("the Serum preset libraries could not be installed (%s) -- everything "
+                      "else works; the live_preset_* tools will say how to add them"
+                      % ", ".join(SERUM_PACKAGES))
         if getattr(self.args, "no_audio", False):
             self.info("--no-audio: live_audio_analyze stays off until its libraries are added")
             return

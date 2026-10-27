@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~199 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~207 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -24,6 +24,8 @@ More companions next to this file (also MCP resources), read the one that fits t
 |---|---|---|
 | `GENRES.md` | `livebridge://genres` | writing drums, bass, chords or sounds in a named genre: techno, hardgroove, house, UK garage, speed garage, trance, Reese/growl/dubstep, synthwave, acid, ambient, hip-hop/trap/DnB grooves, loop-to-track |
 | `SERUM.md` | `livebridge://serum` | designing or tweaking a Serum 2 sound: parameter cheat sheet, recipes (sub, 808, Reese, growl, acid, supersaw, pluck, pad, riser), what the API cannot change |
+| `SERUM_PRESETS.md` | `livebridge://serum-presets` | a Serum 2 sound beyond the 128 exposed knobs: a new preset designed as a file (wavetables, oscillator modes, matrix routes, FX order), "make this preset darker/faster", copying a wavetable or FX rack from another preset, then `live_preset_load` |
+| `OMNISPHERE.md` | `livebridge://omnisphere` | designing or improving an Omnisphere 2/3 sound: sources, granular, filters, modulation, Orb, effects, recipes; what Live can reach (Configure) |
 | `WORKFLOWS.md` | `livebridge://workflows` | extending an arrangement, co-writing parts with the user, starting a project, grooves and MIDI cleanup, chords, mix diagnosis, side-chain, reference matching, mix check / pre-master audit, vocal chain, session snapshot |
 
 ## 1. Start every session the same way
@@ -74,6 +76,7 @@ added or removed. Prefer the `path` fields from the latest summary, or names.
 | New track with an instrument | `live_browser_load(query, category="instrument", new_track=true, track_name=...)` - or `live_tracks_create` + `live_device_insert(name)` for plain built-ins (Live 12.3+, fastest) |
 | Drum kit | `live_browser_load("909 Core Kit", category="drum_kit", new_track=true, track_name="Drums")` |
 | Serum 2 / a big VST3 synth | `live_plugin_expose(plugin="Serum 2", parameters=["sound_design"], new_track=true, track_name=...)` (loads it already controllable) |
+| A whole Serum 2 patch (wavetables, matrix, FX order) | design the preset file: `live_preset_find(query=...)` for a starting preset, `live_preset_edit(...)`, then `live_preset_load(source_path=...)` — `SERUM_PRESETS.md` |
 | Drum/arp/bass step pattern | `live_clip_write_pattern` (creates the clip) |
 | Chord progression | `live_clip_write_chords("Am7 Fmaj7 C G", voice_leading=true)` - Roman numerals in the song key work too ("i VI III VII") |
 | Arpeggio | `live_clip_write_arp(chords="Am F C G", style="up", rate="1/16")` |

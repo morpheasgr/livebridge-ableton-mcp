@@ -38,6 +38,8 @@ dev = ["pytest>=7.0"]
 # live_audio_analyze / _masking / _compare (LUFS, spectrum, masking, tempo, key of audio files);
 # the server runs without it.
 audio = ["numpy>=1.24", "scipy>=1.10", "soundfile>=0.12", "pyloudnorm>=0.1.1"]
+# live_preset_* (Serum 2 preset files: read, edit, design, load); the server runs without it.
+serum = ["cbor2>=5.4", "zstandard>=0.21"]
 
 [project.scripts]
 livebridge-mcp = "livebridge_mcp.__main__:main"

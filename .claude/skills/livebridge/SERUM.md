@@ -1,5 +1,8 @@
 # Sound design in Serum 2
 
+> The 128 knobs below are what Live can reach. For the **whole patch** — wavetable selection, oscillator modes, matrix routes, FX order — design the preset file instead: `SERUM_PRESETS.md` (`live_preset_find`, `live_preset_edit`, `live_preset_load`).
+
+
 Companion to `SKILL.md` (§5 explains the mechanics). This file is the *sound design*: which
 Serum 2 parameters make which sound, recipes for the classic electronic-music patches, and the
 limits of what Live's API lets you change. Read it before you build or tweak a Serum sound.

@@ -40,6 +40,18 @@ the MCP server package and the installer have their own version numbers. `live_s
   5x faster at 120 BPM at today's ~0.2 beat resolution); without one the Remote Script writes
   at ~300 BPM (0.5 beat, still exact for ramps). Refused for the tempo itself and when the song
   has tempo automation. `automation.record` gains `tempo` and `writer="external"`.
+- **Serum 2 preset files** (`live_preset_find`, `live_preset_inspect`, `live_preset_read`,
+  `live_preset_search`, `live_preset_edit`, `live_preset_convert`, `live_preset_compare`,
+  `live_preset_load`): the whole Serum 2 patch beyond the 128 knobs Live can reach — read and
+  search complete `.SerumPreset` state, edit it with guarded JSON Patch operations (copy whole
+  wavetable oscillators or FX racks from another preset), unpack/repack it as JSON, compare two
+  presets, and load one into Live as Serum 2 on a new track or replacing a track's instrument
+  (packed into a `.vstpreset` with a template the user saved from their own Serum 2, found in
+  the User Library; written to `User Library/LiveBridge Presets/Serum 2`). Companion guides
+  `SERUM_PRESETS.md` (`livebridge://serum-presets`) and `OMNISPHERE.md`
+  (`livebridge://omnisphere`). The codec, preset tree, VST3 container, packing and both guides
+  are ported from kasperikaivola's fork of ableton-mcp-pro (MIT, commit 6ac32c8); new `serum`
+  extra (cbor2, zstandard), installed by default.
 - **Technical problems and layer alignment** (`live_audio_problems`, `live_audio_align`):
   clipping, DC offset, left/right polarity, mains hum (50/60 Hz with harmonics, measured in the
   quiet passages), noise floor and persistent resonances (each with an EQ Eight bell: frequency,
