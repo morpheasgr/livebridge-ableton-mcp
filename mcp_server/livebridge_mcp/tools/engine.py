@@ -23,10 +23,12 @@ from .. import audio_analysis, engine
 from ..client import BridgeClient
 
 _KINDS = ("auto", "mix", "stem")
-_HOW_TO_ADD = ("Add the LiveBridge Engine device: in Live's browser open User Library > "
-               "Presets > Audio Effects > Max Audio Effect > LiveBridge Engine and drag it onto "
-               "the master track (it needs Max for Live: Live Suite or the add-on). The "
-               "LiveBridge installer puts it there.")
+_HOW_TO_ADD = ("Add the LiveBridge Engine device yourself: live_browser_load(query="
+               "\"LiveBridge Engine\", category=\"audio_effect\", track=\"master\") (or a "
+               "track name; it loads at the end of the chain, after the instrument), then wait "
+               "until live_engine_status lists it (~2 s). By hand: User Library > Presets > "
+               "Audio Effects > Max Audio Effect > LiveBridge Engine. It needs Max for Live "
+               "(Live Suite or the add-on); the LiveBridge installer puts it there.")
 
 
 _MAX_SAVED = 32

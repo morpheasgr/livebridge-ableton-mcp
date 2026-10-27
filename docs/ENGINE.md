@@ -33,6 +33,10 @@ Presets > Audio Effects > Max Audio Effect > LiveBridge Engine** — drag it ont
 track. It passes audio through untouched; its status line reads "ready", then "master" (or
 the track name) once it knows where it sits.
 
+Claude can add it too: `live_browser_load(query="LiveBridge Engine", category="audio_effect",
+track="master")` (or any track name) loads it at the end of the chain, like any Max for Live
+device in the browser; the tools' "not found" answers say so.
+
 Manual install: copy the folder `max_for_live/LiveBridge Engine/` (all four files: the `.amxd`,
 `engine.js`, `context.js`, `lb_engine.gendsp`) anywhere Live's browser can see, keeping them
 together.

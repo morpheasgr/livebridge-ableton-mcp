@@ -192,7 +192,12 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     smooth_random, steps=[...]); nothing is written and `live_engine_unmodulate` puts the
     value back. Use it to audition movement; when the user likes it, write it as automation
     (`live_automation_*`) — modulations are not saved with the set.
-  No device -> the tool says how to add it; don't insist.
+  No device yet -> add it yourself when the task needs it (say so in one line):
+  `live_browser_load(query="LiveBridge Engine", category="audio_effect", track="master")` (or
+  a track name; MIDI tracks need their instrument first), then `live_engine_status` until it
+  is listed (~2 s). If the browser does not find it, Max for Live or the device is missing:
+  tell the user, don't insist. Any other Max for Live device loads the same way
+  (`category="audio_effect"|"midi_effect"|"instrument"`).
 
 ## 4c. Remember, keep sounds, generate, compare
 
