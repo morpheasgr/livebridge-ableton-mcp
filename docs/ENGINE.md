@@ -120,9 +120,15 @@ readings), checks the patch wiring, and runs `engine.js` under Node with a stand
 
 ## Roadmap
 
-Arrangement automation lanes stay out of reach: Max for Live's LiveAPI is the same Live Object
-Model as the Remote Script's, without track automation envelopes, so `live_automation_record`
-still records them in real time.
+Arrangement automation lanes stay out of reach for drawing: Max for Live's LiveAPI is the same
+Live Object Model as the Remote Script's, without track automation envelopes, so
+`live_automation_record` records them by playing. The Engine makes that faster: with
+`speed="fast"` the Remote Script plays the pass at a raised tempo (automation is stored in
+beats; the tempo is restored after) and the Engine writes the curve 50 times a second
+(`automate`: `path`, `points` [[beat, value]], `mode`, `start`, `end`; `begin_gesture` at
+`start`, `setvalue` through `context.js`, `end_gesture` at `end`) — about 5x faster than real
+time at the Remote Script's resolution. Not for the tempo itself or a song with tempo
+automation, which would override the raised tempo.
 
 # LiveBridge MIDI (Max for Live)
 

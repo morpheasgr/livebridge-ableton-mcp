@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import bridge_call, drop_none, tool_error
+from .. import engine
 from ..client import BridgeClient
 from .cues import time_error
 
@@ -37,6 +38,12 @@ Ref = int | str
 TimeArg = float | str
 
 _MODES = ("step", "linear", "events")
+#: speed="fast": beats between two writes the pass aims for (Live's 0.2 at 120 BPM / 100 ms)
+_FAST_RESOLUTION = 0.2
+#: seconds between writes: the Remote Script's display tick, the LiveBridge Engine's
+_TICK_S = {"live": 0.1, "external": 0.02}
+#: without an Engine, speed="fast" accepts this coarser resolution (still exact for ramps)
+_FAST_RESOLUTION_LIVE = 0.5
 _SHAPES = ("ramp_up", "ramp_down", "sine", "triangle", "saw_up", "saw_down", "square", "random",
            "ramp", "fade_in", "fade_out", "saw", "lfo", "sin", "tri", "noise",
            "sample_and_hold", "s&h", "pulse")
@@ -440,7 +447,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                period: TimeArg | None = None, cycles: float | None = None,
                                phase: float = 0.0, duty: float = 0.5, curve: float = 1.0,
                                seed: int | str | None = None, mode: str = "linear",
-                               preroll: float = 1.0, action: str = "start") -> Any:
+                               preroll: float = 1.0, action: str = "start",
+                               speed: str | float | None = None) -> Any:
         """Record real ARRANGEMENT automation (track automation lanes) — tempo ramps, master
         filter sweeps, return-track sends, long builds. Live's API cannot draw lanes, so this
         does it like a person: Arrangement Record + Automation Arm on, playback from `preroll`
@@ -465,6 +473,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             preroll: Beats of playback before `start` (0..16).
             action: "start" (default), "status" (progress of the running/last pass) or "stop"
                 (abort the running pass).
+            speed: Record faster than real time — automation is stored in beats, so the pass
+                plays at a raised tempo and the tempo is restored after. "fast": as fast as
+                keeps ~0.2 beat between writes (with a LiveBridge Engine in the set it writes
+                50x a second -> ~600 BPM, about 5x faster at 120; without one ~300 BPM at 0.5
+                beat, still exact for ramps). A number multiplies the song tempo (2 = twice
+                as fast, up to 999 BPM). Not for the tempo itself or a song with tempo
+                automation.
 
         Returns:
             start: {"id", "phase", "range", "parameter", "track", "points", "expected_seconds",
@@ -479,10 +494,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         read back through the API. For clip-level automation use live_automation_write/shape.
         """
         if action == "status":
-            return bridge_call(bridge, "automation.record_status", {})
+            return with_engine(bridge_call(bridge, "automation.record_status", {}))
         cmd = "automation.record"
         if action == "stop":
-            return bridge_call(bridge, cmd, {"action": "stop"})
+            stopped = bridge_call(bridge, cmd, {"action": "stop"})
+            cancel_engine()
+            return with_engine(stopped)
         if action != "start":
             return tool_error("action must be start, status or stop", cmd=cmd)
         error = _param_error(parameter, cmd) or time_error(start, "start", cmd) or \
@@ -523,7 +540,80 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             args["mode"] = mode
         if preroll != 1.0:
             args["preroll"] = preroll
-        return bridge_call(bridge, cmd, args)
+        if speed is None:
+            return bridge_call(bridge, cmd, args)
+        return record_fast(cmd, args, speed)
+
+    def engine_writer() -> dict[str, Any] | None:
+        try:
+            found = engine.devices()
+        except engine.EngineError:
+            return None
+        return engine.choose(found) if found else None
+
+    def with_engine(status: Any) -> Any:
+        """A status of an external-writer pass, with the Engine's side of it."""
+        if not isinstance(status, dict) or status.get("writer") != "external":
+            return status
+        try:
+            for device in engine.devices():
+                if device.get("automation"):
+                    status["engine"] = device["automation"]
+                    break
+        except engine.EngineError:
+            pass
+        return status
+
+    def cancel_engine() -> None:
+        try:
+            for device in engine.devices():
+                if (device.get("automation") or {}).get("phase") in ("waiting", "writing"):
+                    engine.request(device, "automate", {"cancel": True})
+        except engine.EngineError:
+            pass
+
+    def record_fast(cmd: str, args: dict[str, Any], speed: Any) -> Any:
+        state = bridge_call(bridge, "transport.get")
+        if not isinstance(state, dict) or "error" in state:
+            return state
+        tempo = float(state.get("tempo") or 120.0)
+        device = engine_writer()
+        writer = "external" if device is not None else "live"
+        if isinstance(speed, str) and speed.strip().lower() == "fast":
+            resolution = _FAST_RESOLUTION if writer == "external" else _FAST_RESOLUTION_LIVE
+            fast = resolution * 60.0 / _TICK_S[writer]
+        elif isinstance(speed, (int, float)) and not isinstance(speed, bool) and \
+                1.0 <= float(speed) <= 20.0:
+            fast = tempo * float(speed)
+        else:
+            return tool_error("speed must be 'fast' or a multiplier 1..20", cmd=cmd)
+        fast = round(min(999.0, max(tempo, fast)), 2)
+        if fast <= tempo * 1.01:
+            answer = bridge_call(bridge, cmd, args)
+            if isinstance(answer, dict) and "error" not in answer:
+                answer["speed_note"] = (f"the song already plays at {tempo:g} BPM — recorded "
+                                        "in real time")
+            return answer
+        answer = bridge_call(bridge, cmd, {**args, "tempo": fast, "writer": writer})
+        if not isinstance(answer, dict) or "error" in answer:
+            return answer
+        if writer == "external":
+            try:
+                engine.request(device, "automate", {
+                    "path": engine.lom_to_max(answer.pop("path")),
+                    "points": answer.pop("curve"), "mode": answer.get("mode", "linear"),
+                    "start": answer["range"][0], "end": answer["range"][1]})
+            except (engine.EngineError, ValueError, KeyError) as exc:
+                bridge_call(bridge, cmd, {"action": "stop"})
+                return tool_error(f"the LiveBridge Engine could not take the pass ({exc}); "
+                                  "it was stopped — try again, or speed=None",
+                                  type="invalid_state", cmd=cmd)
+        answer["speed"] = {"tempo_during_pass": fast, "song_tempo": tempo,
+                           "factor": round(fast / tempo, 2),
+                           "writer": "LiveBridge Engine (50/s)" if writer == "external"
+                           else "Remote Script (10/s)",
+                           "beats_between_writes": round(fast / 60.0 * _TICK_S[writer], 3)}
+        return answer
 
     @mcp.tool()
     def live_automation_clear(track: Ref | None = None, slot: Ref | None = None,

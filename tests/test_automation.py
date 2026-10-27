@@ -941,6 +941,61 @@ def test_record_aborts_when_the_transport_stops(bridge, song):
     assert status["recorded"][0] == 0.0 and status["progress"] == 0.25
 
 
+def test_record_faster_at_another_tempo(bridge, song):
+    param = operator(song).parameters[2]
+    started = run(bridge, "automation.record", track="Bass", parameter="Filter Freq",
+                  points=[[4, 100], [8, 1000]], preroll=0, tempo=496)
+    assert started["tempo_during_pass"] == 496.0
+    assert started["expected_seconds"] == pytest.approx(4 * 60 / 496.0, abs=0.1)
+    assert song.tempo == 496.0                       # set before Arrangement Record goes on
+    bridge.update_display()
+    _record_ticks(bridge, song, 4.0, 8.0, 0.5)
+    assert param.value == 1000.0
+    for _ in range(3):
+        bridge.update_display()
+    status = run(bridge, "automation.record_status")
+    assert status["phase"] == "done" and song.tempo == 124.0
+    assert status["restored"]["tempo"] == 124.0 and song.record_mode is False
+
+
+def test_record_with_an_external_writer(bridge, song):
+    param = operator(song).parameters[2]
+    before = param.value
+    started = run(bridge, "automation.record", track="Bass", parameter="Filter Freq",
+                  points=[[4, 100], [8, 1000]], preroll=0, tempo=480, writer="external")
+    assert started["path"] == "song.tracks[0].devices[0].parameters[2]"
+    assert started["curve"] == [[4.0, 100.0], [8.0, 1000.0]] and started["writer"] == "external"
+    bridge.update_display()
+    _record_ticks(bridge, song, 4.0, 8.25, 0.25)
+    assert param.value == before                     # the other writer moves it, not us
+    assert run(bridge, "automation.record_status")["phase"] == "recording"   # margin
+    song.current_song_time = 8.75                    # 0.64 beat = 80 ms at 480 BPM
+    bridge.update_display()
+    for _ in range(3):
+        bridge.update_display()
+    status = run(bridge, "automation.record_status")
+    assert status["phase"] == "done" and status["recorded"] == [4.0, 8.0]
+    assert "writes" not in status and song.tempo == 124.0
+
+
+def test_record_tempo_refusals(bridge, song):
+    tempo_param = song.master_track.mixer_device.song_tempo
+    refused = fail(bridge, "automation.record", track="master", parameter="tempo",
+                   points=[[0, 120], [4, 130]], tempo=300)
+    assert refused["type"] == "bad_args" and "tempo itself" in refused["message"]
+    for value in (10, 1200, True):
+        assert fail(bridge, "automation.record", track=0, parameter="Resonance",
+                    points=[[0, 0], [4, 1]], tempo=value)["type"] == "bad_args"
+    assert fail(bridge, "automation.record", track=0, parameter="Resonance",
+                points=[[0, 0], [4, 1]], writer="max")["type"] == "bad_args"
+    tempo_param._automation_state = 1                # the song has tempo automation
+    blocked = fail(bridge, "automation.record", track=0, parameter="Resonance",
+                   points=[[0, 0], [4, 1]], tempo=300)
+    assert blocked["type"] == "invalid_state" and "tempo automation" in blocked["message"]
+    tempo_param._automation_state = 0
+    assert song.tempo == 124.0 and song.record_mode is False
+
+
 def test_record_validation(bridge, song):
     assert run(bridge, "automation.record_status") == {"phase": "idle", "finished": True}
     assert fail(bridge, "automation.record", action="stop")["type"] == "invalid_state"

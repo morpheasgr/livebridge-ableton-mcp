@@ -148,6 +148,9 @@ Genre starting points (tempo, feel, key):
     duplicate result); **track automation in the arrangement**: `live_automation_record(parameter=
     "Filter Freq", track=..., points=[[0, "200 Hz"], [32, "4 kHz"]], start=..., end=...)` - it
     plays through the range in real time (poll `action="status"`), then restores the transport.
+    Add `speed="fast"` for long ranges: the pass runs at a raised tempo (restored after; ~5x
+    faster with a LiveBridge Engine in the set, which writes 50x a second) - not for the
+    tempo itself or a song with tempo automation.
 11. **Bounce / export** - `live_record_resample(start="1.1.1", bars=8, source="master")` records
     the section onto an audio track in real time (plays through the speakers; tell the user).
     Freeze a track: `live_record_resample(source="Bass", channel="Post FX")`.

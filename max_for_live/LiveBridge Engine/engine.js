@@ -22,8 +22,13 @@
 // boundary, so Live's launch quantization lands it on the grid. Live's Python API has no follow
 // actions; these run here and are not saved with the set.
 //
+// Finally it is the fast writer of LiveBridge's arrangement automation recording ("automate"):
+// while the Remote Script runs the pass (Arrangement Record, playback, often at a raised
+// tempo), it moves the parameter along the curve 50 times a second — five times the Remote
+// Script's tick — with begin/end gesture, so Live records one touch.
+//
 // Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames" | "capture" | "modulate" |
-//            "unmodulate" | "follow" | "unfollow", "args": {...}}
+//            "unmodulate" | "follow" | "unfollow" | "automate", "args": {...}}
 // Answers:  {"id": 1, "ok": true, "result": {...}} or {"id": 1, "ok": false,
 //           "error": {"type": "bad_args", "message": "..."}}
 
@@ -43,7 +48,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -62,6 +67,8 @@ const MOD_SLOTS = 8;                  // live.remote~ objects in the patch
 const MOD_TICK_MS = 20;               // 50 updates a second, each glided over by line~
 const MOD_RESOLVE_MS = 3000;
 const MAX_PATH = /^live_set( [a-z_]+( \d+)?){1,12}$/;
+const MAX_AUTOMATE_POINTS = 100000;
+const AUTOMATE_TIMEOUT_MS = 15 * 60 * 1000;
 const FOLLOW_ACTIONS = ["next", "previous", "first", "last", "any", "other", "again", "stop"];
 const MAX_RULES = 16;
 const FOLLOW_QUERY_MS = 1000;
@@ -84,6 +91,8 @@ const state = {
   transport: null,                    // {beat, tempo, playing, at}
   rules: new Map(),                   // follow-action target path -> rule
   queries: new Map(),                 // query id -> callback waiting for context.js
+  automation: null,                   // the running "automate" pass
+  lastAutomation: null,
   nextQuery: 1,
   ticker: null,
 };
@@ -187,6 +196,7 @@ function hello() {
     history_seconds: HISTORY_SECONDS, capture: Boolean(maxApi), capturing: state.capturing,
     modulations: [...state.mods.values()].map(describeMod), mod_slots: MOD_SLOTS,
     follow: [...state.rules.values()].map(describeRule),
+    automation: describeAutomation(state.automation || state.lastAutomation),
   };
 }
 
@@ -326,6 +336,9 @@ function tick() {
   for (const rule of state.rules.values()) {
     followTick(rule, now);
   }
+  if (state.automation) {
+    automateTick(state.automation, now);
+  }
   for (const mod of state.mods.values()) {
     const value = modValue(mod, now);
     if (mod.last === null || Math.abs(value - mod.last) > (mod.max - mod.min) * 1e-5) {
@@ -336,13 +349,13 @@ function tick() {
 }
 
 function startTicker() {
-  if (state.ticker === null && (state.mods.size || state.rules.size)) {
+  if (state.ticker === null && (state.mods.size || state.rules.size || state.automation)) {
     state.ticker = setInterval(tick, MOD_TICK_MS);
   }
 }
 
 function stopTickerIfIdle() {
-  if (state.ticker !== null && !state.mods.size && !state.rules.size) {
+  if (state.ticker !== null && !state.mods.size && !state.rules.size && !state.automation) {
     clearInterval(state.ticker);
     state.ticker = null;
   }
@@ -486,6 +499,138 @@ function unmodulate(args, reply) {
   }
   stopTickerIfIdle();
   reply(null, { stopped: stopped });
+}
+
+// ---------------------------------------------------------------------------- automation pass
+
+function describeAutomation(pass) {
+  if (!pass) {
+    return null;
+  }
+  return {
+    path: pass.path, start: pass.start, end: pass.end, phase: pass.phase,
+    writes: pass.writes, first_beat: pass.first, last_beat: pass.last, error: pass.error,
+  };
+}
+
+// The curve's value at `beat` (points sorted by time; before / after them: the end values).
+function curveAt(points, mode, beat) {
+  if (beat <= points[0][0]) {
+    return points[0][1];
+  }
+  const last = points[points.length - 1];
+  if (beat >= last[0]) {
+    return last[1];
+  }
+  let lo = 0;
+  let hi = points.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid][0] <= beat) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  const [t0, v0] = points[lo];
+  const [t1, v1] = points[hi];
+  if (mode === "step" || t1 <= t0) {
+    return v0;
+  }
+  return v0 + (v1 - v0) * (beat - t0) / (t1 - t0);
+}
+
+function finishAutomation(pass, phase, error) {
+  if (pass.gesture) {
+    maxApi.outlet("call", "end_gesture", ...atoms(pass.path));
+    pass.gesture = false;
+  }
+  pass.phase = phase;
+  pass.error = error || null;
+  state.lastAutomation = pass;
+  state.automation = null;
+  stopTickerIfIdle();
+}
+
+function automateTick(pass, now) {
+  if (now - pass.created > AUTOMATE_TIMEOUT_MS) {
+    finishAutomation(pass, "failed", "the pass did not reach its end in time");
+    return;
+  }
+  const beat = songBeat(now);
+  if (beat === null) {
+    if (pass.gesture) {                  // stopped in the middle: the Remote Script aborts
+      finishAutomation(pass, "aborted", "the transport stopped");
+    }
+    return;
+  }
+  if (beat < pass.start - 1e-6) {
+    return;
+  }
+  if (!pass.gesture) {
+    maxApi.outlet("call", "begin_gesture", ...atoms(pass.path));
+    pass.gesture = true;
+    pass.phase = "writing";
+  }
+  const at = Math.min(beat, pass.end);
+  const value = curveAt(pass.points, pass.mode, at);
+  if (pass.lastValue === null || Math.abs(value - pass.lastValue) > 1e-9) {
+    maxApi.outlet("setvalue", value, ...atoms(pass.path));
+    pass.lastValue = value;
+    pass.writes += 1;
+    if (pass.first === null) {
+      pass.first = at;
+    }
+  }
+  pass.last = at;
+  if (beat >= pass.end) {
+    finishAutomation(pass, "done");
+  }
+}
+
+function automate(args, reply) {
+  const target = String(args.path || "");
+  if (!MAX_PATH.test(target)) {
+    reply({ type: "bad_args", message: "path must be a Live object path" });
+    return;
+  }
+  const points = Array.isArray(args.points) ? args.points.map((p) => [Number(p[0]),
+    Number(p[1])]) : [];
+  if (!points.length || points.length > MAX_AUTOMATE_POINTS ||
+      points.some((p) => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) {
+    reply({ type: "bad_args", message: "points: 1.." + MAX_AUTOMATE_POINTS + " [beat, value]" });
+    return;
+  }
+  points.sort((a, b) => a[0] - b[0]);
+  const start = Number(args.start);
+  const end = Number(args.end);
+  if (!(Number.isFinite(start) && Number.isFinite(end) && end > start)) {
+    reply({ type: "bad_args", message: "start and end (beats) with end > start" });
+    return;
+  }
+  if (!maxApi) {
+    reply({ type: "unsupported", message: "writing needs the device running in Live" });
+    return;
+  }
+  if (state.automation) {
+    reply({ type: "busy", message: "an automation pass is already running" });
+    return;
+  }
+  state.automation = {
+    path: target, points: points, mode: args.mode === "step" ? "step" : "linear",
+    start: start, end: end, created: Date.now(), phase: "waiting", writes: 0,
+    first: null, last: null, lastValue: null, gesture: false, error: null,
+  };
+  startTicker();
+  reply(null, describeAutomation(state.automation));
+}
+
+function cancelAutomation(reply) {
+  const pass = state.automation;
+  if (pass) {
+    finishAutomation(pass, "aborted", "stopped");
+  }
+  reply(null, { stopped: describeAutomation(pass) });
 }
 
 // ---------------------------------------------------------------------------- follow actions
@@ -799,6 +944,12 @@ function handle(request, reply) {
     modulate(args, reply);
   } else if (request.cmd === "unmodulate") {
     unmodulate(args, reply);
+  } else if (request.cmd === "automate") {
+    if (args.cancel) {
+      cancelAutomation(reply);
+    } else {
+      automate(args, reply);
+    }
   } else if (request.cmd === "follow") {
     follow(args, reply);
   } else if (request.cmd === "unfollow") {
@@ -900,5 +1051,6 @@ function start() {
 start();
 
 module.exports = {
-  addFrame, setContext, capture, modValue, shapeAt, targetIndex, FRAME_FIELDS, state,
+  addFrame, setContext, capture, modValue, shapeAt, targetIndex, curveAt, FRAME_FIELDS,
+  state,
 };

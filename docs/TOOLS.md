@@ -409,8 +409,9 @@ Record real ARRANGEMENT automation (track automation lanes) — tempo ramps, mas
 | `mode` | str | `"linear"` |
 | `preroll` | float | `1.0` |
 | `action` | str | `"start"` |
+| `speed` | str \| float \| null | `null` |
 
-Bridge: `automation.record`, `automation.record_status`
+Bridge: `automation.record`, `automation.record_status`, `transport.get`
 
 #### `live_automation_clear`
 
@@ -3161,7 +3162,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `automation.list` |  | track=null, slot=null, clip=null, sample=0, include_available=false, filter=null, limit=200 | `live_automation_list` | Which parameters have envelopes in a clip (+ what could be automated) |
 | `automation.overview` |  | track, include_empty=false | `live_automation_overview` | One-call automation overview of a track: envelopes per clip, automated parameters, re-enable state |
 | `automation.re_enable` | M | track=null, parameter=null, device=null | `live_automation_state` | Re-enable overridden automation for a parameter, a track or the whole song |
-| `automation.record` | M | parameter=null, track=null, device=null, points=null, shape=null, start=null, end=null, low=0.0, high=1.0, normalized=null, period=null, cycles=null, phase=0.0, duty=0.5, curve=1.0, seed=null, mode="linear", preroll=1.0, action="start" | `live_automation_record` | Record ARRANGEMENT track automation: play the song through a range while moving a parameter (Arrangement Record + Automation Arm) |
+| `automation.record` | M | parameter=null, track=null, device=null, points=null, shape=null, start=null, end=null, low=0.0, high=1.0, normalized=null, period=null, cycles=null, phase=0.0, duty=0.5, curve=1.0, seed=null, mode="linear", preroll=1.0, action="start", tempo=null, writer="live" | `live_automation_record` | Record ARRANGEMENT track automation: play the song through a range while moving a parameter (Arrangement Record + Automation Arm) |
 | `automation.record_status` |  |  | `live_automation_record` | Progress / result of the running or last automation.record pass |
 | `automation.shape` | M | parameter, shape="sine", track=null, slot=null, clip=null, device=null, start=null, end=null, low=0.0, high=1.0, normalized=true, period=null, cycles=null, phase=0.0, step=null, duty=0.5, curve=1.0, seed=null, clear=false, mode="step", slots=null, extend_clip=false | `live_automation_shape` | Write a shape (ramp, sine/triangle/saw LFO, square, seeded random) into a clip envelope, or one continuous shape across several clips |
 | `automation.state` |  | track=null, parameter=null, device=null, include_all=false | `live_automation_state` | Automation state (none/playing/overridden) of a parameter, a track or the whole set |
@@ -3315,7 +3316,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `transport.back_to_arranger` |  |  | `live_transport_set` (back_to_arranger=false) | Press 'Back to Arrangement' |
 | `transport.capture_midi` | M | destination="auto" | `live_record_capture_midi` (same command) | Capture recently played MIDI |
 | `transport.continue` |  |  | `live_cue_add`, `live_cue_delete`, `live_cue_layout`, `live_cue_set`, `live_transport_play` | Continue playback from the current playhead |
-| `transport.get` |  | include_scales=false | `live_clip_write_euclid`, `live_engine_capture`, `live_engine_follow`, `live_engine_listen`, `live_engine_masking`, `live_memory_note`, `live_memory_recall`, `live_midi_play`, `live_midi_played`, `live_theory_analyze`, `live_transport_get` | Full transport state: play, position, tempo, loop, flags |
+| `transport.get` |  | include_scales=false | `live_automation_record`, `live_clip_write_euclid`, `live_engine_capture`, `live_engine_follow`, `live_engine_listen`, `live_engine_masking`, `live_memory_note`, `live_memory_recall`, `live_midi_play`, `live_midi_played`, `live_theory_analyze`, `live_transport_get` | Full transport state: play, position, tempo, loop, flags |
 | `transport.play` |  | position=null, mode="start" | `live_transport_play` | Start playback (from the start marker, a position, or continue) |
 | `transport.redo` |  | steps=1 | `live_transport_undo` | Redo the last N undone actions |
 | `transport.set` | M | tempo=null, signature=null, signature_numerator=null, signature_denominator=null, metronome=null, record_mode=null, session_record=null, overdub=null, arrangement_overdub=null, punch_in=null, punch_out=null, session_automation_record=null, back_to_arranger=null, loop=null, is_ableton_link_enabled=null, clip_trigger_quantization=null, midi_recording_quantization=null, groove_amount=null, swing_amount=null, scale_name=null, root_note=null, scale_mode=null | `live_transport_set` | Set several transport/song settings at once |

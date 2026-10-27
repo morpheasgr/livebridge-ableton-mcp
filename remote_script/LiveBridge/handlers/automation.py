@@ -1610,10 +1610,16 @@ def _curve_value(points, time, mode):
     return v0 + (v1 - v0) * (time - t0) / (t1 - t0)
 
 
+#: writer="external": how long after ``end`` the pass keeps playing so the other writer can
+#: write the last value and end its gesture
+_EXTERNAL_MARGIN_S = 0.08
+
+
 class _Recording(object):
     """One ``automation.record`` pass, advanced by Live's display tick."""
 
-    def __init__(self, ctx, track_obj, param, label, path, points, mode, start, end, begin):
+    def __init__(self, ctx, track_obj, param, label, path, points, mode, start, end, begin,
+                 tempo=None, external=False):
         _RECORDER["counter"] += 1
         self.id = "rec%d" % _RECORDER["counter"]
         self.ctx = ctx
@@ -1639,13 +1645,19 @@ class _Recording(object):
         self.started_at = _time.time()
         self.saved = {}
         self.disarmed = []
+        #: the song tempo during the pass (automation is stored in beats: a faster pass
+        #: records the same lane sooner), restored afterwards
+        self.tempo = tempo
+        #: another writer (the LiveBridge Engine) moves the parameter; this pass only arms,
+        #: plays, stops and restores
+        self.external = external
 
     # -- setup / teardown -------------------------------------------------
     def setup(self):
         song = self.song
         get = compat.safe_getattr
         for prop in ("loop", "punch_in", "punch_out", "session_automation_record",
-                     "current_song_time"):
+                     "current_song_time", "tempo"):
             self.saved[prop] = get(song, prop)
         for candidate in list(get(song, "tracks", ()) or ()):
             if get(candidate, "can_be_armed", False) and get(candidate, "arm", False):
@@ -1658,6 +1670,8 @@ class _Recording(object):
                 if compat.has(song, prop):
                     setattr(song, prop, value)
             song.current_song_time = float(self.begin)
+            if self.tempo is not None:
+                song.tempo = float(self.tempo)
         except Exception as error:
             self.restore()
             raise BridgeError("invalid_state", "Live refused to prepare the recording: %s"
@@ -1679,6 +1693,12 @@ class _Recording(object):
                     candidate.arm = True
             except Exception as error:
                 problems.append("arm %s: %s" % (_name(candidate), error))
+        tempo = self.saved.get("tempo")
+        if self.tempo is not None and tempo is not None:
+            try:
+                song.tempo = float(tempo)
+            except Exception as error:
+                problems.append("tempo: %s" % error)
         position = self.saved.get("current_song_time")
         if position is not None:
             try:
@@ -1722,9 +1742,13 @@ class _Recording(object):
             playing = bool(compat.safe_getattr(song, "is_playing", False))
             now = float(compat.safe_getattr(song, "current_song_time", 0.0) or 0.0)
             if playing and now >= self.start - 1e-6:
+                self.phase = "recording"
+                if self.external:
+                    self.first_time = now
+                    self.last_time = now
+                    return
                 self.param.begin_gesture()
                 self.gesture = True
-                self.phase = "recording"
                 self._write(now)
             elif self.ticks > _RECORD_WAIT_TICKS:
                 self.error = "playback did not reach beat %s" % rnd(self.start)
@@ -1737,6 +1761,13 @@ class _Recording(object):
                 self._finish("aborted")
                 return
             now = float(compat.safe_getattr(song, "current_song_time", 0.0) or 0.0)
+            if self.external:
+                # the other writer ends its gesture at `end`: give it ~80 ms to get there
+                tempo = float(compat.safe_getattr(song, "tempo", 120.0) or 120.0)
+                self.last_time = min(now, self.end)
+                if now >= self.end + tempo / 60.0 * _EXTERNAL_MARGIN_S - 1e-6:
+                    self._finish("done")
+                return
             if now >= self.end - 1e-6:
                 self._write(self.end)
                 self._finish("done")
@@ -1812,6 +1843,11 @@ class _Recording(object):
                 "range": [rnd(self.start), rnd(self.end)], "writes": self.writes,
                 "progress": rnd(progress, 3), "ticks": self.ticks,
                 "elapsed_s": rnd(_time.time() - self.started_at, 2)}
+        if self.tempo is not None:
+            data["tempo_during_pass"] = rnd(self.tempo)
+        if self.external:
+            data["writer"] = "external"
+            del data["writes"]
         if self.first_time is not None:
             data["recorded"] = [rnd(self.first_time), rnd(self.last_time)]
         if self.error:
@@ -1821,6 +1857,8 @@ class _Recording(object):
             data["restored"] = {"loop": self.saved.get("loop"),
                                 "position": rnd(self.saved.get("current_song_time") or 0.0),
                                 "rearmed": [_name(t) for t in self.disarmed]}
+            if self.tempo is not None:
+                data["restored"]["tempo"] = rnd(self.saved.get("tempo") or 0.0)
         return data
 
 
@@ -1934,7 +1972,7 @@ def _song_length_arg(ctx, value, bar, name):
 def automation_record(ctx, parameter=None, track=None, device=None, points=None, shape=None,
                       start=None, end=None, low=0.0, high=1.0, normalized=None, period=None,
                       cycles=None, phase=0.0, duty=0.5, curve=1.0, seed=None, mode="linear",
-                      preroll=1.0, action="start"):
+                      preroll=1.0, action="start", tempo=None, writer="live"):
     """Write real arrangement (track) automation — the only way through Live's API.
 
     Live's API cannot draw into an automation lane, so this does what a person
@@ -1965,6 +2003,15 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
         preroll: beats of playback before ``start`` (0..16).
         action: "start" (default) or "stop" (abort the running recording;
             nothing else needed).
+        tempo: play the pass at this song tempo (20..999) and restore the
+            tempo afterwards — automation is stored in beats, so a faster pass
+            records the same lane sooner (coarser per tick). Not for the tempo
+            itself, nor when the song has tempo automation (it would win).
+        writer: "live" (default: this script writes on every tick) or
+            "external" (another writer — the LiveBridge Engine — moves the
+            parameter from ``start`` to ``end``, begin/end gesture included;
+            this pass arms, plays, stops ~80 ms after ``end`` and restores; the
+            answer carries the ``curve`` and the parameter's ``path``).
 
     Returns:
         start: {"id", "phase": "arming", "range", "parameter", "track",
@@ -2012,7 +2059,22 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
                           "playback itself")
     if compat.safe_getattr(song, "record_mode", False):
         raise BridgeError("invalid_state", "Arrangement Record is already on")
+    writer = str(writer).strip().lower()
+    if writer not in ("live", "external"):
+        raise BridgeError("bad_args", "writer must be live or external")
+    if tempo is not None and (isinstance(tempo, bool) or not isinstance(tempo, (int, float))
+                              or not 20.0 <= float(tempo) <= 999.0):
+        raise BridgeError("bad_args", "tempo must be 20..999 BPM")
     track_obj, (param, label, path) = _param_target(ctx, track, parameter, device)
+    if tempo is not None:
+        song_tempo = compat.safe_getattr(compat.safe_getattr(
+            compat.safe_getattr(song, "master_track"), "mixer_device"), "song_tempo")
+        if song_tempo is not None and param == song_tempo:
+            raise BridgeError("bad_args", "the tempo itself cannot be recorded at another "
+                              "tempo — leave tempo out")
+        if song_tempo is not None and _state(song_tempo) != "none":
+            raise BridgeError("invalid_state", "the song has tempo automation, which would "
+                              "override the faster tempo — record at normal speed")
     if compat.safe_getattr(param, "is_enabled", True) is False:
         raise BridgeError("invalid_state", "%r is disabled (macro-mapped or controlled by "
                           "Max) — Live does not record it" % _name(param))
@@ -2036,7 +2098,8 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
                           "clip or the loop brace further out first"
                           % (rnd(song_length), rnd(lead_in)))
     recording = _Recording(ctx, track_obj, param, label, path, curve_points, mode, begin,
-                           finish, lead_in)
+                           finish, lead_in, tempo=None if tempo is None else float(tempo),
+                           external=writer == "external")
     recording.setup()
     try:
         recording.schedule()
@@ -2045,12 +2108,16 @@ def automation_record(ctx, parameter=None, track=None, device=None, points=None,
         raise
     _RECORDER["current"] = recording
     _RECORDER["last"] = recording
-    tempo = float(compat.safe_getattr(song, "tempo", 120.0) or 120.0)
+    pace = float(tempo if tempo is not None else
+                 compat.safe_getattr(song, "tempo", 120.0) or 120.0)
     result = recording.status()
     result.update({"points": len(curve_points), "mode": mode,
-                   "expected_seconds": rnd((finish - lead_in) * 60.0 / tempo, 1),
+                   "expected_seconds": rnd((finish - lead_in) * 60.0 / pace, 1),
                    "note": "recording runs in real time — poll automation.record_status "
                            "until finished"})
+    if recording.external:
+        result["curve"] = [[rnd(t, 6), v] for t, v in curve_points]
+        result["path"] = path
     if converter.clamped:
         result["clamped"] = converter.clamped
     result.update(extra)

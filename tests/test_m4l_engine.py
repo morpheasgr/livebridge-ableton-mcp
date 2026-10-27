@@ -819,3 +819,90 @@ def test_follow_actions_end_to_end(engines, tcp_bridge, song):
         assert call_tool(app, "live_engine_follow", args)["type"] == "bad_args", args
     assert call_tool(app, "live_engine_follow", {"target": "Nope"})["type"] == "not_found"
     assert call_tool(app, "live_engine_unfollow", {})["type"] == "bad_args"
+
+
+# ----------------------------------------------------------------------------- fast arrangement
+# automation recording (the Engine writes, the Remote Script runs the pass)
+
+def test_curve_values(tmp_path):
+    if NODE is None:
+        pytest.skip("node is not installed")
+    script = r"""
+const e = require(process.argv[1]);
+const pts = [[4, 100], [8, 1000], [12, 0]];
+process.stdout.write(JSON.stringify([2, 4, 6, 8, 10, 13].map((b) => e.curveAt(pts, "linear", b))
+  .concat([6, 9].map((b) => e.curveAt(pts, "step", b)))));
+process.exit(0);
+"""
+    done = subprocess.run([NODE, "-e", script, str(ENGINE_JS)], capture_output=True, text=True,
+                          timeout=30, env=dict(os.environ, LIVEBRIDGE_ENGINE_DIR=str(tmp_path)))
+    assert json.loads(done.stdout) == [100, 100, 550, 1000, 500, 0, 100, 1000]
+
+
+def test_fast_automation_recording_with_the_engine(engines, tcp_bridge, song):
+    _process, send, outlets = engines()
+    send("context", "master", "Main")
+    _wait_roles(1)
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    param = song.tracks[0].devices[0].parameters[2]
+    before = param.value
+    started = call_tool(app, "live_automation_record", {
+        "track": "Bass", "parameter": "Filter Freq", "points": [[4, 100], [8, 1000]],
+        "preroll": 0, "speed": "fast"})
+    assert started["speed"]["tempo_during_pass"] == 600.0, started
+    assert started["speed"]["writer"].startswith("LiveBridge Engine")
+    assert started["speed"]["beats_between_writes"] == pytest.approx(0.2)
+    assert "curve" not in started and "path" not in started
+    assert song.tempo == 600.0
+    # Live plays from beat 4 at 600 BPM: 4 beats take 0.4 s
+    send("transport", 4, 600, 1)
+    sent = lambda: [json.loads(line) for line in  # noqa: E731
+                    outlets.read_text(encoding="utf-8").splitlines()]
+    assert engine.wait_for(lambda: ["call", "end_gesture", "live_set", "tracks", 0, "devices",
+                                    0, "parameters", 2] in sent(), 5)
+    log = sent()
+    begin = log.index(["call", "begin_gesture", "live_set", "tracks", 0, "devices", 0,
+                       "parameters", 2])
+    values = [m[1] for m in log if m[0] == "setvalue"]
+    assert begin < next(i for i, m in enumerate(log) if m[0] == "setvalue")
+    assert len(values) >= 8 and values == sorted(values) and values[-1] == 1000
+    assert values[0] == pytest.approx(100, abs=60)
+    assert param.value == before                      # the Remote Script did not write
+    # the Remote Script ends the pass a little after the end and restores the tempo
+    song.current_song_time = 9.0
+    assert engine.wait_for(lambda: call_tool(app, "live_automation_record",
+                                             {"action": "status"}).get("finished"), 5)
+    status = call_tool(app, "live_automation_record", {"action": "status"})
+    assert status["phase"] == "done" and status["engine"]["phase"] == "done"
+    assert status["engine"]["writes"] == len(values) and song.tempo == 124.0
+
+
+def test_fast_automation_recording_without_the_engine(tcp_bridge, song, tmp_path,
+                                                      monkeypatch):
+    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path))
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    started = call_tool(app, "live_automation_record", {
+        "track": "Bass", "parameter": "Filter Freq", "points": [[4, 100], [8, 1000]],
+        "preroll": 0, "speed": 2})
+    assert started["speed"]["tempo_during_pass"] == 248.0
+    assert started["speed"]["writer"].startswith("Remote Script") and song.tempo == 248.0
+    stopped = call_tool(app, "live_automation_record", {"action": "stop"})
+    assert stopped["id"] == started["id"]
+    assert engine.wait_for(lambda: call_tool(app, "live_automation_record",
+                                             {"action": "status"}).get("finished"), 5)
+    assert song.tempo == 124.0
+    fast = call_tool(app, "live_automation_record", {
+        "track": "Bass", "parameter": "Filter Freq", "points": [[4, 100], [8, 1000]],
+        "preroll": 0, "speed": "fast"})
+    assert fast["speed"]["tempo_during_pass"] == 300.0
+    call_tool(app, "live_automation_record", {"action": "stop"})
+    assert engine.wait_for(lambda: call_tool(app, "live_automation_record",
+                                             {"action": "status"}).get("finished"), 5)
+    for speed in ("turbo", 0.5, 50):
+        assert call_tool(app, "live_automation_record", {
+            "track": "Bass", "parameter": "Filter Freq", "points": [[4, 100], [8, 1000]],
+            "speed": speed})["type"] == "bad_args", speed
+    refused = call_tool(app, "live_automation_record", {
+        "track": "master", "parameter": "tempo", "points": [[0, 120], [4, 130]],
+        "speed": "fast"})
+    assert refused["type"] == "bad_args" and "tempo itself" in refused["error"]

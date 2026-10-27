@@ -33,6 +33,13 @@ the MCP server package and the installer have their own version numbers. `live_s
   last, any, other, again, stop, jump:N with weights, a chance and a seed, optionally among
   chosen slots) and fires it just before the boundary so launch quantization lands it on the
   grid.
+- **Faster arrangement automation recording** (`live_automation_record(speed="fast" | 2..20)`):
+  automation is stored in beats, so the pass plays at a raised tempo and the tempo is restored
+  after. With a LiveBridge Engine in the set (device 1.4.0) the Engine writes the curve 50
+  times a second with begin/end gesture while the Remote Script runs the pass (~600 BPM: about
+  5x faster at 120 BPM at today's ~0.2 beat resolution); without one the Remote Script writes
+  at ~300 BPM (0.5 beat, still exact for ramps). Refused for the tempo itself and when the song
+  has tempo automation. `automation.record` gains `tempo` and `writer="external"`.
 - **LiveBridge MIDI, a Max for Live MIDI effect** (`live_midi_played`, `live_midi_play`,
   `live_midi_stop`): passes MIDI through and remembers the last 10 minutes of notes and
   controllers with Live's song position — `live_midi_played` returns what you just played as

@@ -14,6 +14,9 @@
 // For follow actions: "query <id> track <path...>" answers "info <id> <playing slot> <fired
 // slot> <has clip 0/1 per slot...>", "query <id> scenes live_set" answers "info <id> -1 -1
 // 1 1 ..." (one per scene), and "call fire|stop_all_clips <path...>" launches or stops.
+//
+// For the fast automation recording: "call begin_gesture|end_gesture <path...>" and
+// "setvalue <value> <path...>" (the parameter objects are kept between calls).
 
 autowatch = 0;
 inlets = 1;
@@ -132,7 +135,26 @@ function query() {
                Number(api.get("fired_slot_index"))].concat(flags));
 }
 
-var CALLS = { fire: true, stop_all_clips: true };
+var CALLS = { fire: true, stop_all_clips: true, begin_gesture: true, end_gesture: true };
+var parameters = {};
+
+function parameterAt(path) {
+    var api = parameters[path];
+    if (!api || api.id == 0) {
+        api = new LiveAPI(path);
+        parameters[path] = api;
+    }
+    return api;
+}
+
+function setvalue() {
+    var parts = arrayfromargs(arguments);
+    var value = parts.shift();
+    var api = parameterAt(parts.join(" "));
+    if (api && api.id != 0) {
+        api.set("value", value);
+    }
+}
 
 function call() {
     var parts = arrayfromargs(arguments);
@@ -140,7 +162,9 @@ function call() {
     if (!CALLS[method]) {
         return;
     }
-    var api = new LiveAPI(parts.join(" "));
+    var path = parts.join(" ");
+    var api = method === "fire" || method === "stop_all_clips" ? new LiveAPI(path)
+        : parameterAt(path);
     if (api && api.id != 0) {
         api.call(method);
     }
