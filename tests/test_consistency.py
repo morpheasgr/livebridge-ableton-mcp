@@ -98,6 +98,8 @@ SAMPLE_ARGS = {
     "live_clip_note_chance": {"track": "Bass", "slot": 0, "probability": 0.8},
     "live_clip_write_euclid": {"track": "Drums", "slot": 3, "rhythms": {"kick": "4/16"}},
     "live_engine_compare": {"before": "before"},
+    "live_engine_follow": {"target": "Bass"},
+    "live_engine_unfollow": {"target": "Bass"},
     "live_engine_modulate": {"track": "Bass", "device": "Operator", "parameter": "Filter Freq"},
     "live_engine_unmodulate": {"track": "Bass", "device": "Operator", "parameter": "Filter Freq"},
     "live_memory_note": {"text": "consistency test", "project": "Smoke"},

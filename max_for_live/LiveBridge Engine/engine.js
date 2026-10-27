@@ -16,8 +16,14 @@
 // set), with LFO shapes or step sequences synced to Live's song position. context.js turns a
 // parameter's path into the id live.remote~ needs and reports the transport.
 //
+// And it plays follow actions ("follow" / "unfollow"): every N beats of Live's song position,
+// a rule picks the next clip of a track (or the next scene) by weighted actions — next,
+// previous, first, last, any, other, again, stop, jump:N — and fires it just before the
+// boundary, so Live's launch quantization lands it on the grid. Live's Python API has no follow
+// actions; these run here and are not saved with the set.
+//
 // Requests: {"id": 1, "token": "...", "cmd": "hello" | "frames" | "capture" | "modulate" |
-//            "unmodulate", "args": {...}}
+//            "unmodulate" | "follow" | "unfollow", "args": {...}}
 // Answers:  {"id": 1, "ok": true, "result": {...}} or {"id": 1, "ok": false,
 //           "error": {"type": "bad_args", "message": "..."}}
 
@@ -37,7 +43,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -56,6 +62,10 @@ const MOD_SLOTS = 8;                  // live.remote~ objects in the patch
 const MOD_TICK_MS = 20;               // 50 updates a second, each glided over by line~
 const MOD_RESOLVE_MS = 3000;
 const MAX_PATH = /^live_set( [a-z_]+( \d+)?){1,12}$/;
+const FOLLOW_ACTIONS = ["next", "previous", "first", "last", "any", "other", "again", "stop"];
+const MAX_RULES = 16;
+const FOLLOW_QUERY_MS = 1000;
+const FOLLOW_HISTORY = 16;
 const SHAPES = ["sine", "triangle", "saw", "ramp_down", "square", "random", "smooth_random",
   "steps"];
 
@@ -72,6 +82,9 @@ const state = {
   mods: new Map(),                    // slot -> modulation
   resolving: new Map(),               // slot -> callback waiting for context.js
   transport: null,                    // {beat, tempo, playing, at}
+  rules: new Map(),                   // follow-action target path -> rule
+  queries: new Map(),                 // query id -> callback waiting for context.js
+  nextQuery: 1,
   ticker: null,
 };
 
@@ -173,6 +186,7 @@ function hello() {
     frames_buffered: state.frames.length, frame_interval_ms: frameInterval(),
     history_seconds: HISTORY_SECONDS, capture: Boolean(maxApi), capturing: state.capturing,
     modulations: [...state.mods.values()].map(describeMod), mod_slots: MOD_SLOTS,
+    follow: [...state.rules.values()].map(describeRule),
   };
 }
 
@@ -309,6 +323,9 @@ function modValue(mod, now) {
 
 function tick() {
   const now = Date.now();
+  for (const rule of state.rules.values()) {
+    followTick(rule, now);
+  }
   for (const mod of state.mods.values()) {
     const value = modValue(mod, now);
     if (mod.last === null || Math.abs(value - mod.last) > (mod.max - mod.min) * 1e-5) {
@@ -319,13 +336,13 @@ function tick() {
 }
 
 function startTicker() {
-  if (state.ticker === null && state.mods.size) {
+  if (state.ticker === null && (state.mods.size || state.rules.size)) {
     state.ticker = setInterval(tick, MOD_TICK_MS);
   }
 }
 
 function stopTickerIfIdle() {
-  if (state.ticker !== null && !state.mods.size) {
+  if (state.ticker !== null && !state.mods.size && !state.rules.size) {
     clearInterval(state.ticker);
     state.ticker = null;
   }
@@ -471,6 +488,258 @@ function unmodulate(args, reply) {
   reply(null, { stopped: stopped });
 }
 
+// ---------------------------------------------------------------------------- follow actions
+
+function describeRule(rule) {
+  return {
+    target: rule.target, kind: rule.kind, every_beats: rule.every, lead_beats: rule.lead,
+    actions: rule.actions, chance: rule.chance, slots: rule.slots, seed: rule.seed,
+    current: rule.current, next_boundary: rule.boundary, history: rule.history,
+  };
+}
+
+function songBeat(now) {
+  const t = state.transport;
+  return t && t.playing ? t.beat + (now - t.at) / 60000 * t.tempo : null;
+}
+
+function followTick(rule, now) {
+  const beat = songBeat(now);
+  if (beat === null) {
+    rule.boundary = null;                // stopped: start again from the next boundary
+    return;
+  }
+  if (rule.boundary === null || beat > rule.boundary + rule.every) {
+    rule.boundary = (Math.floor(beat / rule.every + 1e-9) + 1) * rule.every;
+  }
+  if (beat >= rule.boundary - rule.lead && rule.acted !== rule.boundary) {
+    rule.acted = rule.boundary;
+    const boundary = rule.boundary;
+    rule.boundary += rule.every;
+    act(rule, boundary);
+  }
+}
+
+function random(rule) {
+  rule.draws += 1;
+  return noise(rule.seed, rule.draws);
+}
+
+// One weighted pick from rule.actions ([[name, weight], ...]).
+function pickAction(rule) {
+  const total = rule.actions.reduce((sum, item) => sum + item[1], 0);
+  let left = random(rule) * total;
+  for (const [name, weight] of rule.actions) {
+    left -= weight;
+    if (left < 0) {
+      return name;
+    }
+  }
+  return rule.actions[rule.actions.length - 1][0];
+}
+
+// Which index an action leads to, from `current` among `candidates` (sorted indices that can
+// be fired); null = nothing to do.
+function targetIndex(rule, action, current, candidates) {
+  if (action.startsWith("jump:")) {
+    const index = Number(action.slice(5));
+    return candidates.indexOf(index) >= 0 ? index : null;
+  }
+  if (!candidates.length) {
+    return null;
+  }
+  const at = candidates.indexOf(current);
+  const pick = (list) => (list.length ? list[Math.floor(random(rule) * list.length)] : null);
+  switch (action) {
+    case "again": return at >= 0 ? current : candidates[0];
+    case "first": return candidates[0];
+    case "last": return candidates[candidates.length - 1];
+    case "any": return pick(candidates);
+    case "other": {
+      const others = candidates.filter((i) => i !== current);
+      return others.length ? pick(others) : candidates[0];
+    }
+    case "previous":
+      if (at < 0) {
+        const before = candidates.filter((i) => i < current);
+        return before.length ? before[before.length - 1] : candidates[candidates.length - 1];
+      }
+      return candidates[(at - 1 + candidates.length) % candidates.length];
+    default: {                           // next
+      if (at < 0) {
+        const after = candidates.filter((i) => i > current);
+        return after.length ? after[0] : candidates[0];
+      }
+      return candidates[(at + 1) % candidates.length];
+    }
+  }
+}
+
+function remember(rule, entry) {
+  rule.history.push(entry);
+  if (rule.history.length > FOLLOW_HISTORY) {
+    rule.history.shift();
+  }
+}
+
+function atoms(text) {
+  return text.split(" ").map((part) => (/^\d+$/.test(part) ? Number(part) : part));
+}
+
+function ask(kind, target, done) {
+  const id = state.nextQuery++;
+  const timer = setTimeout(() => {
+    state.queries.delete(id);
+    done(null);
+  }, FOLLOW_QUERY_MS);
+  state.queries.set(id, (info) => {
+    clearTimeout(timer);
+    state.queries.delete(id);
+    done(info);
+  });
+  maxApi.outlet("query", id, kind, ...atoms(target));
+}
+
+// context.js answer: info <id> <playing index> <fired index> <has clip 0/1 per slot...>
+function info(id, playing, fired, ...flags) {
+  const waiting = state.queries.get(Number(id));
+  if (waiting) {
+    waiting({ playing: Number(playing), fired: Number(fired), flags: flags.map(Number) });
+  }
+}
+
+function act(rule, boundary) {
+  if (rule.chance < 1 && random(rule) >= rule.chance) {
+    remember(rule, { beat: boundary, action: "stay" });
+    return;
+  }
+  const action = pickAction(rule);
+  if (action === "stop") {
+    maxApi.outlet("call", "stop_all_clips", ...atoms(rule.target));
+    rule.current = -1;
+    remember(rule, { beat: boundary, action: action });
+    return;
+  }
+  ask(rule.kind, rule.target, (found) => {
+    if (found === null) {
+      remember(rule, { beat: boundary, action: action, error: "Live did not answer" });
+      return;
+    }
+    // the clip Live plays (or is about to) is the starting point; scenes: the last one fired
+    let current = rule.current;
+    if (rule.kind === "track") {
+      current = found.fired >= 0 ? found.fired : found.playing >= 0 ? found.playing : current;
+    }
+    let candidates = [];
+    found.flags.forEach((has, index) => {
+      if (has && (!rule.slots || rule.slots.indexOf(index) >= 0)) {
+        candidates.push(index);
+      }
+    });
+    const index = targetIndex(rule, action, current, candidates);
+    if (index === null) {
+      remember(rule, { beat: boundary, action: action, error: "nothing to launch" });
+      return;
+    }
+    const path = rule.kind === "track" ? rule.target + " clip_slots " + index
+      : "live_set scenes " + index;
+    maxApi.outlet("call", "fire", ...atoms(path));
+    rule.current = index;
+    remember(rule, { beat: boundary, action: action, index: index });
+  });
+}
+
+function parseActions(value) {
+  const entries = typeof value === "string" ? [[value, 1]]
+    : Array.isArray(value) ? value : Object.entries(value || {});
+  const actions = [];
+  for (const entry of entries) {
+    const name = String(entry[0]);
+    const weight = Number(entry[1]);
+    if (FOLLOW_ACTIONS.indexOf(name) < 0 && !/^jump:\d+$/.test(name)) {
+      return { error: "unknown action " + JSON.stringify(name) + " — use " +
+        FOLLOW_ACTIONS.join(", ") + " or jump:<index>" };
+    }
+    if (!(weight > 0)) {
+      return { error: "action weights must be > 0" };
+    }
+    actions.push([name, weight]);
+  }
+  if (!actions.length) {
+    return { error: "give at least one action" };
+  }
+  return { actions: actions };
+}
+
+function follow(args, reply) {
+  const target = String(args.target || "");
+  const kind = target === "live_set" ? "scenes" : "track";
+  if (kind === "track" && !/^live_set (tracks|return_tracks) \d+$/.test(target)) {
+    reply({ type: "bad_args", message: "target must be 'live_set tracks <n>' or 'live_set' "
+      + "(scenes)" });
+    return;
+  }
+  const every = Number(args.every_beats);
+  if (!(every >= 0.25 && every <= 1024)) {
+    reply({ type: "bad_args", message: "every_beats must be 0.25..1024" });
+    return;
+  }
+  const lead = args.lead_beats === undefined ? 0.25 : Number(args.lead_beats);
+  if (!(lead >= 0 && lead < every)) {
+    reply({ type: "bad_args", message: "lead_beats must be >= 0 and < every_beats" });
+    return;
+  }
+  const chance = args.chance === undefined ? 1 : Number(args.chance);
+  if (!(chance > 0 && chance <= 1)) {
+    reply({ type: "bad_args", message: "chance must be > 0 and <= 1" });
+    return;
+  }
+  const parsed = parseActions(args.actions === undefined ? "next" : args.actions);
+  if (parsed.error) {
+    reply({ type: "bad_args", message: parsed.error });
+    return;
+  }
+  let slots = null;
+  if (args.slots !== undefined && args.slots !== null) {
+    slots = Array.isArray(args.slots) ? args.slots.map(Number) : [];
+    if (!slots.length || slots.some((i) => !Number.isInteger(i) || i < 0)) {
+      reply({ type: "bad_args", message: "slots must list clip slot / scene indices" });
+      return;
+    }
+  }
+  if (!maxApi) {
+    reply({ type: "unsupported", message: "follow actions need the device running in Live" });
+    return;
+  }
+  if (!state.rules.has(target) && state.rules.size >= MAX_RULES) {
+    reply({ type: "busy", message: "at most " + MAX_RULES + " follow rules per device" });
+    return;
+  }
+  const previous = state.rules.get(target);
+  const rule = {
+    target: target, kind: kind, every: every, lead: lead, chance: chance,
+    actions: parsed.actions, slots: slots, seed: Number(args.seed || 0) | 0, draws: 0,
+    current: args.current === undefined ? (previous ? previous.current : -1)
+      : Number(args.current),
+    boundary: null, acted: null, history: [],
+  };
+  state.rules.set(target, rule);
+  startTicker();
+  reply(null, describeRule(rule));
+}
+
+function unfollow(args, reply) {
+  const stopped = [];
+  for (const rule of [...state.rules.values()]) {
+    if (args.all || rule.target === args.target) {
+      stopped.push(describeRule(rule));
+      state.rules.delete(rule.target);
+    }
+  }
+  stopTickerIfIdle();
+  reply(null, { stopped: stopped });
+}
+
 // sfrecord~ closes the file asynchronously: poll until its size stops changing.
 function waitForFile(file, attempts, done) {
   let last = -1;
@@ -530,6 +799,10 @@ function handle(request, reply) {
     modulate(args, reply);
   } else if (request.cmd === "unmodulate") {
     unmodulate(args, reply);
+  } else if (request.cmd === "follow") {
+    follow(args, reply);
+  } else if (request.cmd === "unfollow") {
+    unfollow(args, reply);
   } else {
     reply({ type: "unknown_command", message: "unknown command " + JSON.stringify(request.cmd) });
   }
@@ -620,9 +893,12 @@ function start() {
     maxApi.addHandler("context", (role, ...track) => setContext(String(role), track.map(String)));
     maxApi.addHandler("transport", setTransport);
     maxApi.addHandler("resolved", resolved);
+    maxApi.addHandler("info", info);
   }
 }
 
 start();
 
-module.exports = { addFrame, setContext, capture, modValue, shapeAt, FRAME_FIELDS, state };
+module.exports = {
+  addFrame, setContext, capture, modValue, shapeAt, targetIndex, FRAME_FIELDS, state,
+};

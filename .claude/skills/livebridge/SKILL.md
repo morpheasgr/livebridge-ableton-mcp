@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~192 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~194 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -192,6 +192,10 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     smooth_random, steps=[...]); nothing is written and `live_engine_unmodulate` puts the
     value back. Use it to audition movement; when the user likes it, write it as automation
     (`live_automation_*`) — modulations are not saved with the set.
+  - *Follow actions / generative playback*: Live's API has none, the Engine plays them:
+    `live_engine_follow(target="Drums", every="2 bars", actions={"next": 3, "other": 1},
+    chance=0.8)` cycles clip variations; `target="scenes"` chains scenes. Stop with
+    `live_engine_unfollow`. Needs launch quantization (1 bar is best) and a playing transport.
   No device yet -> add it yourself when the task needs it (say so in one line):
   `live_browser_load(query="LiveBridge Engine", category="audio_effect", track="master")` (or
   a track name; MIDI tracks need their instrument first), then `live_engine_status` until it

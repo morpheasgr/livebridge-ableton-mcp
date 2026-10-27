@@ -27,6 +27,12 @@ the MCP server package and the installer have their own version numbers. `live_s
   step sequences on any device or mixer parameter, locked to Live's song position ("1 bar",
   "1/8d", "1/16t") or free ("0.5 Hz"), through the device's 8 `live.remote~` slots: no
   automation, no undo steps, nothing saved with the set; stopping restores the value.
+- **Follow actions** (`live_engine_follow`, `live_engine_unfollow`; device 1.3.0): Live's
+  Python API has no follow actions, so the Engine plays them — every N bars of Live's song
+  position a rule picks the next clip of a track or the next scene (next, previous, first,
+  last, any, other, again, stop, jump:N with weights, a chance and a seed, optionally among
+  chosen slots) and fires it just before the boundary so launch quantization lands it on the
+  grid.
 - **Production knowledge for Claude**, next to the skill and served as MCP resources:
   `GENRES.md` (`livebridge://genres`: drum patterns, bass lines, chords and sounds for techno,
   hardgroove, house, UK and speed garage, trance, bass music, synthwave, acid, ambient and

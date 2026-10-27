@@ -5,8 +5,8 @@ LiveBridge talks to Live through a Python Remote Script, and Live's Python API c
 track (and at the end of any track you want Claude to hear on its own) and Claude reads
 loudness, peaks, spectral balance and stereo image *while the song plays*, compares before and
 after a change, records what it hears and finds masking between tracks — without bouncing —
-and moves any parameter with tempo-synced LFOs and step sequences without writing
-automation.
+moves any parameter with tempo-synced LFOs and step sequences without writing
+automation, and plays follow actions on tracks and scenes.
 
 | Tool | What it does |
 |---|---|
@@ -17,6 +17,8 @@ automation.
 | `live_engine_masking` | Capture every track device at once and run the masking analysis of `live_audio_masking` at fader level (muted / -inf tracks left out) |
 | `live_engine_modulate` | LFO (sine, triangle, saw, ramp down, square, random, smooth random) or step sequence on any device or mixer parameter, synced to the song ("1 bar", "1/8d", "1/16t") or free ("0.5 Hz"), with depth/center or low/high and phase |
 | `live_engine_unmodulate` | Stop one modulation (or `all=true`); the parameter goes back to its value |
+| `live_engine_follow` | Follow actions: every N bars pick the next clip of a track or the next scene — next, previous, first, last, any, other, again, stop, jump:N with weights, a chance, a seed, optionally only some slots |
+| `live_engine_unfollow` | Stop a track's or the scenes' rule (or `all=true`); what plays keeps playing |
 
 Everything else in LiveBridge works without the device; without it these tools say how to
 add it.
@@ -70,7 +72,9 @@ together.
   `{"id", "ok", "result" | "error": {"type", "message"}}`. Commands: `hello` (role, track,
   version, frames buffered), `frames` (`seconds` ≤ 60, `wait`: true = collect from now on,
   false = the last `seconds`), `modulate` (`path`: Max LOM path, `shape`, `beats` or `hz`,
-  `low`/`high` shares of the range, `phase`, `steps`, `seed`), `unmodulate` (`path` or `all`)
+  `low`/`high` shares of the range, `phase`, `steps`, `seed`), `unmodulate` (`path` or `all`),
+  `follow` (`target`: `live_set tracks N` or `live_set` for scenes, `every_beats`,
+  `lead_beats`, `actions`, `chance`, `slots`, `seed`), `unfollow` (`target` or `all`)
   and `capture` (`seconds` ≤ 60, `name`: a plain `.wav` file name
   in the capture folder, `at`: start time in epoch ms, at most 5 s ahead — the MCP server
   gives every device the same `at`). Captures are written by the patch's `sfrecord~`
@@ -88,6 +92,14 @@ together.
   `live.remote~` changes the parameter without automation or undo steps; while it holds a
   parameter, Live greys it out and ignores its automation. Modulations live in the device's
   Node process: they end with the device and are not saved with the set.
+
+- **Follow actions**: Live 12.4.5's API has no follow-action properties, so the device plays
+  them. On the same 20 ms tick, each rule watches the song position; a quarter beat (at most
+  half the launch quantization) before each boundary of its grid it rolls the chance, picks a
+  weighted action, asks `context.js` which slots hold clips and which plays (`query` ->
+  `info`) and fires the clip slot or scene (`call fire`, `call stop_all_clips`), so Live's
+  launch quantization starts it exactly on the boundary. Rules start with playback, keep
+  their last 16 decisions (`live_engine_status`) and are not saved with the set.
 
 The Remote Script is not involved, so a busy Live main thread never delays the device and the
 device never touches the set.
@@ -108,5 +120,4 @@ readings), checks the patch wiring, and runs `engine.js` under Node with a stand
 
 ## Roadmap
 
-Next for the same device: transport-synced follow actions and generative playback; a separate
-**LiveBridge MIDI** device handles MIDI input.
+MIDI input and live note playing are the separate **LiveBridge MIDI** device.

@@ -10,6 +10,10 @@
 // "resolved <slot> <id> <min> <max> <value> <name...>" (id 0 when nothing is there), and the
 // transport is reported as "transport <beat> <tempo> <playing>" when it changes (song position
 // at most every 50 ms while playing).
+//
+// For follow actions: "query <id> track <path...>" answers "info <id> <playing slot> <fired
+// slot> <has clip 0/1 per slot...>", "query <id> scenes live_set" answers "info <id> -1 -1
+// 1 1 ..." (one per scene), and "call fire|stop_all_clips <path...>" launches or stops.
 
 autowatch = 0;
 inlets = 1;
@@ -98,6 +102,48 @@ function resolve() {
     var name = api.get("name");
     outlet(0, "resolved", slot, Number(api.id), Number(api.get("min")), Number(api.get("max")),
            Number(api.get("value")), name && name.length ? String(name.join(" ")) : "");
+}
+
+function query() {
+    var parts = arrayfromargs(arguments);
+    var id = parts.shift();
+    var kind = parts.shift();
+    var api = new LiveAPI(parts.join(" "));
+    var flags = [];
+    if (!api || api.id == 0) {
+        outlet(0, "info", id, -1, -1);
+        return;
+    }
+    if (kind === "scenes") {
+        var scenes = api.getcount("scenes");
+        for (var s = 0; s < scenes; s++) {
+            flags.push(1);
+        }
+        outlet(0, ["info", id, -1, -1].concat(flags));
+        return;
+    }
+    var slots = api.getcount("clip_slots");
+    var base = parts.join(" ");
+    for (var i = 0; i < slots; i++) {
+        var slot = new LiveAPI(base + " clip_slots " + i);
+        flags.push(Number(slot.get("has_clip")) ? 1 : 0);
+    }
+    outlet(0, ["info", id, Number(api.get("playing_slot_index")),
+               Number(api.get("fired_slot_index"))].concat(flags));
+}
+
+var CALLS = { fire: true, stop_all_clips: true };
+
+function call() {
+    var parts = arrayfromargs(arguments);
+    var method = parts.shift();
+    if (!CALLS[method]) {
+        return;
+    }
+    var api = new LiveAPI(parts.join(" "));
+    if (api && api.id != 0) {
+        api.call(method);
+    }
 }
 
 function trackOf() {

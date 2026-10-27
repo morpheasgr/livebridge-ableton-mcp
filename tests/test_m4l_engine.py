@@ -204,7 +204,7 @@ MAX_API_STUB = r"""
 // Stand-in for Max: outlets are logged to OUTLET_LOG; "capture" messages act like the patch's
 // sfrecord~ ("open <path>", 1, 0) and write a stereo WAV holding a STUB_FREQ Hz sine.
 const fs = require("fs");
-const recorder = { file: null, started: 0 };
+const recorder = { file: null, started: 0, playing: 0 };
 
 function writeWav(file, seconds) {
   const rate = 44100, frames = Math.round(seconds * rate), freq = Number(process.env.STUB_FREQ);
@@ -234,6 +234,18 @@ module.exports = {
       const index = Number.isInteger(last) ? last : 50;
       setImmediate(() => global.__maxHandlers.resolved(
         args[1], index === 99 ? 0 : 100 + index, 20, 20000, 1000, "Filter", "Freq"));
+      return;
+    }
+    if (args[0] === "query") {
+      // like context.js: track 0 has clips in slots 0, 1 and 3 (playing: the last fired),
+      // the set has 4 scenes
+      const flags = args[2] === "scenes" ? [1, 1, 1, 1] : [1, 1, 0, 1, 0];
+      const playing = args[2] === "scenes" ? -1 : recorder.playing;
+      setImmediate(() => global.__maxHandlers.info(args[1], playing, -1, ...flags));
+      return;
+    }
+    if (args[0] === "call" && args[1] === "fire" && args.indexOf("clip_slots") > 0) {
+      recorder.playing = args[args.length - 1];
       return;
     }
     if (args[0] !== "capture") {
@@ -706,3 +718,100 @@ def test_modulate_argument_checks(tmp_path, monkeypatch):
     assert call_tool(app, "live_engine_unmodulate", {})["type"] == "bad_args"
     assert call_tool(app, "live_engine_unmodulate", {"all": True, "parameter": 1})["type"] \
         == "bad_args"
+
+
+# ----------------------------------------------------------------------------- step 4: follow
+# actions
+
+TARGET_SCRIPT = r"""
+const engine = require(process.argv[1]);
+let draws = 0;
+const rule = { seed: 3, draws: 0 };
+const clips = [0, 1, 3, 6];
+const out = {};
+for (const action of ["next", "previous", "first", "last", "again", "jump:3", "jump:2"]) {
+  out[action] = [0, 3, 6, -1, 4].map((current) => engine.targetIndex(rule, action, current,
+                                                                       clips));
+}
+out.other = Array.from({ length: 40 }, () => engine.targetIndex(rule, "other", 1, clips));
+out.any = Array.from({ length: 40 }, () => engine.targetIndex(rule, "any", 1, clips));
+out.empty = engine.targetIndex(rule, "next", 0, []);
+process.stdout.write(JSON.stringify(out));
+process.exit(0);
+"""
+
+
+def test_follow_action_targets(tmp_path):
+    if NODE is None:
+        pytest.skip("node is not installed")
+    done = subprocess.run([NODE, "-e", TARGET_SCRIPT, str(ENGINE_JS)], capture_output=True,
+                          text=True, timeout=30,
+                          env=dict(os.environ, LIVEBRIDGE_ENGINE_DIR=str(tmp_path)))
+    out = json.loads(done.stdout)
+    # from slot 0, 3, 6 (the last, wraps), nothing playing (-1) and an empty slot 4
+    assert out["next"] == [1, 6, 0, 0, 6]
+    assert out["previous"] == [6, 1, 3, 6, 3]
+    assert out["first"] == [0] * 5 and out["last"] == [6] * 5
+    assert out["again"] == [0, 3, 6, 0, 0]
+    assert out["jump:3"] == [3] * 5 and out["jump:2"] == [None] * 5
+    assert 1 not in out["other"] and set(out["other"]) == {0, 3, 6}
+    assert set(out["any"]) == {0, 1, 3, 6}
+    assert out["empty"] is None
+
+
+def _calls(outlets):
+    return [json.loads(line) for line in outlets.read_text(encoding="utf-8").splitlines()
+            if line.startswith('["call"')]
+
+
+def test_follow_actions_end_to_end(engines, tcp_bridge, song):
+    _process, send, outlets = engines()
+    send("context", "master", "Main")
+    _wait_roles(1)
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    started = call_tool(app, "live_engine_follow", {"target": "Bass", "every": "1 bar",
+                                                    "actions": "next"})
+    assert started["follow"]["kind"] == "track" and started["follow"]["every_beats"] == 4.0
+    assert started["follow"]["target"] == "Bass" and "note" in started   # transport stopped
+    lead = started["follow"]["lead_beats"]
+    assert 0 <= lead <= 0.25
+    time.sleep(0.3)
+    assert _calls(outlets) == []                       # nothing while Live is stopped
+
+    # 960 BPM: a bar every 0.25 s, from beat 0
+    send("transport", 0, 960, 1)
+    assert engine.wait_for(lambda: len(_calls(outlets)) >= 4, 5)
+    fired = [c[-1] for c in _calls(outlets)][:4]
+    assert fired == [1, 3, 0, 1]                       # slots with clips: 0, 1, 3 (wrapping)
+    status = call_tool(app, "live_engine_status", {})
+    (rule,) = status["devices"][0]["follow"]
+    assert rule["target"] == "live_set tracks 0"
+    beats = [h["beat"] for h in rule["history"]]
+    assert beats[:3] == [4, 8, 12] and all(h["action"] == "next" for h in rule["history"])
+
+    # scenes, weighted with a chance, reproducible with a seed
+    call_tool(app, "live_engine_unfollow", {"target": "Bass"})
+    count = len(_calls(outlets))
+    scenes = call_tool(app, "live_engine_follow", {"target": "scenes", "every": "1 bar",
+                                                   "actions": {"other": 1, "stop": 1},
+                                                   "chance": 0.7, "seed": 5})
+    assert scenes["follow"]["kind"] == "scenes"
+    assert engine.wait_for(lambda: len(_calls(outlets)) >= count + 3, 6)
+    later = _calls(outlets)[count:]
+    assert all(c[1] == "stop_all_clips" and c[2:] == ["live_set"] or
+               c[1:4] == ["fire", "live_set", "scenes"] for c in later)
+    stopped = call_tool(app, "live_engine_unfollow", {"all": True})
+    (gone,) = stopped["stopped"]
+    assert gone["kind"] == "scenes" and gone["history"]
+    settled = len(_calls(outlets))
+    time.sleep(0.6)
+    assert len(_calls(outlets)) == settled             # nothing after unfollow
+    assert call_tool(app, "live_engine_unfollow", {"all": True})["note"] == \
+        "no follow actions were running"
+
+    for args in ({"target": "Bass", "every": "0.5 Hz"}, {"target": "Bass", "actions": "jump"},
+                 {"target": "Bass", "actions": {"next": 0}}, {"target": "Bass", "chance": 0},
+                 {"target": "Bass", "every": "1/64"}):
+        assert call_tool(app, "live_engine_follow", args)["type"] == "bad_args", args
+    assert call_tool(app, "live_engine_follow", {"target": "Nope"})["type"] == "not_found"
+    assert call_tool(app, "live_engine_unfollow", {})["type"] == "bad_args"

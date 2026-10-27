@@ -4,7 +4,8 @@ playing right now (loudness, peaks, spectral balance, stereo) without bouncing a
 `live_engine_compare` is the A/B check of a change, `live_engine_capture` records what the
 devices hear to WAV files, `live_engine_masking` finds the parts that fight for the same
 frequencies while the song plays, and `live_engine_modulate` / `live_engine_unmodulate` move
-any parameter with a tempo-synced LFO or step sequence (no automation written).
+any parameter with a tempo-synced LFO or step sequence (no automation written), and
+`live_engine_follow` / `live_engine_unfollow` play follow actions on tracks and scenes.
 
 The device is optional: drop "LiveBridge Engine" (User Library > Presets > Audio Effects >
 Max Audio Effect) on the master track and at the end of the tracks to compare. Without it these
@@ -112,11 +113,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Returns:
             `{devices:[{role ("master"|"track"), track, version, frames_buffered,
             frame_interval_ms, started, modulations:[{slot, path, name, shape, beats|hz,
-            low, high, phase}]}], hint?}`.
+            low, high, phase}], follow:[{target, kind, every_beats, actions, chance, current,
+            history}]}], hint?}`.
         """
         found = engine.devices()
         keep = ("role", "track", "version", "frames_buffered", "frame_interval_ms",
-                "started", "instance", "modulations")
+                "started", "instance", "modulations", "follow")
         result: dict[str, Any] = {"devices": [{k: d.get(k) for k in keep} for d in found]}
         if not found:
             result["hint"] = _HOW_TO_ADD
@@ -606,4 +608,165 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         result: dict[str, Any] = {"stopped": stopped, "engines": len(found)}
         if not stopped:
             result["note"] = "nothing was modulated" + ("" if all else " on that parameter")
+        return result
+
+    _QUANT_BEATS = {"8 bars": 32.0, "4 bars": 16.0, "2 bars": 8.0, "1 bar": 4.0, "1/2": 2.0,
+                    "1/2T": 4 / 3, "1/4": 1.0, "1/4T": 2 / 3, "1/8": 0.5, "1/8T": 1 / 3,
+                    "1/16": 0.25, "1/16T": 1 / 6, "1/32": 0.125}
+
+    def follow_target(cmd: str, target: Any) -> dict[str, Any]:
+        """``{"path": Max path, "label"}`` for "scenes" or a track."""
+        if isinstance(target, str) and target.strip().lower() in ("scenes", "scene"):
+            return {"path": "live_set", "label": "scenes"}
+        info = bridge_call(bridge, "tracks.get", {"track": target, "detail": "minimal"})
+        if _is_error(info) or not isinstance(info, dict):
+            return info if isinstance(info, dict) else tool_error(
+                "unexpected answer from Live", type="internal", cmd=cmd)
+        try:
+            path = engine.lom_to_max(str(info.get("path") or ""))
+        except ValueError:
+            return tool_error("this track cannot hold follow actions (only regular and "
+                              "return tracks have clips)", type="invalid_state", cmd=cmd)
+        if not path.startswith(("live_set tracks ", "live_set return_tracks ")):
+            return tool_error("only tracks with clip slots can follow", type="invalid_state",
+                              cmd=cmd)
+        return {"path": path, "label": info.get("name") or target}
+
+    @mcp.tool()
+    def live_engine_follow(
+        target: int | str,
+        every: str | float = "4 bars",
+        actions: str | dict[str, float] = "next",
+        chance: float = 1.0,
+        slots: list[int] | None = None,
+        seed: int | None = None,
+    ) -> Any:
+        """Follow actions while the song plays — Live's own follow actions are not reachable
+        from its API, so the LiveBridge Engine device plays them: every `every` (on Live's bar
+        grid) it picks what comes next on a track — or which scene — and launches it in time.
+        Use it for evolving loops, generative arrangements of clip variations and scene
+        chains. Calling it again on the same target replaces the rule. Nothing is written to
+        the set.
+
+        Args:
+            target: A track (index or name: its clips) or "scenes" (launch whole scenes).
+            every: How often to act: "4 bars", "1 bar", "8 beats", "1/2" ... (beats count at
+                the song's time signature).
+            actions: One action or weights, e.g. {"next": 3, "other": 1, "again": 2}:
+                "next" / "previous" (wrapping), "first", "last", "any" (random, may repeat),
+                "other" (random, never the same), "again" (retrigger), "stop", "jump:N"
+                (slot/scene index N, 0-based).
+            chance: Probability (0..1] that anything happens at a boundary; otherwise the
+                current clip keeps playing.
+            slots: Only these clip slot (or scene) indices take part (default every slot with
+                a clip / every scene).
+            seed: Fix the random choices (same seed, same sequence).
+
+        Returns:
+            `{follow:{target, kind ("track"|"scenes"), every_beats, actions, chance, slots,
+            lead_beats}, engine:{role, track}, warning?}`.
+
+        Gotchas: needs the LiveBridge Engine device and the transport running; it launches
+        a quarter beat (or half the launch quantization) before the boundary so Live's launch
+        quantization (Song > Launch Quantization, default 1 bar) lands it on the grid — with
+        quantization "None" launches are a few ms late. Rules end when the Engine is removed
+        or Live quits; `live_engine_unfollow` stops them.
+        """
+        cmd = "engine.follow"
+        state = bridge_call(bridge, "transport.get")
+        if _is_error(state) or not isinstance(state, dict):
+            return state if isinstance(state, dict) else tool_error(
+                "unexpected answer from Live", type="internal", cmd=cmd)
+        try:                                            # "7/8"
+            numerator, denominator = (float(v) for v in
+                                      str(state.get("signature") or "4/4").split("/"))
+        except ValueError:
+            numerator, denominator = 4.0, 4.0
+        try:
+            timing = engine.parse_rate(every, beats_per_bar=numerator * 4.0 / denominator)
+        except ValueError as exc:
+            return tool_error(str(exc).replace("rate", "every"), cmd=cmd)
+        if "hz" in timing:
+            return tool_error("every follows the bar grid: give bars, beats or a note value",
+                              cmd=cmd)
+        every_beats = timing["beats"]
+        if not 0.25 <= every_beats <= 1024:
+            return tool_error("every must be 1/16 .. 256 bars", cmd=cmd)
+        if isinstance(actions, str):
+            actions = {actions: 1.0}
+        if not isinstance(actions, dict) or not actions:
+            return tool_error("actions: a name or {name: weight}", cmd=cmd)
+        if not 0 < chance <= 1:
+            return tool_error("chance must be > 0 and <= 1", cmd=cmd)
+        found_target = follow_target(cmd, target)
+        if _is_error(found_target):
+            return found_target
+        quant = str(state.get("clip_trigger_quantization") or "none")
+        q_beats = _QUANT_BEATS.get(quant)
+        lead = 0.0 if q_beats is None else min(0.25, q_beats / 2)
+        warning = None
+        if q_beats is None:
+            warning = ("Launch quantization is None: launches land a few ms after the "
+                       "boundary. Set Song > Launch Quantization to 1 bar for tight timing.")
+        elif abs(every_beats / q_beats - round(every_beats / q_beats)) > 1e-6:
+            warning = (f"every ({every_beats:g} beats) is not a multiple of the launch "
+                       f"quantization ({quant}): launches snap to the quantization grid.")
+        args: dict[str, Any] = {"target": found_target["path"], "every_beats": every_beats,
+                                "lead_beats": lead, "actions": actions, "chance": chance}
+        if slots is not None:
+            args["slots"] = slots
+        if seed is not None:
+            args["seed"] = seed
+        try:
+            found = engine.devices()
+            if not found:
+                raise engine.EngineError("not_found", "no LiveBridge Engine is running")
+            running = next((d for d in found for r in d.get("follow") or []
+                            if r.get("target") == found_target["path"]), None)
+            chosen = running or engine.choose(found)
+            answer = engine.request(chosen, "follow", args, timeout=8.0)
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        rule = {"target": found_target["label"], "kind": answer.get("kind"),
+                "every_beats": every_beats, "actions": dict(answer.get("actions") or []),
+                "chance": chance, "slots": slots, "lead_beats": lead}
+        result: dict[str, Any] = {"follow": rule, "engine": _where(chosen)}
+        if warning:
+            result["warning"] = warning
+        if not state.get("is_playing"):
+            result["note"] = "The transport is stopped: the rule starts with playback."
+        return result
+
+    @mcp.tool()
+    def live_engine_unfollow(target: int | str | None = None, all: bool = False) -> Any:
+        """Stop follow actions started with `live_engine_follow` on a track or "scenes"
+        (what is playing keeps playing), or every rule with all=true.
+
+        Returns:
+            `{stopped:[{target, kind, history}], engines}`.
+        """
+        cmd = "engine.unfollow"
+        if all == (target is not None):
+            return tool_error("give a target or all=true", cmd=cmd)
+        args: dict[str, Any] = {"all": True}
+        if not all:
+            found_target = follow_target(cmd, target)
+            if _is_error(found_target):
+                return found_target
+            args = {"target": found_target["path"]}
+        try:
+            found = engine.devices()
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        if not found:
+            return _engine_failure(engine.EngineError("not_found",
+                                                      "no LiveBridge Engine is running"), cmd)
+        stopped = []
+        for answer in engine.each(found, lambda d: engine.request(d, "unfollow", args)):
+            if isinstance(answer, dict):
+                stopped += [{k: r.get(k) for k in ("target", "kind", "history")}
+                            for r in answer.get("stopped") or []]
+        result: dict[str, Any] = {"stopped": stopped, "engines": len(found)}
+        if not stopped:
+            result["note"] = "no follow actions were running" + ("" if all else " there")
         return result

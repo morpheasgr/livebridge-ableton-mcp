@@ -246,8 +246,11 @@ def engine_patcher() -> dict:
         _box("obj-thisdevice", "live.thisdevice", [440.0, 220.0, 90.0, 22.0], 1, 3,
              ["bang", "int", "int"]),
         _box("obj-context", "js context.js", [440.0, 260.0, 90.0, 22.0], 1, 1),
-        _box("obj-route", "route status log context capture resolve mod",
-             [120.0, 340.0, 300.0, 22.0], 1, 7),
+        _box("obj-route", "route status log context capture resolve mod query call",
+             [120.0, 340.0, 400.0, 22.0], 1, 9),
+        # follow actions: "query <id> <kind> <path...>" and "call <method> <path...>"
+        _box("obj-query", "prepend query", [560.0, 180.0, 90.0, 22.0], 1, 1),
+        _box("obj-call", "prepend call", [660.0, 180.0, 80.0, 22.0], 1, 1),
         # parameter lookups for the modulation go to context.js as "resolve <slot> <path...>"
         _box("obj-resolve", "prepend resolve", [560.0, 220.0, 100.0, 22.0], 1, 1),
         # "mod <slot> value <v> [ms]" / "mod <slot> id <n>" -> one live.remote~ per slot
@@ -276,7 +279,9 @@ def engine_patcher() -> dict:
         _line("obj-set", 0, "obj-status", 0), _line("obj-route", 1, "obj-print", 0),
         _line("obj-route", 2, "obj-context", 0), _line("obj-route", 3, "obj-sfrecord", 0),
         _line("obj-route", 4, "obj-resolve", 0), _line("obj-resolve", 0, "obj-context", 0),
-        _line("obj-route", 5, "obj-modslot", 0), _line("obj-route", 6, "obj-print", 0),
+        _line("obj-route", 5, "obj-modslot", 0), _line("obj-route", 6, "obj-query", 0),
+        _line("obj-route", 7, "obj-call", 0), _line("obj-route", 8, "obj-print", 0),
+        _line("obj-query", 0, "obj-context", 0), _line("obj-call", 0, "obj-context", 0),
         _line("obj-plugin", 0, "obj-sfrecord", 0), _line("obj-plugin", 1, "obj-sfrecord", 1),
     ]
     for i in range(MOD_SLOTS):
