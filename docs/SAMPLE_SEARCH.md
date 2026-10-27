@@ -8,7 +8,8 @@ Library) and no tags; Live's browser database has all of it.
 
 | Tool | What |
 |---|---|
-| `live_sample_search` | words (`query`), tags (`tags` all / `any_tags` / `exclude_tags`), `kind` (`one_shot` / `loop`), `place`, `extensions`, `order` (`relevance`, `name`, `newest`, `random`), paging; every result has its absolute `path` |
+| `live_sample_search` | words (`query`), tags (`tags` all / `any_tags` / `exclude_tags`), `kind` (`one_shot` / `loop`), `place`, `source` (`core_library`, `pack`, `user_library`, `user_folder`, `current_project`), `extensions`, `order` (`relevance`, `name`, `newest`, `most_used`, `random`), `similar_to` (rank by how close each sample sounds to another), paging; every result has its absolute `path` |
+| `live_sample_duplicates` | groups of samples with identical audio (the same sound shipped twice) |
 | `live_sample_tags` | the tag groups and tags with how many samples carry them |
 | `live_sample_index` | status (places, their folders, what is unresolved) or `action="refresh"` |
 
@@ -22,6 +23,9 @@ python -m livebridge_mcp.sample_check --refresh
 python -m livebridge_mcp.sample_check --tags "Drums|Kick" "Character|Punchy" --kind one_shot
 python -m livebridge_mcp.sample_check --query "909 kick" --limit 5
 python -m livebridge_mcp.sample_check --list-tags Character
+python -m livebridge_mcp.sample_check --similar "D:\Samples\Kicks\Kick 01.wav"
+python -m livebridge_mcp.sample_check --tags "Drums|Kick" --order most_used
+python -m livebridge_mcp.sample_check --duplicates
 ```
 
 ## How it works
@@ -33,19 +37,29 @@ python -m livebridge_mcp.sample_check --list-tags Character
    folder; SQLite reads the copy, the copy is deleted. Live's files are only read as bytes, so
    Live's database cannot be changed or locked. If Live wrote during the copy and the copy is
    unreadable, it is copied once more.
-3. **Rebuild paths**: `files` rows are walked up `parent_id` to their place's root folder;
-   only audio files (`.wav .aif .aiff .mp3 .flac .ogg .m4a`) are kept, with their tags from
-   `metadata` + `metadata_values`.
-4. **Find each place's folder** (the database stores paths relative to it), in this order, and
-   accept a folder only when some of that place's files really exist under it:
+3. **Rebuild paths**: `files` keeps every folder up to the drive (`C:\` -> `ProgramData`
+   -> `Ableton` -> ...), so each audio file (`.wav .aif .aiff .mp3 .flac .ogg .m4a`) gets
+   its absolute path from the database, plus its path relative to its place. Tags are the
+   `Group|Tag` values of `metadata` + `metadata_values` (other metadata — pack names, URLs,
+   years — is left out). `files.use_count` is Live's own "how often loaded" counter;
+   `places.folder_kind` says what each place is.
+4. **Check each place's folder**, in this order, accepting a folder only when some of that
+   place's files really exist under it (so a moved drive or a renamed folder can be
+   corrected):
    1. `sample_index.roots` in `~/.livebridge/config.json` (your setting);
-   2. an absolute path stored in the database for that place;
+   2. the folder the database itself records for that place;
    3. what Live reports (`samples.locations`): the Core Library next to the running Live
       executable, the User Library and Factory Packs from Live's `Library.cfg`, the known
       Music / Downloads / Desktop folders;
    4. folders of the same name: `<drive>:\<place>` (e.g. `D:\Samples`), your home folder,
       Documents, Music, Desktop, `Documents\Ableton`, the default Live install folders.
-5. **Index**: everything goes into `~/.livebridge/sample_index.sqlite`; searches take a few
+5. **Similar sounds**: `fe_values` holds the audio features Live computes for its own
+   "similar samples" browsing (a small header — version, dimension count — then 64 floats)
+   and a hash of the audio. `similar_to` ranks samples by distance in that feature space,
+   each feature scaled by its spread across your library; the same hash + features means
+   identical audio (`live_sample_duplicates`). Live analyses new files in the background, so
+   recently added samples may have no features yet.
+6. **Index**: everything goes into `~/.livebridge/sample_index.sqlite`; searches take a few
    milliseconds. All of this runs in the MCP server process — nothing runs inside Live except
    the one quick `samples.locations` question during a refresh.
 

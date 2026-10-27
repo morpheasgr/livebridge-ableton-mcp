@@ -5,6 +5,9 @@
     python -m livebridge_mcp.sample_check --tags "Drums|Kick" "Character|Punchy" --kind one_shot
     python -m livebridge_mcp.sample_check --query "909 kick" --limit 5
     python -m livebridge_mcp.sample_check --list-tags Character
+    python -m livebridge_mcp.sample_check --similar "D:\\Samples\\Kicks\\Kick 01.wav"
+    python -m livebridge_mcp.sample_check --tags "Drums|Kick" --order most_used
+    python -m livebridge_mcp.sample_check --duplicates
 
 Uses the same settings as the MCP server (``~/.livebridge/config.json``); Live should be open
 so it can report its Core Library and User Library folders during a refresh.
@@ -42,6 +45,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--tags", nargs="+", help='tags that must all be present ("Drums|Kick")')
     parser.add_argument("--kind", choices=("one_shot", "loop"))
     parser.add_argument("--place", nargs="+", help="only these places")
+    parser.add_argument("--source", nargs="+", help="core_library, pack, user_library, "
+                        "user_folder, current_project, other")
+    parser.add_argument("--similar", metavar="SAMPLE", help="rank by similarity to this sample")
+    parser.add_argument("--order", choices=("relevance", "name", "newest", "most_used",
+                                            "random"))
+    parser.add_argument("--duplicates", action="store_true", help="groups of identical audio")
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--list-tags", nargs="?", const="", metavar="GROUP",
                         help="list tag groups, or the tags of one group")
@@ -53,14 +62,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     bridge = BridgeClient.from_config(config)
     app = create_app(bridge, config=config)
     try:
-        if args.list_tags is not None:
+        if args.duplicates:
+            answer = _call(app, "live_sample_duplicates", {"limit": args.limit})
+        elif args.list_tags is not None:
             answer = _call(app, "live_sample_tags",
                            {"group": args.list_tags} if args.list_tags else {})
-        elif args.query or args.tags or args.kind or args.place:
+        elif any((args.query, args.tags, args.kind, args.place, args.source, args.similar,
+                  args.order)):
             search: dict[str, Any] = {"limit": args.limit, "refresh": args.refresh}
-            for key in ("query", "tags", "kind", "place"):
+            for key in ("query", "tags", "kind", "place", "source", "order"):
                 if getattr(args, key):
                     search[key] = getattr(args, key)
+            if args.similar:
+                search["similar_to"] = args.similar
             answer = _call(app, "live_sample_search", search)
         else:
             answer = _call(app, "live_sample_index",

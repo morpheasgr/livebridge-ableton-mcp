@@ -1,8 +1,10 @@
 """Sample search over everything Live's browser shows under Library > Samples, with Live's
 browser tags: `live_sample_search` finds samples by words and tags ("a punchy kick" ->
 tags=["Drums|Kick", "Character|Punchy"], kind="one_shot") and returns absolute file paths for
-`live_drumrack_set_pad(file_path=...)` / `live_sample_import`; `live_sample_tags` lists the tag
-vocabulary; `live_sample_index` shows or refreshes the index.
+`live_drumrack_set_pad(file_path=...)` / `live_sample_import`, and finds samples that sound like
+another one (Live's own audio features); `live_sample_duplicates` lists identical audio shipped
+more than once; `live_sample_tags` lists the tag vocabulary; `live_sample_index` shows or
+refreshes the index.
 
 The engine (:mod:`livebridge_mcp.sample_db`) reads a temporary copy of Live's browser database
 in this process — never Live's file itself and never inside Live — and keeps a local index in
@@ -32,7 +34,7 @@ from ..client import BridgeClient
 from ..config import read_config_file
 
 _KINDS = ("one_shot", "loop")
-_ORDERS = ("relevance", "name", "newest", "random")
+_ORDERS = ("relevance", "name", "newest", "most_used", "random")
 _ACTIONS = ("status", "refresh")
 _DEFAULT_AUTO_REFRESH = 300.0
 _INDEX_NAME = "sample_index.sqlite"
@@ -117,7 +119,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         exclude_tags: list[str] | None = None,
         kind: str | None = None,
         place: str | list[str] | None = None,
+        source: str | list[str] | None = None,
         extensions: str | None = None,
+        similar_to: str | None = None,
+        include_copies: bool = False,
         order: str = "relevance",
         seed: int | None = None,
         offset: int = 0,
@@ -141,9 +146,19 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             exclude_tags: None of these tags.
             kind: "one_shot" or "loop" (from the Type tag, else guessed from the path).
             place: Only these places ("Core Library", "Samples", "User Library", a pack name).
+            source: Only these kinds of place: "core_library", "pack", "user_library",
+                "user_folder" (folders added to Places), "current_project", "other".
             extensions: Only these file types, like `live_sample_list`: "wav,aif".
+            similar_to: A sample (path from a result, or a unique file name): rank by how close
+                each sample sounds to it, using the audio features Live computed for its
+                browser (closest first, `distance` 0 = the same sound). Combines with every
+                filter ("kicks in my own folders that sound like this one"). `order` is
+                ignored.
+            include_copies: With `similar_to`, also list files with exactly the same audio
+                as the seed (skipped by default).
             order: "relevance" (default: query words in the file name first, short names
-                first), "name", "newest" (file date) or "random" (variety; same `seed` =
+                first), "name", "newest" (file date), "most_used" (how often Live loaded
+                the file — the user's go-to sounds) or "random" (variety; same `seed` =
                 same order).
             seed: Seed for order="random".
             offset, limit: Paging (limit 1..200, default 20).
@@ -152,8 +167,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{total, offset, count, samples:[{name, path (absolute; null when the place's
-            folder is unknown), place, rel_path, tags, kind, size?, exists}], next_offset?,
-            index:{refreshed?, stale?, unresolved_places?}}`.
+            folder is unknown), place, source, rel_path, tags, kind, size?, use_count?,
+            distance? (similar_to), exists}], next_offset?, seed? (similar_to), index:
+            {refreshed?, stale?, unresolved_places?}}`.
 
         Gotchas: the first call builds the index (copies Live's database, a few seconds;
         nothing in Live is touched). `exists: false` means the file moved since Live indexed
@@ -161,6 +177,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         are Live's own browser tags; files Live has not analysed yet have none.
         """
         cmd = "sample_index.search"
+        if similar_to is not None and not str(similar_to).strip():
+            return tool_error("similar_to must be a path or file name", cmd=cmd)
         if kind is not None and kind not in _KINDS:
             return tool_error(f"kind must be one of {', '.join(_KINDS)}", cmd=cmd)
         if order not in _ORDERS:
@@ -174,12 +192,59 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         state = ensure(refresh, cmd)
         if _is_error(state):
             return state
+        filters = dict(
+            query=query, tags=tags, any_tags=any_tags, exclude_tags=exclude_tags, kind=kind,
+            places=_list(place), sources=_list(source),
+            extensions=[e.strip() for e in extensions.split(",") if e.strip()]
+            if extensions else None, offset=offset, limit=limit)
         try:
-            result = sample_db.search(
-                _index_path(), query=query, tags=tags, any_tags=any_tags,
-                exclude_tags=exclude_tags, kind=kind, places=_list(place),
-                extensions=[e.strip() for e in extensions.split(",") if e.strip()]
-                if extensions else None, order=order, seed=seed, offset=offset, limit=limit)
+            if similar_to is not None:
+                result = sample_db.similar(_index_path(), str(similar_to),
+                                           include_copies=include_copies, **filters)
+            else:
+                result = sample_db.search(_index_path(), order=order, seed=seed, **filters)
+        except sample_db.SampleIndexError as exc:
+            return tool_error(str(exc), type="not_found", cmd=cmd)
+        except sqlite3.DatabaseError as exc:
+            return tool_error(f"the sample index is unreadable ({exc}) — rebuild it with "
+                              "live_sample_index(action='refresh')", type="invalid_state",
+                              cmd=cmd)
+        if state["index"]:
+            result["index"] = state["index"]
+        return result
+
+    @mcp.tool()
+    def live_sample_duplicates(
+        query: str | None = None,
+        place: str | list[str] | None = None,
+        source: str | list[str] | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> Any:
+        """Find samples whose audio is identical (the same sound shipped by several packs, or
+        copied into several folders) — according to the audio fingerprint Live keeps in its
+        browser database. Read-only: nothing is moved or deleted.
+
+        Args:
+            query: Only samples whose name or folders contain these words.
+            place: Only these places; source: only these kinds of place (see
+                `live_sample_search`). A group counts when at least two of its files match.
+            offset, limit: Paging over the groups (largest first; limit 1..200).
+
+        Returns:
+            `{total_groups, duplicate_files (files beyond the first of each group), offset,
+            count, groups:[{copies, samples:[{name, path, place, source, ...}]}],
+            next_offset?, index?}`.
+        """
+        cmd = "sample_index.duplicates"
+        if offset < 0 or not 1 <= limit <= 200:
+            return tool_error("offset must be >= 0 and limit 1..200", cmd=cmd)
+        state = ensure(False, cmd)
+        if _is_error(state):
+            return state
+        try:
+            result = sample_db.duplicates(_index_path(), query=query, places=_list(place),
+                                          sources=_list(source), offset=offset, limit=limit)
         except sample_db.SampleIndexError as exc:
             return tool_error(str(exc), type="not_found", cmd=cmd)
         except sqlite3.DatabaseError as exc:
@@ -228,8 +293,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{built, index, source_db, built_at, build_seconds, samples, tagged, with_path,
-            places:[{name, root, source ("config"|"database"|"live"|"guess"), verified,
-            samples}], unresolved:[place names without a folder], stale?, refreshed?}`.
+            with_features (samples with Live's audio features, for similar_to), places:[{name,
+            kind, root, root_from ("config"|"database"|"live"|"guess"), verified, samples,
+            without_path?}], unresolved:[places with samples that have no path], stale?,
+            refreshed?}`.
 
         Gotchas: a place is "unresolved" when its folder could not be found and checked; add
         it to ~/.livebridge/config.json — `"sample_index": {"roots": {"<place name>":

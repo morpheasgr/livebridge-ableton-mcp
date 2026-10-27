@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~183 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~184 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -222,7 +222,11 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   `live_sample_search(tags=["Drums|Kick", "Character|Punchy"], kind="one_shot")` -> each result
   has an absolute `path` to load. Words go in `query` ("909 kick", "vinyl"); a bare tag
   ("Punchy") matches any group; `live_sample_tags(filter="punch")` shows which tags exist.
-  Offer a few results (`order="random"` for variety) unless the user said "any". A null `path`
+  Offer a few results (`order="random"` for variety, `order="most_used"` for the user's
+  go-to sounds) unless the user said "any". "More like this one":
+  `live_sample_search(similar_to=<path>, tags=[...])` ranks by Live's own audio features;
+  `source="user_folder"` keeps to the user's own folders ("core_library", "pack",
+  "user_library" too). `live_sample_duplicates` finds identical audio. A null `path`
   or `exists: false` -> `live_sample_index()` explains which folder is unknown.
   "Load a punchy kick onto C1": search, then `live_drumrack_set_pad(note="C1", track=...,
   file_path=<path>)`.

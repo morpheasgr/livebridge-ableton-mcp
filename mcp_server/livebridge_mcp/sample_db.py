@@ -11,7 +11,15 @@ Library) and no tags; Live's browser database has all of them:
   is rebuilt by walking ``parent_id`` up to the place's root folder.
 * ``places(file_id, folder_kind, level, name)`` — the roots ("Core Library", "User Library",
   packs, user folders such as "Samples").
-* ``metadata(file_id, key, value_id)`` + ``metadata_values(id, value)`` — the tags.
+* ``metadata(file_id, key, value_id)`` + ``metadata_values(id, value)`` — browser metadata
+  keyed by four-letter codes; the browser tags are the ``"Group|Tag"`` values.
+* ``files.use_count`` — how often Live loaded the file; ``places.folder_kind`` — what kind of
+  place it is (packs incl. the Core Library, User Library, added folders ...).
+* ``fe_values(file_id, data, hash)`` — Live's audio-similarity features (``data``: version,
+  dimension count, reserved, then that many little-endian float32) and a hash of the audio
+  (equal hash + data = the same audio shipped twice).
+* ``files`` keeps every folder up to the drive root (``C:\\`` -> ``ProgramData`` -> ...), so
+  absolute paths come from the database itself.
 
 **Live's database is never opened.** :func:`read_live_database` copies the database and its
 ``-wal`` file together into a temporary folder, reads the copy and deletes it; Live keeps the
@@ -36,6 +44,7 @@ import os
 import re
 import shutil
 import sqlite3
+import struct
 import sys
 import tempfile
 import threading
@@ -44,19 +53,23 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 __all__ = [
-    "AUDIO_EXTENSIONS", "SampleIndexError", "build_index", "database_dirs", "find_live_database",
+    "AUDIO_EXTENSIONS", "SampleIndexError", "build_index", "duplicates", "similar", "database_dirs", "find_live_database",
     "index_status", "read_live_database", "resolve_roots", "search", "source_signature",
     "tag_counts",
 ]
 
 AUDIO_EXTENSIONS = (".wav", ".aif", ".aiff", ".mp3", ".flac", ".ogg", ".m4a")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _DB_RE = re.compile(r"^Live-files-(\d+)\.db$", re.I)
 _ABSOLUTE_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\|/)")
 _SPLIT_RE = re.compile(r"[\\/_\-.\s]+")
 _VERIFY_SAMPLES = 8
 _MAX_DEPTH = 64
 _BUILD_LOCK = threading.Lock()
+#: places.folder_kind -> what the place is (Live 12.4, Live-files-12300.db).
+PLACE_KINDS = {0: "pack", 1: "user_library", 2: "user_folder", 4: "current_project",
+               5: "plugin_presets", 8: "built_in", 9: "cloud", 10: "plugins"}
+SOURCES = ("core_library", "pack", "user_library", "user_folder", "current_project", "other")
 
 
 class SampleIndexError(RuntimeError):
@@ -121,6 +134,17 @@ def _columns(con: sqlite3.Connection, table: str) -> list[str]:
     return [row[1] for row in con.execute(f"PRAGMA table_info({table})")]
 
 
+def _features(blob: Any) -> bytes | None:
+    """The float32 payload of one ``fe_values.data`` blob (header: version, dimensions,
+    reserved — three little-endian uint32), or None when it does not look like one."""
+    if not isinstance(blob, (bytes, bytearray)) or len(blob) < 16:
+        return None
+    _version, dims, _reserved = struct.unpack_from("<3I", blob)
+    if not 1 <= dims <= 4096 or len(blob) != 12 + 4 * dims:
+        return None
+    return bytes(blob[12:])
+
+
 def _read_copy(copy: Path) -> dict[str, Any]:
     con = sqlite3.connect(str(copy))
     try:
@@ -128,7 +152,7 @@ def _read_copy(copy: Path) -> dict[str, Any]:
         if not {"file_id", "parent_id", "name", "place_id"} <= set(file_columns):
             raise SampleIndexError("Live's database has an unexpected layout (table files: "
                               f"{', '.join(file_columns) or 'missing'})")
-        extra = [c for c in ("file_size", "mod_date") if c in file_columns]
+        extra = [c for c in ("file_size", "mod_date", "use_count") if c in file_columns]
         select = ", ".join(["file_id", "parent_id", "name", "place_id"] + extra)
         files = {row[0]: row[1:] for row in con.execute(f"SELECT {select} FROM files")}
         place_columns = _columns(con, "places")
@@ -150,12 +174,22 @@ def _read_copy(copy: Path) -> dict[str, Any]:
             for file_id, value in con.execute(
                     "SELECT m.file_id, v.value FROM metadata m "
                     "JOIN metadata_values v ON v.id = m.value_id"):
-                if isinstance(value, str) and value:
+                # other metadata (pack name, vendor, URLs, years) is not a browser tag
+                if isinstance(value, str) and "|" in value.strip("|"):
                     tags.setdefault(file_id, []).append(value)
+        vectors: dict[int, tuple[int | None, bytes]] = {}
+        if "fe_values" in tables and {"file_id", "data"} <= set(_columns(con, "fe_values")):
+            has_hash = "hash" in _columns(con, "fe_values")
+            for file_id, blob, digest in con.execute(
+                    "SELECT file_id, data, " + ("hash" if has_hash else "NULL")
+                    + " FROM fe_values"):
+                features = _features(blob)
+                if features is not None:
+                    vectors[file_id] = (digest, features)
     finally:
         con.close()
     return {"files": files, "extra_columns": extra, "places": places, "roots": roots,
-            "tags": tags}
+            "tags": tags, "vectors": vectors}
 
 
 def read_live_database(path: Path, attempts: int = 2) -> dict[str, Any]:
@@ -187,30 +221,30 @@ def read_live_database(path: Path, attempts: int = 2) -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- paths
 
-def _rel_paths(data: dict[str, Any], sep: str) -> dict[int, tuple[int, str]]:
-    """``{file_id: (place_id, path relative to the place root)}`` for every audio file."""
+def _paths(data: dict[str, Any], sep: str
+           ) -> dict[int, tuple[int, str | None, str | None]]:
+    """``{file_id: (place_id, path relative to its place's root folder | None, absolute path
+    from the folders the database keeps up to the drive | None)}`` for every audio file."""
     files = data["files"]
-    place_ids = {p["file_id"] for p in data["places"] if p.get("file_id") is not None}
-    folders: dict[int, str | None] = {}
+    absolute: dict[int, str | None] = {}
 
-    def folder_path(fid: int | None) -> str | None:
+    def folder_abs(fid: int) -> str | None:
         chain = []
-        while fid is not None and fid not in place_ids and fid not in folders:
-            row = files.get(fid)
-            if row is None or len(chain) > _MAX_DEPTH:
-                return None
+        while fid in files and fid not in absolute and len(chain) <= _MAX_DEPTH:
             chain.append(fid)
-            fid = row[0]
-        if fid is None:
-            return None
-        base = "" if fid in place_ids else folders[fid]
+            fid = files[fid][0]
+        if fid in absolute:
+            base = absolute[fid]
+        else:                                   # reached the top of the tree
+            top = chain.pop() if chain else None
+            name = files[top][1] if top is not None else None
+            base = name if isinstance(name, str) and _ABSOLUTE_RE.match(name) else None
+            if top is not None:
+                absolute[top] = base
         for folder in reversed(chain):
-            if base is None:
-                folders[folder] = None
-                continue
             name = files[folder][1] or ""
-            base = name if not base else base + sep + name
-            folders[folder] = base
+            base = os.path.join(base, name) if base is not None else None
+            absolute[folder] = base
         return base
 
     result = {}
@@ -218,10 +252,14 @@ def _rel_paths(data: dict[str, Any], sep: str) -> dict[int, tuple[int, str]]:
         parent, name, place = row[0], row[1], row[2]
         if not isinstance(name, str) or not name.lower().endswith(AUDIO_EXTENSIONS):
             continue
-        base = folder_path(parent)
-        if base is None:
-            continue
-        result[fid] = (place, base + sep + name if base else name)
+        parts, current, steps = [name], parent, 0
+        while current != place and current in files and steps < _MAX_DEPTH:
+            parts.append(files[current][1] or "")
+            current = files[current][0]
+            steps += 1
+        rel = sep.join(reversed(parts)) if current == place else None
+        base = folder_abs(parent) if parent in files else None
+        result[fid] = (place, rel, os.path.join(base, name) if base else None)
     return result
 
 
@@ -378,7 +416,7 @@ def _verified(root: str, rel_paths: list[str]) -> bool:
     return hits >= max(1, (len(rel_paths) + 1) // 2)
 
 
-def resolve_roots(data: dict[str, Any], rel: dict[int, tuple[int, str]],
+def resolve_roots(data: dict[str, Any], paths: dict[int, tuple[int, str | None, str | None]],
                   overrides: Mapping[str, str] | None = None,
                   hints: Mapping[str, Any] | None = None, home: str | None = None,
                   drives: Iterable[str] | None = None) -> dict[int, dict[str, Any]]:
@@ -389,17 +427,18 @@ def resolve_roots(data: dict[str, Any], rel: dict[int, tuple[int, str]],
     home = home or os.path.expanduser("~")
     drives = list(_drives() if drives is None else drives)
     by_place: dict[int, list[str]] = {}
-    for _fid, (place, path) in rel.items():
-        by_place.setdefault(place, []).append(path)
+    for _fid, (place, rel, _absolute) in paths.items():
+        if rel is not None:
+            by_place.setdefault(place, []).append(rel)
     result = {}
     for place in data["places"]:
         pid = place.get("file_id")
         if pid is None:
             continue
         name = str(place.get("name") or pid)
-        paths = by_place.get(pid, [])
-        step = max(1, len(paths) // _VERIFY_SAMPLES)
-        sample = paths[::step][:_VERIFY_SAMPLES]
+        rel_list = by_place.get(pid, [])
+        step = max(1, len(rel_list) // _VERIFY_SAMPLES)
+        sample = rel_list[::step][:_VERIFY_SAMPLES]
         candidates = _candidates(name, place, data["roots"].get(pid), data, overrides, hints,
                                  home, drives)
         chosen = None
@@ -411,7 +450,11 @@ def resolve_roots(data: dict[str, Any], rel: dict[int, tuple[int, str]],
             configured = [(p, s) for p, s in candidates if s == "config"]
             chosen = ({"root": configured[0][0], "source": "config", "verified": False}
                       if configured else {"root": None, "source": None, "verified": False})
-        chosen.update(name=name, samples=len(paths), tried=len(candidates))
+        kind = PLACE_KINDS.get(place.get("folder_kind"), "other")
+        if kind == "pack" and name.lower() == "core library":
+            kind = "core_library"
+        chosen.update(name=name, samples=len(rel_list), tried=len(candidates),
+                      kind=kind if kind in SOURCES else "other")
         result[pid] = chosen
     return result
 
@@ -446,8 +489,8 @@ def build_index(index_path: Path, database: Path, overrides: Mapping[str, str] |
         started = time.time()
         signature = source_signature(database)
         data = read_live_database(database)
-        rel = _rel_paths(data, os.sep)
-        roots = resolve_roots(data, rel, overrides, hints, home, drives)
+        paths = _paths(data, os.sep)
+        roots = resolve_roots(data, paths, overrides, hints, home, drives)
         index_path.parent.mkdir(parents=True, exist_ok=True)
         temp = index_path.with_name(index_path.name + ".building")
         try:
@@ -459,53 +502,73 @@ def build_index(index_path: Path, database: Path, overrides: Mapping[str, str] |
             con.executescript("""
                 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
                 CREATE TABLE places (place_id INTEGER PRIMARY KEY, name TEXT, name_lc TEXT,
-                    root TEXT, source TEXT, verified INTEGER, samples INTEGER);
+                    root TEXT, source TEXT, verified INTEGER, samples INTEGER, kind TEXT);
                 CREATE TABLE samples (file_id INTEGER PRIMARY KEY, name TEXT, name_lc TEXT,
                     place_id INTEGER, rel_path TEXT, path TEXT, search_lc TEXT, ext TEXT,
-                    size INTEGER, mod_date INTEGER, kind TEXT);
+                    size INTEGER, mod_date INTEGER, kind TEXT, use_count INTEGER,
+                    source TEXT, audio_hash INTEGER);
+                CREATE TABLE vectors (file_id INTEGER PRIMARY KEY, data BLOB);
                 CREATE TABLE tags (file_id INTEGER, tag TEXT, tag_lc TEXT, group_lc TEXT,
                     value_lc TEXT);
             """)
             extra = data["extra_columns"]
             size_at = 3 + extra.index("file_size") if "file_size" in extra else None
             date_at = 3 + extra.index("mod_date") if "mod_date" in extra else None
+            use_at = 3 + extra.index("use_count") if "use_count" in extra else None
             places = {pid: info["name"] for pid, info in roots.items()}
-            sample_rows, tag_rows, tagged = [], [], 0
-            for fid, (place, rel_path) in rel.items():
+            sample_rows, tag_rows, vector_rows, tagged = [], [], [], 0
+            for fid, (place, rel_path, from_db) in paths.items():
                 row = data["files"][fid]
                 name = row[1]
                 tags = sorted(set(data["tags"].get(fid, [])))
                 if tags:
                     tagged += 1
-                root = roots.get(place, {}).get("root")
+                info = roots.get(place, {})
+                root = info.get("root")
+                if root and rel_path is not None:
+                    path = os.path.join(root, rel_path)
+                else:
+                    path = from_db
+                shown_rel = rel_path if rel_path is not None else name
                 place_name = places.get(place, str(place))
-                words = _normal(f"{name} {rel_path} {place_name}")
+                words = _normal(f"{name} {shown_rel} {place_name}")
+                vector = data["vectors"].get(fid)
+                if vector is not None:
+                    vector_rows.append((fid, vector[1]))
                 sample_rows.append((
-                    fid, name, name.lower(), place, rel_path,
-                    os.path.join(root, rel_path) if root else None, words,
+                    fid, name, name.lower(), place, shown_rel, path, words,
                     os.path.splitext(name)[1].lower(),
                     row[size_at] if size_at is not None else None,
                     row[date_at] if date_at is not None else None,
-                    _kind(tags, words)))
+                    _kind(tags, words),
+                    row[use_at] if use_at is not None else 0,
+                    info.get("kind", "other"),
+                    vector[0] if vector is not None else None))
                 for tag in tags:
                     group, _, value = tag.partition("|")
                     tag_rows.append((fid, tag, tag.lower(), group.strip().lower() if value
                                      else "", (value or group).strip().lower()))
-            con.executemany("INSERT INTO samples VALUES (?,?,?,?,?,?,?,?,?,?,?)", sample_rows)
+            con.executemany("INSERT INTO samples VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            sample_rows)
             con.executemany("INSERT INTO tags VALUES (?,?,?,?,?)", tag_rows)
-            con.executemany("INSERT INTO places VALUES (?,?,?,?,?,?,?)", [
+            con.executemany("INSERT INTO vectors VALUES (?,?)", vector_rows)
+            con.executemany("INSERT INTO places VALUES (?,?,?,?,?,?,?,?)", [
                 (pid, info["name"], info["name"].lower(), info["root"], info["source"],
-                 int(info["verified"]), info["samples"]) for pid, info in roots.items()])
+                 int(info["verified"]), info["samples"], info["kind"])
+                for pid, info in roots.items()])
             con.executescript("""
                 CREATE INDEX tags_file ON tags (file_id);
                 CREATE INDEX tags_tag ON tags (tag_lc, file_id);
                 CREATE INDEX tags_value ON tags (value_lc, file_id);
                 CREATE INDEX samples_place ON samples (place_id);
+                CREATE INDEX samples_hash ON samples (audio_hash);
             """)
             meta = {"schema": SCHEMA_VERSION, "source_db": str(database),
                     "signature": signature, "built_at": time.time(),
                     "build_seconds": round(time.time() - started, 1),
                     "samples": len(sample_rows), "tagged": tagged,
+                    "with_features": len(vector_rows),
+                    "feature_scale": _feature_scale([v for _f, v in vector_rows]),
                     "overrides": dict(overrides or {})}
             con.executemany("INSERT INTO meta VALUES (?, ?)",
                             [(k, json.dumps(v)) for k, v in meta.items()])
@@ -544,10 +607,16 @@ def index_status(index_path: Path, current_signature: dict[str, Any] | None = No
         return {"built": False, "index": str(index_path)}
     con = _connect(index_path)
     try:
-        places = [{"name": n, "root": r, "source": s, "verified": bool(v), "samples": c}
-                  for n, r, s, v, c in con.execute(
-                      "SELECT name, root, source, verified, samples FROM places "
-                      "ORDER BY samples DESC")]
+        places = []
+        for name, root, source, verified, kind, count, missing in con.execute(
+                "SELECT p.name, p.root, p.source, p.verified, p.kind, COUNT(s.file_id), "
+                "SUM(s.file_id IS NOT NULL AND s.path IS NULL) FROM places p LEFT JOIN samples s "
+                "ON s.place_id = p.place_id GROUP BY p.place_id ORDER BY 6 DESC"):
+            entry = {"name": name, "kind": kind, "root": root, "root_from": source,
+                     "verified": bool(verified), "samples": count}
+            if missing:
+                entry["without_path"] = missing
+            places.append(entry)
         with_path = con.execute("SELECT COUNT(*) FROM samples WHERE path IS NOT NULL"
                                 ).fetchone()[0]
     finally:
@@ -557,8 +626,9 @@ def index_status(index_path: Path, current_signature: dict[str, Any] | None = No
                                         time.localtime(meta.get("built_at", 0))),
               "build_seconds": meta.get("build_seconds"), "samples": meta.get("samples"),
               "tagged": meta.get("tagged"), "with_path": with_path,
+              "with_features": meta.get("with_features"),
               "places": [p for p in places if p["samples"]],
-              "unresolved": [p["name"] for p in places if p["samples"] and not p["root"]]}
+              "unresolved": [p["name"] for p in places if p.get("without_path")]}
     if current_signature is not None:
         status["stale"] = current_signature != meta.get("signature")
     return status
@@ -579,62 +649,122 @@ def _tag_clause(spec: str) -> tuple[str, str]:
     return "t.value_lc = ?", text
 
 
+def _filters(con: sqlite3.Connection, query: str | None = None,
+             tags: list[str] | None = None, any_tags: list[str] | None = None,
+             exclude_tags: list[str] | None = None, kind: str | None = None,
+             places: list[str] | None = None, extensions: list[str] | None = None,
+             sources: list[str] | None = None) -> tuple[str, list[Any], list[str]]:
+    """``(" WHERE ...", params, query words)`` for the samples table (alias s)."""
+    where: list[str] = []
+    params: list[Any] = []
+    words = _normal(query or "").split()
+    for word in words:
+        where.append("s.search_lc LIKE ? ESCAPE '\\'")
+        params.append(_like(word))
+    for spec in tags or []:
+        clause, value = _tag_clause(spec)
+        where.append(f"EXISTS (SELECT 1 FROM tags t WHERE t.file_id = s.file_id AND {clause})")
+        params.append(value)
+    if any_tags:
+        parts = [_tag_clause(spec) for spec in any_tags]
+        where.append("EXISTS (SELECT 1 FROM tags t WHERE t.file_id = s.file_id AND ("
+                     + " OR ".join(c for c, _ in parts) + "))")
+        params.extend(v for _, v in parts)
+    for spec in exclude_tags or []:
+        clause, value = _tag_clause(spec)
+        where.append(
+            f"NOT EXISTS (SELECT 1 FROM tags t WHERE t.file_id = s.file_id AND {clause})")
+        params.append(value)
+    if kind:
+        where.append("s.kind = ?")
+        params.append(kind)
+    if places:
+        known: dict[str, list[int]] = {}
+        for pid, name_lc in con.execute("SELECT place_id, name_lc FROM places"):
+            known.setdefault(name_lc, []).append(pid)
+        wanted = [p.strip().lower() for p in places]
+        missing = [p for p in wanted if p not in known]
+        if missing:
+            names = [n for (n,) in con.execute(
+                "SELECT name FROM places WHERE samples > 0 ORDER BY samples DESC")]
+            raise SampleIndexError(f"unknown place(s) {', '.join(missing)} — known: "
+                                   + ", ".join(names[:40]))
+        ids = [pid for p in wanted for pid in known[p]]
+        where.append(f"s.place_id IN ({','.join('?' * len(ids))})")
+        params.extend(ids)
+    if sources:
+        bad = [x for x in sources if x not in SOURCES]
+        if bad:
+            raise SampleIndexError(f"unknown source(s) {', '.join(bad)} — use "
+                                   + ", ".join(SOURCES))
+        where.append(f"s.source IN ({','.join('?' * len(sources))})")
+        params.extend(sources)
+    if extensions:
+        exts = [e.lower() if e.startswith(".") else "." + e.lower() for e in extensions]
+        where.append(f"s.ext IN ({','.join('?' * len(exts))})")
+        params.extend(exts)
+    return ((" WHERE " + " AND ".join(where)) if where else ""), params, words
+
+
+def _items(con: sqlite3.Connection, ids: list[int], check_exists: bool,
+           extra: dict[int, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Result entries for these file ids, in this order."""
+    if not ids:
+        return []
+    marks = ",".join("?" * len(ids))
+    rows = {r[0]: r for r in con.execute(
+        "SELECT s.file_id, s.name, p.name, s.rel_path, s.path, s.kind, s.size, s.use_count, "
+        f"s.source FROM samples s LEFT JOIN places p ON p.place_id = s.place_id "
+        f"WHERE s.file_id IN ({marks})", ids)}
+    tag_map: dict[int, list[str]] = {}
+    for fid, tag in con.execute(
+            f"SELECT file_id, tag FROM tags WHERE file_id IN ({marks}) ORDER BY tag", ids):
+        tag_map.setdefault(fid, []).append(tag)
+    items = []
+    for fid in ids:
+        _id, name, place, rel_path, path, kind, size, use_count, source = rows[fid]
+        item: dict[str, Any] = {"name": name, "path": path, "place": place, "source": source,
+                                "rel_path": rel_path, "tags": tag_map.get(fid, []),
+                                "kind": kind}
+        if size is not None:
+            item["size"] = size
+        if use_count:
+            item["use_count"] = use_count
+        if extra and fid in extra:
+            item.update(extra[fid])
+        if check_exists:
+            item["exists"] = bool(path) and os.path.isfile(path)
+        items.append(item)
+    return items
+
+
+def _page(total: int, offset: int, items: list[dict[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {"total": total, "offset": offset, "count": len(items),
+                              "samples": items}
+    if offset + len(items) < total:
+        result["next_offset"] = offset + len(items)
+    return result
+
+
 def search(index_path: Path, query: str | None = None, tags: list[str] | None = None,
            any_tags: list[str] | None = None, exclude_tags: list[str] | None = None,
            kind: str | None = None, places: list[str] | None = None,
-           extensions: list[str] | None = None, order: str = "relevance",
-           seed: int | None = None, offset: int = 0, limit: int = 20,
-           check_exists: bool = True) -> dict[str, Any]:
+           extensions: list[str] | None = None, sources: list[str] | None = None,
+           order: str = "relevance", seed: int | None = None, offset: int = 0,
+           limit: int = 20, check_exists: bool = True) -> dict[str, Any]:
     """Search the index. Every filter is AND-ed; see the tool docstring for the forms."""
     con = _connect(index_path)
     try:
-        where, params = [], []
-        words = _normal(query or "").split()
-        for word in words:
-            where.append("s.search_lc LIKE ? ESCAPE '\\'")
-            params.append(_like(word))
-        for spec in tags or []:
-            clause, value = _tag_clause(spec)
-            where.append(f"EXISTS (SELECT 1 FROM tags t WHERE t.file_id = s.file_id AND {clause})")
-            params.append(value)
-        if any_tags:
-            parts = [_tag_clause(spec) for spec in any_tags]
-            where.append("EXISTS (SELECT 1 FROM tags t WHERE t.file_id = s.file_id AND ("
-                         + " OR ".join(c for c, _ in parts) + "))")
-            params.extend(v for _, v in parts)
-        for spec in exclude_tags or []:
-            clause, value = _tag_clause(spec)
-            where.append(
-                f"NOT EXISTS (SELECT 1 FROM tags t WHERE t.file_id = s.file_id AND {clause})")
-            params.append(value)
-        if kind:
-            where.append("s.kind = ?")
-            params.append(kind)
-        if places:
-            known: dict[str, list[int]] = {}
-            for pid, name_lc in con.execute("SELECT place_id, name_lc FROM places"):
-                known.setdefault(name_lc, []).append(pid)
-            wanted = [p.strip().lower() for p in places]
-            missing = [p for p in wanted if p not in known]
-            if missing:
-                names = [n for (n,) in con.execute(
-                    "SELECT name FROM places WHERE samples > 0 ORDER BY samples DESC")]
-                raise SampleIndexError(f"unknown place(s) {', '.join(missing)} — known: "
-                                  + ", ".join(names[:40]))
-            ids = [pid for p in wanted for pid in known[p]]
-            where.append(f"s.place_id IN ({','.join('?' * len(ids))})")
-            params.extend(ids)
-        if extensions:
-            exts = [e.lower() if e.startswith(".") else "." + e.lower() for e in extensions]
-            where.append(f"s.ext IN ({','.join('?' * len(exts))})")
-            params.extend(exts)
-        clause = (" WHERE " + " AND ".join(where)) if where else ""
+        clause, params, words = _filters(con, query, tags, any_tags, exclude_tags, kind,
+                                         places, extensions, sources)
         total = con.execute(f"SELECT COUNT(*) FROM samples s{clause}", params).fetchone()[0]
         order_params: list[Any] = []
         if order == "name":
             order_sql = "s.name_lc, s.file_id"
         elif order == "newest":
             order_sql = "s.mod_date IS NULL, s.mod_date DESC, s.name_lc"
+        elif order == "most_used":
+            order_sql = "s.use_count DESC, s.name_lc"
         elif order == "random":
             order_sql = "((s.file_id * 2654435761 + ?) % 4294967291), s.file_id"
             order_params.append(seed if seed is not None else int(time.time()))
@@ -644,36 +774,151 @@ def search(index_path: Path, query: str | None = None, tags: list[str] | None = 
             order_params.extend(words)
         else:
             order_sql = "s.name_lc, s.file_id"
-        rows = con.execute(
-            "SELECT s.file_id, s.name, p.name, s.rel_path, s.path, s.kind, s.ext, s.size "
-            f"FROM samples s LEFT JOIN places p ON p.place_id = s.place_id{clause} "
-            f"ORDER BY {order_sql} LIMIT ? OFFSET ?",
-            params + order_params + [limit, offset]).fetchall()
-        tag_map: dict[int, list[str]] = {}
-        ids = [r[0] for r in rows]
-        if ids:
-            marks = ",".join("?" * len(ids))
-            for fid, tag in con.execute(
-                    f"SELECT file_id, tag FROM tags WHERE file_id IN ({marks}) ORDER BY tag",
-                    ids):
-                tag_map.setdefault(fid, []).append(tag)
+        ids = [r[0] for r in con.execute(
+            f"SELECT s.file_id FROM samples s{clause} ORDER BY {order_sql} LIMIT ? OFFSET ?",
+            params + order_params + [limit, offset])]
+        return _page(total, offset, _items(con, ids, check_exists))
     finally:
         con.close()
-    samples = []
-    for fid, name, place, rel_path, path, sample_kind, _ext, size in rows:
-        item: dict[str, Any] = {"name": name, "path": path, "place": place,
-                                "rel_path": rel_path, "tags": tag_map.get(fid, []),
-                                "kind": sample_kind}
-        if size is not None:
-            item["size"] = size
-        if check_exists:
-            item["exists"] = bool(path) and os.path.isfile(path)
-        samples.append(item)
-    result: dict[str, Any] = {"total": total, "offset": offset, "count": len(samples),
-                              "samples": samples}
-    if offset + len(samples) < total:
-        result["next_offset"] = offset + len(samples)
-    return result
+
+
+# ----------------------------------------------------------------------------- similarity
+
+def _floats(blob: bytes) -> tuple[float, ...]:
+    return struct.unpack(f"<{len(blob) // 4}f", blob)
+
+
+def _feature_scale(blobs: list[bytes]) -> list[float] | None:
+    """Per-dimension standard deviation over the library (dimensions differ in range; the
+    distance divides by it so that no single feature dominates)."""
+    if not blobs:
+        return None
+    dims = len(blobs[0]) // 4
+    total = [0.0] * dims
+    squares = [0.0] * dims
+    count = 0
+    for blob in blobs:
+        if len(blob) != dims * 4:
+            continue
+        values = _floats(blob)
+        count += 1
+        for i, x in enumerate(values):
+            if x == x and abs(x) != float("inf"):       # skip NaN / inf
+                total[i] += x
+                squares[i] += x * x
+    if not count:
+        return None
+    scale = []
+    for i in range(dims):
+        mean = total[i] / count
+        variance = max(squares[i] / count - mean * mean, 0.0)
+        scale.append(max(variance ** 0.5, 1e-6))
+    return scale
+
+
+def _distances(rows: list[tuple[int, bytes]], target: bytes, scale: list[float]
+               ) -> list[tuple[float, int]]:
+    """``(scaled euclidean distance, file_id)`` of every row to the target vector (plain
+    Python: well under a second for 50,000 samples)."""
+    weights = [1.0 / (x * x) for x in scale]
+    seed = _floats(target)
+    scored = []
+    for fid, blob in rows:
+        values = _floats(blob)
+        distance = sum(w * (a - b) * (a - b) for w, a, b in zip(weights, values, seed))
+        scored.append((distance ** 0.5, fid))
+    return scored
+
+
+def _find_seed(con: sqlite3.Connection, seed: str) -> int:
+    text = seed.strip()
+    name = _basename(text) if ("/" in text or "\\" in text) else text
+    rows = con.execute("SELECT file_id, path FROM samples WHERE name_lc = ?",
+                       (name.lower(),)).fetchall()
+    if "/" in text or "\\" in text:
+        wanted = os.path.normcase(os.path.normpath(text))
+        rows = [r for r in rows if r[1] and os.path.normcase(os.path.normpath(r[1])) == wanted]
+    if not rows:
+        raise SampleIndexError(f"{seed!r} is not in the sample index — pass a path or file "
+                               "name from live_sample_search")
+    if len(rows) > 1:
+        raise SampleIndexError(f"{len(rows)} samples are called {name!r} — pass the full path: "
+                               + "; ".join(str(r[1]) for r in rows[:5]))
+    return rows[0][0]
+
+
+def similar(index_path: Path, seed: str, query: str | None = None,
+            tags: list[str] | None = None, any_tags: list[str] | None = None,
+            exclude_tags: list[str] | None = None, kind: str | None = None,
+            places: list[str] | None = None, extensions: list[str] | None = None,
+            sources: list[str] | None = None, offset: int = 0, limit: int = 20,
+            include_copies: bool = False, check_exists: bool = True) -> dict[str, Any]:
+    """Samples whose audio features are closest to the seed's (Live's own features from its
+    browser database), within the usual filters; ``distance`` 0 = the same sound."""
+    meta = read_meta(index_path)
+    scale = meta.get("feature_scale")
+    con = _connect(index_path)
+    try:
+        seed_id = _find_seed(con, seed)
+        row = con.execute("SELECT data FROM vectors WHERE file_id = ?", (seed_id,)).fetchone()
+        if row is None or not scale:
+            raise SampleIndexError("Live has no audio features for that sample yet (it "
+                                   "analyses files in the background) — try another one")
+        seed_hash = con.execute("SELECT audio_hash FROM samples WHERE file_id = ?",
+                                (seed_id,)).fetchone()[0]
+        target = _floats(row[0])
+        clause, params, _words = _filters(con, query, tags, any_tags, exclude_tags, kind,
+                                          places, extensions, sources)
+        join = " AND " if clause else " WHERE "
+        candidates = con.execute(
+            f"SELECT s.file_id, v.data, s.audio_hash FROM samples s "
+            f"JOIN vectors v ON v.file_id = s.file_id{clause}{join}s.file_id != ?",
+            params + [seed_id]).fetchall()
+        kept = [(fid, blob) for fid, blob, audio_hash in candidates
+                if len(blob) == len(row[0]) and (include_copies or seed_hash is None
+                                                 or audio_hash != seed_hash)]
+        scored = _distances(kept, row[0], scale)
+        scored.sort()
+        page = scored[offset:offset + limit]
+        extra = {fid: {"distance": round(d, 3)} for d, fid in page}
+        result = _page(len(scored), offset,
+                       _items(con, [fid for _d, fid in page], check_exists, extra))
+        result["seed"] = _items(con, [seed_id], check_exists)[0]
+        return result
+    finally:
+        con.close()
+
+
+def duplicates(index_path: Path, query: str | None = None, places: list[str] | None = None,
+               sources: list[str] | None = None, offset: int = 0, limit: int = 20,
+               check_exists: bool = True) -> dict[str, Any]:
+    """Groups of samples with identical audio (same audio hash and features — e.g. a sound
+    that several packs ship), largest groups first; filters pick which samples count."""
+    con = _connect(index_path)
+    try:
+        clause, params, _words = _filters(con, query, places=places, sources=sources)
+        join = " AND " if clause else " WHERE "
+        rows = con.execute(
+            f"SELECT s.file_id, s.audio_hash, v.data FROM samples s "
+            f"JOIN vectors v ON v.file_id = s.file_id{clause}{join}s.audio_hash IN ("
+            "SELECT audio_hash FROM samples WHERE audio_hash IS NOT NULL "
+            "GROUP BY audio_hash HAVING COUNT(*) > 1)", params).fetchall()
+        groups: dict[tuple[int, bytes], list[int]] = {}
+        for fid, audio_hash, blob in rows:
+            groups.setdefault((audio_hash, blob), []).append(fid)
+        found = sorted((ids for ids in groups.values() if len(ids) > 1),
+                       key=lambda ids: (-len(ids), ids[0]))
+        page = found[offset:offset + limit]
+        result: dict[str, Any] = {
+            "total_groups": len(found), "offset": offset, "count": len(page),
+            "duplicate_files": sum(len(ids) - 1 for ids in found),
+            "groups": [{"copies": len(ids), "samples": _items(con, sorted(ids), check_exists)}
+                       for ids in page]}
+        if offset + len(page) < len(found):
+            result["next_offset"] = offset + len(page)
+        return result
+    finally:
+        con.close()
 
 
 def tag_counts(index_path: Path, group: str | None = None, filter: str | None = None,
