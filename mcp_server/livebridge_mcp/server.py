@@ -37,7 +37,8 @@ Skill text: the production workflow in ``.claude/skills/livebridge/SKILL.md`` is
 clients without the skill (Claude Desktop without the uploaded zip) as the MCP resource
 ``livebridge://skill`` and the prompt ``livebridge_workflow`` (:func:`register_skill`); its
 musical companion ``PRODUCTION.md`` as ``livebridge://production``, and the other companions
-(:data:`COMPANIONS`: genre recipes, Serum 2 sound design, workflows) as ``livebridge://<name>``.
+(:data:`COMPANIONS`: genre recipes, Serum 2 sound design and preset files, Omnisphere,
+workflows) as ``livebridge://<name>``.
 
 Compatibility: `mcp` 1.x exposes ``mcp.server.fastmcp.FastMCP``; `mcp` 2.x renamed it to
 ``mcp.server.mcpserver.MCPServer`` with the same decorator/`run` surface. Both are supported.
@@ -133,7 +134,9 @@ Conventions:
 - For the full production workflow (beat, bass, chords, mix, arrangement, plug-ins, Splice) read
   the `livebridge://skill` resource or the `livebridge_workflow` prompt; for how a track is
   built (sections, build-ups, transitions, effects, mix targets) read `livebridge://production`;
-  genre material in `livebridge://genres`, Serum 2 sound design in `livebridge://serum`,
+  genre material in `livebridge://genres`, Serum 2 sound design in `livebridge://serum` (whole
+  presets — wavetables, matrix, FX — in `livebridge://serum-presets`), Omnisphere in
+  `livebridge://omnisphere`,
   co-writing, arranging and mix procedures in `livebridge://workflows`. Check your work with
   `live_theory_analyze` (MIDI) and `live_audio_analyze` (audio).
 """
@@ -154,6 +157,12 @@ COMPANIONS = (
     ("SERUM.md", "livebridge://serum", "livebridge_serum",
      "LiveBridge Serum 2 sound design (SERUM.md): parameter cheat sheet, recipes (sub, Reese, "
      "growl, acid, supersaw, pluck, pad), what the API cannot change"),
+    ("SERUM_PRESETS.md", "livebridge://serum-presets", "livebridge_serum_presets",
+     "LiveBridge Serum 2 preset files (SERUM_PRESETS.md): designing, editing and loading complete "
+     "Serum 2 presets — wavetables, matrix, FX — with the live_preset_* tools"),
+    ("OMNISPHERE.md", "livebridge://omnisphere", "livebridge_omnisphere",
+     "LiveBridge Omnisphere 2/3 reference (OMNISPHERE.md): sources, filters, modulation, Orb, "
+     "effects and recipes, and what Live can reach"),
     ("WORKFLOWS.md", "livebridge://workflows", "livebridge_workflows",
      "LiveBridge workflows (WORKFLOWS.md): extend an arrangement, co-write parts, start a "
      "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit"),
@@ -318,7 +327,8 @@ TOOLSETS: dict[str, tuple[str, ...]] = {
     # session memory.
     "production": _CORE + ("arrangement", "automation", "racks", "plugins", "plugin_racks",
                            "samples", "sample_search", "splice", "record", "routing",
-                           "analysis", "generate", "sounds", "memory", "engine", "midi"),
+                           "analysis", "generate", "sounds", "memory", "engine", "midi",
+                           "serum_preset"),
 }
 
 _ALL_NAMES = ("all", "full", "*")

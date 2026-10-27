@@ -13,7 +13,7 @@
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
-  199 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
+  207 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
   macOS and Windows · every Live 12 edition · Max for Live optional · MIT licensed
 </p>
@@ -89,7 +89,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 
 ## Why LiveBridge
 
-- **All of Live that its API allows**, not just transport and notes: 199 tools backed by 200
+- **All of Live that its API allows**, not just transport and notes: 207 tools backed by 200
   commands, plus direct access to the Live Object Model for anything else.
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
@@ -110,7 +110,8 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 - **Production know-how and memory:** genre recipes, a Serum 2 cheat sheet, workflows, a sound
   library, generative rhythms and note chance, and project notes Claude remembers.
 - **Big plug-ins, fully controllable:** Serum 2 and other VST3 synths without clicking
-  *Configure* for every knob.
+  *Configure* for every knob — and complete Serum 2 preset files (wavetables, mod matrix, FX
+  order) designed, edited and loaded onto a track.
 - **Splice in the same conversation**, through Splice's official MCP server.
 - **Two computers:** Claude on your laptop, Live on the studio PC (or the other way round),
   with discovery and a token.
@@ -128,7 +129,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
  ┌───────────────────────────┐   TCP JSON lines :9880    ┌──────────────────────────────────┐
  │ livebridge-mcp            │ ────────────────────────▶ │ Ableton Live 12                  │
  │ MCP server (Python ≥3.10) │ ◀──────────────────────── │  └ LiveBridge Remote Script      │
- │ 199 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
+ │ 207 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
  │ client, LAN discovery     │ ◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │     runs every command on Live's │
  └───────────────────────────┘                           │     main thread, 1 undo step each)│
                                                          └──────────────────────────────────┘
@@ -257,7 +258,7 @@ Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and 
 
 ## Tools
 
-199 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
+207 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
 full reference (every tool with its arguments and defaults, and every bridge command with the tool
 that runs it) is [docs/TOOLS.md](docs/TOOLS.md), generated from the code by
 `installers/gen_tools_doc.py`; Claude reads the full docstrings at runtime.
@@ -278,6 +279,7 @@ colours are a palette index, `"#RRGGBB"`, `[r, g, b]` or a name.
 | Scenes | `live_scene_create/fire/set/capture` | Scene tempo/signature, launch, capture |
 | Devices & racks | `live_device_insert/set_parameter/set_parameters/randomize`, `live_rack_macros`, `live_drumrack_overview`, `live_simpler_*` | Any parameter by name/display text ("-12 dB", "1/8"), macros, drum pads, Simpler |
 | Plug-ins | `live_plugin_expose/param_map/preset_files`, `live_plugin_list/presets/set/parameters` | Serum 2 / any VST3 fully controllable without Configure; presets and exposed parameters |
+| Serum 2 preset files | `live_preset_find`, `live_preset_inspect`, `live_preset_read`, `live_preset_search`, `live_preset_edit`, `live_preset_convert`, `live_preset_compare`, `live_preset_load` | The whole Serum 2 patch beyond the 128 exposed knobs: read, search and edit complete `.SerumPreset` files (wavetables, oscillator modes, mod matrix, FX order), design new ones, compare them, and load one into Live as Serum 2 on a track (packed into a `.vstpreset` with a template saved from your own Serum) — guide in `SERUM_PRESETS.md`; Omnisphere reference in `OMNISPHERE.md` |
 | Browser | `live_browser_search/load/hotswap/preview` | Load anything from Live's browser by name (`category="instrument"`, `"drum_kit"`, `"plugin"` …) |
 | Sample search | `live_sample_search`, `live_sample_tags`, `live_sample_duplicates`, `live_sample_index`, `live_plugin_search` | Everything Live's browser shows under Library > Samples (Core Library, packs, User Library, your added folders) by words and Live's browser tags ("Drums\|Kick", "Character\|Punchy"), most used first, "sounds like this one" (Live's audio features), identical-audio duplicates, Live's browser categories, several searches per call (a whole kit), every installed plug-in; absolute paths — [details](docs/SAMPLE_SEARCH.md) |
 | Samples & Splice | `live_sample_import/upload/list`, `live_drumrack_set_pad/convert`, `live_splice_import_downloaded` | Files from disk (or from Claude's machine in LAN mode) into slots, the arrangement, Simpler or drum pads |

@@ -1,6 +1,7 @@
 # Third-party notices
 
-`GENRES.md` and `WORKFLOWS.md` adapt production know-how from two MIT-licensed projects. The text
+`GENRES.md`, `WORKFLOWS.md`, `SERUM_PRESETS.md` and `OMNISPHERE.md` adapt production know-how
+from MIT-licensed projects. The text
 was rewritten for LiveBridge's tools; the musical content (patterns, patch settings, mixing
 values, procedures) comes from these sources:
 
@@ -12,6 +13,12 @@ values, procedures) comes from these sources:
   mastering prep, MIDI cleanup, mixer doctor, producer mode, reference match, side-chain setup,
   sound designer, tempo coach, vocal chain and the init/export/snapshot commands. Used in
   `WORKFLOWS.md`.
+
+- **ableton-mcp-pro, kasperikaivola's fork**, https://github.com/kasperikaivola/ableton-mcp-pro
+  (commit 6ac32c8, same MIT license and copyright notice below): the Serum 2 preset guide
+  (`MCP_Server/synth_guides/serum-presets.md` -> `SERUM_PRESETS.md`, adapted to LiveBridge's
+  tools) and the Omnisphere guide (`omnisphere.md` -> `OMNISPHERE.md`, with a LiveBridge header);
+  the code behind them is ported in `mcp_server/livebridge_mcp/serum/` (license copy there).
 
 `SERUM.md` is original to this fork, built on LiveBridge's Serum 2 parameter map.
 
