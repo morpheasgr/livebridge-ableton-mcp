@@ -8,9 +8,10 @@ Library) and no tags; Live's browser database has all of it.
 
 | Tool | What |
 |---|---|
-| `live_sample_search` | words (`query`), tags (`tags` all / `any_tags` / `exclude_tags`), `kind` (`one_shot` / `loop`), `place`, `source` (`core_library`, `pack`, `user_library`, `user_folder`, `current_project`), `extensions`, `order` (`relevance`, `name`, `newest`, `most_used`, `random`), `similar_to` (rank by how close each sample sounds to another), paging; every result has its absolute `path` |
+| `live_sample_search` | words (`query`), tags (`tags` all / `any_tags` / `exclude_tags`), `kind` (`one_shot` / `loop`), `place`, `source` (`core_library`, `pack`, `user_library`, `user_folder`, `current_project`), `extensions`, `order` (`relevance`, `name`, `newest`, `most_used`, `random`), `similar_to` (rank by how close each sample sounds to another), `category` (Live's browser categories), paging, and `searches` (several searches in one call, e.g. a whole kit); every result has its absolute `path` |
 | `live_sample_duplicates` | groups of samples with identical audio (the same sound shipped twice) |
-| `live_sample_tags` | the tag groups and tags with how many samples carry them |
+| `live_plugin_search` | every installed plug-in Live knows (name, vendor, VST2/VST3/AU/CLAP, instrument or effect) — not only those in the set |
+| `live_sample_tags` | the tag groups and tags with how many samples carry them; `categories=true`: Live's browser categories |
 | `live_sample_index` | status (places, their folders, what is unresolved) or `action="refresh"` |
 
 A result loads with the existing tools: `live_drumrack_set_pad(note="C1", file_path=...)`,
@@ -26,6 +27,8 @@ python -m livebridge_mcp.sample_check --list-tags Character
 python -m livebridge_mcp.sample_check --similar "D:\Samples\Kicks\Kick 01.wav"
 python -m livebridge_mcp.sample_check --tags "Drums|Kick" --order most_used
 python -m livebridge_mcp.sample_check --duplicates
+python -m livebridge_mcp.sample_check --categories
+python -m livebridge_mcp.sample_check --plugins serum
 ```
 
 ## How it works
@@ -59,7 +62,12 @@ python -m livebridge_mcp.sample_check --duplicates
    each feature scaled by its spread across your library; the same hash + features means
    identical audio (`live_sample_duplicates`). Live analyses new files in the background, so
    recently added samples may have no features yet.
-6. **Index**: everything goes into `~/.livebridge/sample_index.sqlite`; searches take a few
+6. **Categories and plug-ins**: `vfolders` + `vfolder_patterns` are the browser's sound
+   categories and the words that put a sample in one; a sample counts when a word equals one
+   of its tag values or a word of its file name, and each group is named after the tag group
+   its words match (Sounds, Drums ...). The "Plugins" place (`folder_kind` 10) lists every
+   installed plug-in with a `device_id` such as `device:vst3:instr:<id>?n=Serum 2`.
+7. **Index**: everything goes into `~/.livebridge/sample_index.sqlite`; searches take a few
    milliseconds. All of this runs in the MCP server process — nothing runs inside Live except
    the one quick `samples.locations` question during a refresh.
 

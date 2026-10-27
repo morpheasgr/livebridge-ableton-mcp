@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~184 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~185 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -213,6 +213,8 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   `live_plugin_param_map(plugin=...)` once. Audio Units expose nothing this way - prefer VST3;
   for AU/VST2 ask the user to use the device's **Configure** button (`live_plugin_configure`
   lists the names and waits).
+- **What plug-ins does the user own?** `live_plugin_search(query="reverb", kind="audio_effect")`
+  lists every installed plug-in Live knows (not only those in the set); suggest only those.
 - Plain plug-in load (no control needed): `live_browser_load("Serum 2", category="plugin",
   plugin_format="vst3", editor_open=false)`.
 - Racks: `live_rack_macros` (read + set macros), `live_drumrack_overview`, `live_drumrack_set_pad`,
@@ -226,7 +228,11 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   go-to sounds) unless the user said "any". "More like this one":
   `live_sample_search(similar_to=<path>, tags=[...])` ranks by Live's own audio features;
   `source="user_folder"` keeps to the user's own folders ("core_library", "pack",
-  "user_library" too). `live_sample_duplicates` finds identical audio. A null `path`
+  "user_library" too); `category="Bass"` uses Live's browser categories
+  (`live_sample_tags(categories=true)` lists them). A whole kit in one call:
+  `live_sample_search(kind="one_shot", limit=3, searches=[{"tags": ["Drums|Kick"]}, {"tags":
+  ["Drums|Snare"]}, {"tags": ["Drums|Hihat"]}])`. `live_sample_duplicates` finds identical
+  audio. A null `path`
   or `exists: false` -> `live_sample_index()` explains which folder is unknown.
   "Load a punchy kick onto C1": search, then `live_drumrack_set_pad(note="C1", track=...,
   file_path=<path>)`.

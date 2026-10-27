@@ -18,6 +18,11 @@ Library) and no tags; Live's browser database has all of them:
 * ``fe_values(file_id, data, hash)`` — Live's audio-similarity features (``data``: version,
   dimension count, reserved, then that many little-endian float32) and a hash of the audio
   (equal hash + data = the same audio shipped twice).
+* ``vfolders(vfolder_id, group_id, name)`` + ``vfolder_patterns(vfolder_id, name)`` — the
+  browser's sound categories ("Bass", "Booms", "Ambient & Evolving" ...) and the words that put
+  a sample in them.
+* the "Plugins" place lists every installed plug-in: ``files.device_id`` like
+  ``device:vst3:instr:<id>?n=<name>``, ``device_type`` 1/2/4 = instrument/audio/MIDI effect.
 * ``files`` keeps every folder up to the drive root (``C:\\`` -> ``ProgramData`` -> ...), so
   absolute paths come from the database itself.
 
@@ -59,7 +64,7 @@ __all__ = [
 ]
 
 AUDIO_EXTENSIONS = (".wav", ".aif", ".aiff", ".mp3", ".flac", ".ogg", ".m4a")
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _DB_RE = re.compile(r"^Live-files-(\d+)\.db$", re.I)
 _ABSOLUTE_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\|/)")
 _SPLIT_RE = re.compile(r"[\\/_\-.\s]+")
@@ -186,10 +191,25 @@ def _read_copy(copy: Path) -> dict[str, Any]:
                 features = _features(blob)
                 if features is not None:
                     vectors[file_id] = (digest, features)
+        categories: dict[int, dict[str, Any]] = {}
+        if {"vfolders", "vfolder_patterns"} <= tables:
+            for vid, group_id, name in con.execute(
+                    "SELECT vfolder_id, group_id, name FROM vfolders"):
+                if isinstance(name, str) and name:
+                    categories[vid] = {"group_id": group_id, "name": name, "patterns": []}
+            for vid, pattern in con.execute("SELECT vfolder_id, name FROM vfolder_patterns"):
+                if vid in categories and isinstance(pattern, str) and pattern.strip():
+                    categories[vid]["patterns"].append(pattern.strip())
+        plugins: list[tuple[Any, ...]] = []
+        if {"device_id", "device_type"} <= set(file_columns):
+            plugins = con.execute(
+                "SELECT file_id, parent_id, name, place_id, device_id, device_type FROM files "
+                "WHERE device_id LIKE 'device:%' AND device_id NOT LIKE 'device:ableton:%' "
+                "AND device_id NOT LIKE 'device:max:%'").fetchall()
     finally:
         con.close()
     return {"files": files, "extra_columns": extra, "places": places, "roots": roots,
-            "tags": tags, "vectors": vectors}
+            "tags": tags, "vectors": vectors, "categories": categories, "plugins": plugins}
 
 
 def read_live_database(path: Path, attempts: int = 2) -> dict[str, Any]:
@@ -481,6 +501,82 @@ def _normal(text: str) -> str:
     return _SPLIT_RE.sub(" ", text.lower()).strip()
 
 
+_PLUGIN_FORMATS = {"vst": "VST2", "vst2": "VST2", "vst3": "VST3", "au": "AU", "auv3": "AU",
+                   "clap": "CLAP", "aax": "AAX"}
+_PLUGIN_KINDS = {1: "instrument", 2: "audio_effect", 4: "midi_effect"}
+_KIND_WORDS = {"instr": "instrument", "audiofx": "audio_effect", "midifx": "midi_effect"}
+
+
+def _categories(data: dict[str, Any], paths: dict[int, tuple[int, str | None, str | None]]
+                ) -> tuple[list[tuple[Any, ...]], list[tuple[int, int]]]:
+    """Category rows and (file_id, category_id) memberships. A sample is in a category when
+    one of the category's words is the value of one of its tags ("Bass" -> "Sounds|Bass") or
+    a word of its file name; the group's label is the tag group its words match most."""
+    categories = data.get("categories") or {}
+    if not categories:
+        return [], []
+    by_value: dict[str, set[int]] = {}
+    value_groups: dict[str, dict[str, int]] = {}
+    for fid in paths:
+        for tag in data["tags"].get(fid, []):
+            group, _, value = tag.partition("|")
+            key = value.strip().lower()
+            by_value.setdefault(key, set()).add(fid)
+            counts = value_groups.setdefault(key, {})
+            counts[group.strip()] = counts.get(group.strip(), 0) + 1
+    by_word: dict[str, set[int]] = {}
+    for fid in paths:
+        name = data["files"][fid][1]
+        for word in set(_normal(os.path.splitext(name)[0]).split()):
+            by_word.setdefault(word, set()).add(fid)
+    labels: dict[Any, str] = {}
+    for group_id in {c["group_id"] for c in categories.values()}:
+        votes: dict[str, int] = {}
+        for category in categories.values():
+            if category["group_id"] != group_id:
+                continue
+            for word in [category["name"]] + category["patterns"]:
+                for group, count in value_groups.get(word.lower(), {}).items():
+                    votes[group] = votes.get(group, 0) + count
+        labels[group_id] = max(votes, key=votes.get) if votes else f"Group {group_id}"
+    rows, members = [], []
+    for vid, category in sorted(categories.items()):
+        words = {w.lower() for w in [category["name"]] + category["patterns"]}
+        found: set[int] = set()
+        for word in words:
+            found |= by_value.get(word, set())
+            if " " not in word:
+                found |= by_word.get(word, set())
+        rows.append((vid, labels[category["group_id"]], category["name"],
+                     category["name"].lower(), json.dumps(sorted(category["patterns"])),
+                     len(found)))
+        members.extend((fid, vid) for fid in found)
+    return rows, members
+
+
+def _plugins(data: dict[str, Any]) -> list[tuple[Any, ...]]:
+    """Installed plug-ins: entries of the "Plugins" place (folder_kind 10) with a device id
+    ``device:<format>:<kind>:<id>[?n=<name>]``; the vendor is the folder Live lists them in."""
+    plugin_places = {p["file_id"] for p in data["places"] if p.get("folder_kind") == 10}
+    files = data["files"]
+    rows = []
+    for fid, parent, name, place, device_id, device_type in data.get("plugins") or []:
+        if place not in plugin_places or not isinstance(device_id, str):
+            continue
+        parts = device_id.split(":")
+        fmt = _PLUGIN_FORMATS.get(parts[1].lower(), parts[1].upper()) if len(parts) > 1 \
+            else None
+        kind = _PLUGIN_KINDS.get(device_type) or (
+            _KIND_WORDS.get(parts[2].lower()) if len(parts) > 2 else None)
+        label = name if isinstance(name, str) and name else device_id.rpartition("n=")[2]
+        label = re.sub(r"\.(vst3?|component|dll|clap)$", "", label, flags=re.I)
+        vendor = None
+        if parent in files and parent not in plugin_places:
+            vendor = files[parent][1]
+        rows.append((fid, label, label.lower(), vendor, fmt, kind, device_id))
+    return rows
+
+
 def build_index(index_path: Path, database: Path, overrides: Mapping[str, str] | None = None,
                 hints: Mapping[str, Any] | None = None, home: str | None = None,
                 drives: Iterable[str] | None = None) -> dict[str, Any]:
@@ -508,6 +604,11 @@ def build_index(index_path: Path, database: Path, overrides: Mapping[str, str] |
                     size INTEGER, mod_date INTEGER, kind TEXT, use_count INTEGER,
                     source TEXT, audio_hash INTEGER);
                 CREATE TABLE vectors (file_id INTEGER PRIMARY KEY, data BLOB);
+                CREATE TABLE categories (category_id INTEGER PRIMARY KEY, grp TEXT,
+                    name TEXT, name_lc TEXT, patterns TEXT, files INTEGER);
+                CREATE TABLE sample_categories (file_id INTEGER, category_id INTEGER);
+                CREATE TABLE plugins (file_id INTEGER PRIMARY KEY, name TEXT, name_lc TEXT,
+                    vendor TEXT, format TEXT, kind TEXT, device_id TEXT);
                 CREATE TABLE tags (file_id INTEGER, tag TEXT, tag_lc TEXT, group_lc TEXT,
                     value_lc TEXT);
             """)
@@ -552,6 +653,11 @@ def build_index(index_path: Path, database: Path, overrides: Mapping[str, str] |
                             sample_rows)
             con.executemany("INSERT INTO tags VALUES (?,?,?,?,?)", tag_rows)
             con.executemany("INSERT INTO vectors VALUES (?,?)", vector_rows)
+            category_rows, member_rows = _categories(data, paths)
+            con.executemany("INSERT INTO categories VALUES (?,?,?,?,?,?)", category_rows)
+            con.executemany("INSERT INTO sample_categories VALUES (?,?)", member_rows)
+            plugin_rows = _plugins(data)
+            con.executemany("INSERT INTO plugins VALUES (?,?,?,?,?,?,?)", plugin_rows)
             con.executemany("INSERT INTO places VALUES (?,?,?,?,?,?,?,?)", [
                 (pid, info["name"], info["name"].lower(), info["root"], info["source"],
                  int(info["verified"]), info["samples"], info["kind"])
@@ -562,12 +668,14 @@ def build_index(index_path: Path, database: Path, overrides: Mapping[str, str] |
                 CREATE INDEX tags_value ON tags (value_lc, file_id);
                 CREATE INDEX samples_place ON samples (place_id);
                 CREATE INDEX samples_hash ON samples (audio_hash);
+                CREATE INDEX sample_categories_cat ON sample_categories (category_id, file_id);
             """)
             meta = {"schema": SCHEMA_VERSION, "source_db": str(database),
                     "signature": signature, "built_at": time.time(),
                     "build_seconds": round(time.time() - started, 1),
                     "samples": len(sample_rows), "tagged": tagged,
-                    "with_features": len(vector_rows),
+                    "with_features": len(vector_rows), "categories": len(category_rows),
+                    "plugins": len(plugin_rows),
                     "feature_scale": _feature_scale([v for _f, v in vector_rows]),
                     "overrides": dict(overrides or {})}
             con.executemany("INSERT INTO meta VALUES (?, ?)",
@@ -627,6 +735,7 @@ def index_status(index_path: Path, current_signature: dict[str, Any] | None = No
               "build_seconds": meta.get("build_seconds"), "samples": meta.get("samples"),
               "tagged": meta.get("tagged"), "with_path": with_path,
               "with_features": meta.get("with_features"),
+              "categories": meta.get("categories"), "plugins": meta.get("plugins"),
               "places": [p for p in places if p["samples"]],
               "unresolved": [p["name"] for p in places if p.get("without_path")]}
     if current_signature is not None:
@@ -653,7 +762,8 @@ def _filters(con: sqlite3.Connection, query: str | None = None,
              tags: list[str] | None = None, any_tags: list[str] | None = None,
              exclude_tags: list[str] | None = None, kind: str | None = None,
              places: list[str] | None = None, extensions: list[str] | None = None,
-             sources: list[str] | None = None) -> tuple[str, list[Any], list[str]]:
+             sources: list[str] | None = None, categories: list[str] | None = None
+             ) -> tuple[str, list[Any], list[str]]:
     """``(" WHERE ...", params, query words)`` for the samples table (alias s)."""
     where: list[str] = []
     params: list[Any] = []
@@ -699,6 +809,26 @@ def _filters(con: sqlite3.Connection, query: str | None = None,
                                    + ", ".join(SOURCES))
         where.append(f"s.source IN ({','.join('?' * len(sources))})")
         params.extend(sources)
+    if categories:
+        ids = []
+        for wanted in categories:
+            group, _, name = wanted.rpartition("/")
+            sql, args = "SELECT category_id FROM categories WHERE name_lc = ?", [
+                name.strip().lower()]
+            if group:
+                sql += " AND lower(grp) = ?"
+                args.append(group.strip().lower())
+            found = [r[0] for r in con.execute(sql, args)]
+            if not found:
+                names = [f"{g}/{n}" for g, n in con.execute(
+                    "SELECT grp, name FROM categories WHERE files > 0 ORDER BY grp, name")]
+                raise SampleIndexError(f"unknown category {wanted!r} — known: "
+                                       + ", ".join(names[:80]))
+            ids.append(found)
+        for found in ids:                      # every named category must match (AND)
+            where.append("EXISTS (SELECT 1 FROM sample_categories c WHERE c.file_id = "
+                         f"s.file_id AND c.category_id IN ({','.join('?' * len(found))}))")
+            params.extend(found)
     if extensions:
         exts = [e.lower() if e.startswith(".") else "." + e.lower() for e in extensions]
         where.append(f"s.ext IN ({','.join('?' * len(exts))})")
@@ -720,12 +850,20 @@ def _items(con: sqlite3.Connection, ids: list[int], check_exists: bool,
     for fid, tag in con.execute(
             f"SELECT file_id, tag FROM tags WHERE file_id IN ({marks}) ORDER BY tag", ids):
         tag_map.setdefault(fid, []).append(tag)
+    category_map: dict[int, list[str]] = {}
+    for fid, group, name in con.execute(
+            "SELECT m.file_id, c.grp, c.name FROM sample_categories m JOIN categories c "
+            f"ON c.category_id = m.category_id WHERE m.file_id IN ({marks}) "
+            "ORDER BY c.grp, c.name", ids):
+        category_map.setdefault(fid, []).append(f"{group}/{name}")
     items = []
     for fid in ids:
         _id, name, place, rel_path, path, kind, size, use_count, source = rows[fid]
         item: dict[str, Any] = {"name": name, "path": path, "place": place, "source": source,
                                 "rel_path": rel_path, "tags": tag_map.get(fid, []),
                                 "kind": kind}
+        if category_map.get(fid):
+            item["categories"] = category_map[fid]
         if size is not None:
             item["size"] = size
         if use_count:
@@ -750,13 +888,13 @@ def search(index_path: Path, query: str | None = None, tags: list[str] | None = 
            any_tags: list[str] | None = None, exclude_tags: list[str] | None = None,
            kind: str | None = None, places: list[str] | None = None,
            extensions: list[str] | None = None, sources: list[str] | None = None,
-           order: str = "relevance", seed: int | None = None, offset: int = 0,
+           categories: list[str] | None = None, order: str = "relevance", seed: int | None = None, offset: int = 0,
            limit: int = 20, check_exists: bool = True) -> dict[str, Any]:
     """Search the index. Every filter is AND-ed; see the tool docstring for the forms."""
     con = _connect(index_path)
     try:
         clause, params, words = _filters(con, query, tags, any_tags, exclude_tags, kind,
-                                         places, extensions, sources)
+                                         places, extensions, sources, categories)
         total = con.execute(f"SELECT COUNT(*) FROM samples s{clause}", params).fetchone()[0]
         order_params: list[Any] = []
         if order == "name":
@@ -851,8 +989,8 @@ def similar(index_path: Path, seed: str, query: str | None = None,
             tags: list[str] | None = None, any_tags: list[str] | None = None,
             exclude_tags: list[str] | None = None, kind: str | None = None,
             places: list[str] | None = None, extensions: list[str] | None = None,
-            sources: list[str] | None = None, offset: int = 0, limit: int = 20,
-            include_copies: bool = False, check_exists: bool = True) -> dict[str, Any]:
+            sources: list[str] | None = None, categories: list[str] | None = None,
+            offset: int = 0, limit: int = 20, include_copies: bool = False, check_exists: bool = True) -> dict[str, Any]:
     """Samples whose audio features are closest to the seed's (Live's own features from its
     browser database), within the usual filters; ``distance`` 0 = the same sound."""
     meta = read_meta(index_path)
@@ -868,7 +1006,7 @@ def similar(index_path: Path, seed: str, query: str | None = None,
                                 (seed_id,)).fetchone()[0]
         target = _floats(row[0])
         clause, params, _words = _filters(con, query, tags, any_tags, exclude_tags, kind,
-                                          places, extensions, sources)
+                                          places, extensions, sources, categories)
         join = " AND " if clause else " WHERE "
         candidates = con.execute(
             f"SELECT s.file_id, v.data, s.audio_hash FROM samples s "
@@ -952,3 +1090,62 @@ def tag_counts(index_path: Path, group: str | None = None, filter: str | None = 
         return {"tags": [{"tag": t, "files": c} for t, c in rows]}
     finally:
         con.close()
+
+
+def category_counts(index_path: Path, group: str | None = None,
+                    filter: str | None = None) -> dict[str, Any]:
+    """Live's browser categories with how many samples each holds, grouped."""
+    con = _connect(index_path)
+    try:
+        sql, args = "SELECT grp, name, files, patterns FROM categories WHERE files > 0", []
+        if group:
+            sql += " AND lower(grp) = ?"
+            args.append(group.strip().lower())
+        if filter:
+            sql += " AND (name_lc LIKE ? ESCAPE '\\' OR patterns LIKE ? ESCAPE '\\')"
+            args += [_like(filter.strip().lower()), _like(filter.strip())]
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for grp, name, files, patterns in con.execute(sql + " ORDER BY grp, files DESC, name_lc",
+                                                      args):
+            groups.setdefault(grp, []).append(
+                {"category": f"{grp}/{name}", "files": files, "words": json.loads(patterns)})
+        return {"categories": [{"group": g, "categories": c} for g, c in groups.items()]}
+    finally:
+        con.close()
+
+
+def plugin_search(index_path: Path, query: str | None = None, format: str | None = None,
+                  kind: str | None = None, vendor: str | None = None, offset: int = 0,
+                  limit: int = 50) -> dict[str, Any]:
+    """Installed plug-ins Live knows (its Plugins browser), filtered."""
+    con = _connect(index_path)
+    try:
+        where, params = [], []
+        for word in _normal(query or "").split():
+            where.append("(name_lc LIKE ? ESCAPE '\\' OR lower(coalesce(vendor, '')) "
+                         "LIKE ? ESCAPE '\\')")
+            params += [_like(word), _like(word)]
+        if format:
+            where.append("lower(format) = ?")
+            params.append(format.strip().lower())
+        if kind:
+            where.append("kind = ?")
+            params.append(kind)
+        if vendor:
+            where.append("lower(coalesce(vendor, '')) LIKE ? ESCAPE '\\'")
+            params.append(_like(vendor.strip().lower()))
+        clause = (" WHERE " + " AND ".join(where)) if where else ""
+        total = con.execute(f"SELECT COUNT(*) FROM plugins{clause}", params).fetchone()[0]
+        rows = con.execute(
+            f"SELECT name, vendor, format, kind, device_id FROM plugins{clause} "
+            "ORDER BY name_lc, format LIMIT ? OFFSET ?", params + [limit, offset]).fetchall()
+        formats = dict(con.execute("SELECT format, COUNT(*) FROM plugins GROUP BY format"))
+    finally:
+        con.close()
+    plugins = [{"name": n, "vendor": v, "format": f, "kind": k, "device_id": d}
+               for n, v, f, k, d in rows]
+    result: dict[str, Any] = {"total": total, "offset": offset, "count": len(plugins),
+                              "plugins": plugins, "formats": formats}
+    if offset + len(plugins) < total:
+        result["next_offset"] = offset + len(plugins)
+    return result

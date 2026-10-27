@@ -14,13 +14,15 @@ the MCP server package and the installer have their own version numbers. `live_s
   vocal chain). Adapted in part from the MIT-licensed ableton-mcp-pro and glincker/ableton-skills
   (`THIRD_PARTY_NOTICES.md`).
 - **Sample search with Live's browser tags** (`live_sample_search`, `live_sample_tags`,
-  `live_sample_duplicates`, `live_sample_index`): everything Live's browser lists under Library > Samples — Core
+  `live_sample_duplicates`, `live_sample_index`, `live_plugin_search`): everything Live's browser lists under Library > Samples — Core
   Library, packs, User Library and every folder added to Places, not only what Live's API
   returns — searchable by words and tags ("Drums|Kick", "Character|Punchy"), with absolute
   paths ready for `live_drumrack_set_pad` / `live_sample_import`; also most-used first
   (Live's use counter), "sounds like this one" (`similar_to`, Live's own audio features),
   identical-audio duplicates and a `source` filter (Core Library, packs, User Library, your
-  folders). Paths come from the folders Live's database keeps up to the drive. Built in the MCP server from
+  folders), Live's browser categories (`category=`), several searches per call
+  (`searches=`), and every installed plug-in Live knows (`live_plugin_search`). Paths come
+  from the folders Live's database keeps up to the drive. Built in the MCP server from
   a temporary copy of Live's browser database (database + -wal; the original is never opened),
   refreshed when it changes. See `docs/SAMPLE_SEARCH.md`.
 - `tests/test_skill_docs.py` checks that every tool and argument the skill files name exists.

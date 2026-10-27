@@ -26,12 +26,16 @@ from test_consistency import call_tool  # noqa: E402
 SCHEMA = """
 CREATE TABLE files (file_id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER,
     file_kind INTEGER DEFAULT 0, mod_date INTEGER, file_size INTEGER, name TEXT,
-    use_count INTEGER DEFAULT 0, place_id INTEGER NOT NULL DEFAULT 0);
+    use_count INTEGER DEFAULT 0, place_id INTEGER NOT NULL DEFAULT 0,
+    device_type INTEGER DEFAULT 0, device_id TEXT);
 CREATE TABLE places (file_id INTEGER, folder_kind INTEGER, level INTEGER NOT NULL DEFAULT 0,
     name TEXT, UNIQUE (file_id) ON CONFLICT IGNORE);
 CREATE TABLE metadata (file_id INTEGER, key INTEGER, value_id INTEGER);
 CREATE TABLE metadata_values (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT);
 CREATE TABLE fe_values (file_id INTEGER, data BLOB, hash INTEGER);
+CREATE TABLE vfolders (vfolder_id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER,
+    name TEXT);
+CREATE TABLE vfolder_patterns (vfolder_id INTEGER, name TEXT);
 """
 TAG_KEY, PACK_KEY = 0x54616773, 0x43426b79           # four-letter codes, like Live's keys
 
@@ -65,11 +69,22 @@ class LiveSet:
         # the drive root, like "C:\\" in Live's database: an absolute name, parent 0
         self.top = self.row(0, str(base), 0)
 
-    def row(self, parent, name, place, size=None, use=0):
+    def row(self, parent, name, place, size=None, use=0, device_id="", device_type=0):
         cursor = self.con.execute(
-            "INSERT INTO files (parent_id, name, place_id, file_size, mod_date, use_count) "
-            "VALUES (?,?,?,?,?,?)", (parent, name, place, size, 1700000000, use))
+            "INSERT INTO files (parent_id, name, place_id, file_size, mod_date, use_count, "
+            "device_id, device_type) VALUES (?,?,?,?,?,?,?,?)",
+            (parent, name, place, size, 1700000000, use, device_id, device_type))
         return cursor.lastrowid
+
+    def category(self, group_id, name, *words):
+        vid = self.con.execute("INSERT INTO vfolders (group_id, name) VALUES (?, ?)",
+                               (group_id, name)).lastrowid
+        self.con.executemany("INSERT INTO vfolder_patterns VALUES (?, ?)",
+                             [(vid, w) for w in words])
+
+    def plugin(self, place, vendor, name, device_id, device_type):
+        parent = self.folder(place, [vendor], place) if vendor else place
+        return self.row(parent, name, place, device_id=device_id, device_type=device_type)
 
     def folder(self, parent, names, place=0):
         for name in names:
@@ -173,6 +188,23 @@ def live(tmp_path):
     s.sample(projects, None, "Song Project/Samples/Recorded/take 1.wav")
     gone = s.place("Elsewhere", 2)                                     # unknown folder
     s.sample(gone, None, "lost.wav")
+    # Live's browser categories: group 1 matches "Sounds|..." tags, group 2 "Drums|..."
+    s.category(1, "Bass", "Bass", "Sub")
+    s.category(1, "Ambient & Evolving", "Ambience", "Ambient", "Ambient & Evolving")
+    s.category(2, "Kick", "Kick", "bd")
+    s.category(2, "Tom", "Tom")
+    s.category(2, "Snare", "sn", "Snare")                             # no samples
+    # installed plug-ins (the "Plugins" place) and a preset that only references one
+    plugins = s.place("Plugins", 10)
+    s.plugin(plugins, "Xfer Records", "Serum 2",
+             "device:vst3:instr:56534558667350736572756d20320000?n=Serum 2", 1)
+    s.plugin(plugins, "Xfer Records", "Serum_x64", "device:vst:instr:1483109208?n=Serum_x64", 1)
+    s.plugin(plugins, "Valhalla DSP, LLC", "ValhallaSupermassive",
+             "device:vst3:audiofx:56535456736d7373?n=ValhallaSupermassive", 2)
+    s.plugin(plugins, None, "Operator", "device:ableton:instr:Operator", 1)   # not a plug-in
+    presets = s.place("VST3 Presets", 5)
+    s.plugin(presets, "Xfer Records", "Dark Reese.vstpreset",
+             "device:vst3:instr:56534558667350736572756d20320000?n=Serum 2", 1)
     s.commit()
     yield s
     s.con.close()
@@ -522,3 +554,71 @@ def test_sample_check_command(tools, live, capsys):
     assert json.loads(capsys.readouterr().out)["samples"][0]["use_count"] == 40
     assert sample_check.main(["--duplicates"]) == 0
     assert json.loads(capsys.readouterr().out)["total_groups"] == 1
+    assert sample_check.main(["--category", "Tom"]) == 0
+    assert json.loads(capsys.readouterr().out)["samples"][0]["name"] == "Deep Tom.wav"
+    assert sample_check.main(["--categories"]) == 0
+    assert len(json.loads(capsys.readouterr().out)["categories"]) == 2
+    assert sample_check.main(["--plugins", "valhalla"]) == 0
+    assert json.loads(capsys.readouterr().out)["total"] == 1
+
+
+# ----------------------------------------------------------------------------- categories, plug-ins
+
+def test_categories(index):
+    listed = sample_db.category_counts(index)["categories"]
+    groups = {g["group"]: {c["category"]: c["files"] for c in g["categories"]} for g in listed}
+    assert groups == {"Drums": {"Drums/Kick": 5, "Drums/Tom": 1},
+                      "Sounds": {"Sounds/Bass": 1, "Sounds/Ambient & Evolving": 1}}
+    assert sample_db.search(index, categories=["Kick"])["total"] == 5
+    assert sample_db.search(index, categories=["drums/kick"], kind="one_shot")["total"] == 4
+    ambient = sample_db.search(index, categories=["Ambient & Evolving"])["samples"][0]
+    assert ambient["name"] == "Dawn.wav" and ambient["categories"] == [
+        "Sounds/Ambient & Evolving"]
+    assert sample_db.search(index, categories=["Kick", "Tom"])["total"] == 0  # all must match
+    assert sample_db.category_counts(index, filter="ambien")["categories"][0][
+        "categories"][0]["words"] == ["Ambience", "Ambient", "Ambient & Evolving"]
+    with pytest.raises(sample_db.SampleIndexError, match="unknown category"):
+        sample_db.search(index, categories=["Snaredrum"])
+
+
+def test_installed_plugins(index):
+    every = sample_db.plugin_search(index)
+    assert every["total"] == 3 and every["formats"] == {"VST3": 2, "VST2": 1}
+    assert [p["name"] for p in sample_db.plugin_search(index, query="serum")["plugins"]] == [
+        "Serum 2", "Serum_x64"]
+    serum = sample_db.plugin_search(index, format="vst3", kind="instrument")["plugins"]
+    assert serum == [{"name": "Serum 2", "vendor": "Xfer Records", "format": "VST3",
+                      "kind": "instrument",
+                      "device_id": "device:vst3:instr:56534558667350736572756d20320000"
+                                   "?n=Serum 2"}]
+    valhalla = sample_db.plugin_search(index, vendor="valhalla")["plugins"]
+    assert [(p["name"], p["kind"]) for p in valhalla] == [("ValhallaSupermassive",
+                                                           "audio_effect")]
+    assert sample_db.plugin_search(index, query="xfer")["total"] == 2      # vendor words
+    assert sample_db.plugin_search(index, limit=1)["next_offset"] == 1
+
+
+def test_search_tool_several_searches_categories_and_plugins(tools, live):
+    app, _config, _fake = tools
+    kit = call_tool(app, "live_sample_search", {"limit": 1, "kind": "one_shot", "searches": [
+        {"tags": ["Drums|Kick"], "order": "most_used"},
+        {"category": "Tom", "kind": None},
+        {"place": "Mars"}]})
+    kick, tom, mars = kit["results"]
+    assert kick["search"] == {"tags": ["Drums|Kick"], "order": "most_used"}
+    assert kick["count"] == 1 and kick["samples"][0]["name"] == "Punchy Kick 01.wav"
+    assert tom["samples"][0]["name"] == "Deep Tom.wav"          # kind=None overrides one_shot
+    assert mars["type"] == "not_found" and "unknown place" in mars["error"]
+    for bad in ([], [{"tags": "Drums|Kick"}], [{"colour": "red"}],
+                [{}] * 17, [{"limit": 0}]):
+        assert call_tool(app, "live_sample_search", {"searches": bad})["type"] == "bad_args", bad
+    cats = call_tool(app, "live_sample_tags", {"categories": True, "group": "Sounds"})
+    assert [c["category"] for c in cats["categories"][0]["categories"]] == [
+        "Sounds/Ambient & Evolving", "Sounds/Bass"]
+    by_category = call_tool(app, "live_sample_search", {"category": "Bass"})
+    assert by_category["samples"][0]["name"] == "Glow Bass C.wav"
+    plugins = call_tool(app, "live_plugin_search", {"query": "serum", "format": "VST3"})
+    assert plugins["total"] == 1 and plugins["plugins"][0]["vendor"] == "Xfer Records"
+    assert call_tool(app, "live_plugin_search", {"kind": "synth"})["type"] == "bad_args"
+    status = call_tool(app, "live_sample_index", {})
+    assert status["categories"] == 5 and status["plugins"] == 3
