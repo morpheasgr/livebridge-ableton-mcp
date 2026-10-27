@@ -3,7 +3,8 @@
 Companion to `SKILL.md` (tools), `PRODUCTION.md` (how a track works), `GENRES.md` (material per
 genre) and `SERUM.md` (Serum 2). This file is step-by-step procedures for common requests:
 extending an arrangement, co-writing, grooves, MIDI cleanup, chords, mix diagnosis, side-chain,
-reference matching, pre-master checks, vocal chains, tempo and session snapshots. Several are
+reference matching, pre-master checks, vocal chains, tempo and session snapshots, technical
+checks and layer alignment, parallel compression, a mastering chain and creative send effects. Several are
 adapted from glincker/ableton-skills (MIT, see `THIRD_PARTY_NOTICES.md`).
 
 **Principles in every workflow**
@@ -200,7 +201,9 @@ User: *"it sounds muddy"*, *"the kick and bass fight"*, *"no headroom"*.
      `live_device_parameters(filter=...)`.
    - While it plays: `live_mixer_meters(seconds=3)` for levels.
    - For frequencies: bounce the section and run `live_audio_analyze`; `flags` name mud,
-     harshness, missing sub and wide low end.
+     harshness, missing sub and wide low end. Ringing, hum, clipping, DC or a flipped side:
+     `live_audio_problems` on the part (§12) — resonances come with an EQ Eight bell.
+   - Kick and bass fighting can also be phase, not level: `live_audio_align` (§12).
    - Leave the user's solo and mute states as you found them.
 3. **Diagnose in producer language**, with numbers: "the pads have no low cut and add to the
    250 Hz build-up the analysis flags; the bass has no side-chain from the kick".
@@ -319,3 +322,117 @@ tracks (type, colour, volume, pan, devices with their key settings, clips with l
 counts), returns and sends, master chain. Volume and the key device settings, not every knob; note
 counts, not note lists. Write it to a file only if the user wants one (a timestamped name; never
 overwrite).
+
+## 12. Technical check and layer alignment
+
+User: *"check these parts before I mix"*, *"something sounds off in the low end"*, *"the kick
+loses punch when the bass comes in"*, a new sample or recording.
+
+1. **Get audio of the part**: a LiveBridge Engine at the end of the track (Claude may add it,
+   `SKILL.md` §4b) and `live_engine_capture(seconds=8, tracks=["Kick", "Sub"])` while it plays —
+   both captured at the same moment — or `live_record_resample` per part, or the sample file.
+2. **Technical problems**: `live_audio_problems(source="<file>")` on each part. Read it in order
+   of severity:
+   - *clipping*: lower the gain before the stage that clips; flattened peaks do not come back.
+   - *dc_offset*: a low cut at 20-30 Hz (EQ Eight band 1) on that track.
+   - *polarity*: the two sides cancel in mono: one side's phase switch on a Utility.
+   - *hum*: narrow EQ Eight notches (Q 30+) at the listed lines — or a cleaner recording.
+   - *noise*: a gate or expander; with samples, a cleaner sample.
+   - *resonance*: each peak has `eq` {frequency_hz, gain_db, q}: one EQ Eight bell per peak
+     (`live_device_set_parameters`), smallest cut that stops the ringing. A peak with a note
+     name that never moves may be the part's own drone — ask before cutting it.
+3. **Layers that should hit together** (kick + sub, two kick layers, bass DI + amp, snare top +
+   bottom): `live_audio_align(a="<kick file>", b="<sub file>", band="low")`.
+   - `polarity: inverted` -> `apply=true` (with b given as the track's clip) puts a Utility on
+     B with its phase switches on; or switch them by hand.
+   - `offset_ms` -> move B by that much: MIDI parts by shifting their notes
+     (`live_clip_modify_notes`, `offset_beats` is given), audio clips by nudging, or Live's
+     Track Delay in the track header (not in the API — tell the user the value).
+   - `sum_gain_db` says what the fix brings: 1 dB and more is worth it; under 0.5 dB, leave it.
+4. **Listen, then re-check**: capture again and run the same tool; `live_audio_compare` on the
+   bus shows what the low end gained.
+
+## 13. Parallel compression
+
+User: *"make the drums hit harder"*, *"the bass needs more weight but not louder peaks"*. A
+heavily compressed copy blended under the dry signal: the transients stay, the body comes up.
+
+1. **Where**: drums (most common), bass, vocals. Not on parts with a lot of reverb.
+2. **Two ways in Live**:
+   - *Return track* (several parts can share it): `live_tracks_create(type="return",
+     name="Crush")`, `live_device_insert(name="Compressor", track="Crush")` (or Glue
+     Compressor / Drum Buss), then the send from each part with `live_mixer_set(track="Drums",
+     sends={"A": "-12 dB"})`, raised until it just thickens.
+   - *In one device*: Live's Compressor and Glue Compressor have a Dry/Wet knob — set it to
+     20-40 % on the drum bus for the same effect in one place.
+3. **Settings for the crushed copy**:
+
+| Part | Ratio | Attack | Release | Reduction | Blend |
+|---|---|---|---|---|---|
+| Drums | 10:1+ (or Glue 10:1) | 0.1-1 ms | 50-100 ms | 10-15 dB | -15 to -10 dB under the dry |
+| Bass | 6:1 | 5-10 ms | 100 ms | 6-10 dB | until the low mids fill in |
+| Vocal | 8:1 | 1-3 ms | 60 ms | 10 dB | felt more than heard |
+
+   Then EQ the crushed signal: cut its low end below 60-80 Hz (the dry kick carries that) and
+   add a little 4-8 kHz for snap. A Saturator after the compressor adds grit.
+4. **Check**: loudness rises — compare at matched level (`live_engine_compare` reports the
+   LUFS change; judge tone at equal loudness), and keep the crest factor of the drum bus above
+   ~8 dB (`live_engine_listen` while it plays).
+
+## 14. Mastering chain (a demo or self-release)
+
+User: *"master this"*, *"make it louder for the club / for streaming"*. Mastering in the set:
+the master track's chain, last step before export. Mixing problems are fixed in the mix first
+(§6, §9, §12) — the master chain only finishes.
+
+1. **Before**: no clipping anywhere (`live_mixer_meters`), master peaking -6 to -3 dB with
+   nothing on it, and a reference in mind (§8). Listen to the current state:
+   `live_engine_listen(track="master", seconds=8)` while the drop plays.
+2. **Chain on the master** (`live_device_insert(name=..., track="master")`, in this order,
+   gentle at every step — each one 1-2 dB of work):
+
+| Step | Device | Starting point |
+|---|---|---|
+| Corrective EQ | EQ Eight | low cut 25-30 Hz; cut only what `live_audio_problems` / `flags` name |
+| Glue | Glue Compressor | 2:1, attack 10-30 ms, release Auto, 1-2 dB |
+| Tone | EQ Eight | broad +/-1 dB moves only (low shelf 100 Hz, high shelf 10 kHz) |
+| Width | Utility | Bass Mono on, 120 Hz; width unchanged unless the reference is wider |
+| Colour (optional) | Saturator (soft) or Multiband Dynamics | 1-2 dB drive, level-matched |
+| Loudness | Limiter | ceiling -1 dB (streaming) / -0.3 dB (club); raise its gain until the target |
+
+3. **Targets** (measure with `live_engine_listen` live, then a bounce + `live_audio_analyze`):
+
+| Destination | Integrated loudness | True peak | Note |
+|---|---|---|---|
+| Streaming | -14 to -9 LUFS | <= -1 dBTP | louder masters get turned down — judge the sound, not the number |
+| Club / DJ | -9 to -6 LUFS | <= -0.3 dBTP | crest factor 7+ dB keeps the kick punching |
+| Mastering engineer | none (pre-master, §9) | peaks -6 dB | no limiter at all |
+
+4. **Check it**: `live_audio_compare(before=<pre-master bounce>, after=<mastered bounce>)` —
+   punch (crest) must not collapse; low-end width ~0; mono check with Utility width 0 %.
+   Bounce: `live_record_resample(source="master", ...)`; export itself is the user's step
+   (24-bit WAV, dither only for 16-bit).
+
+## 15. Creative send effects
+
+User: *"make it bigger"*, *"add some space"*, *"a dub delay on the snare"*, transitions. Effects
+on **returns**, fed by sends, so one space glues several parts (`PRODUCTION.md` §5).
+
+| Effect | Return chain | Fed from | Tip |
+|---|---|---|---|
+| Delay throw | Echo or Delay 1/4 or dotted 1/8, feedback 30-40 %, filter 300 Hz-4 kHz | vocal / lead | automate the send up for single words or the last note of a phrase |
+| Dub delay | Echo with Reverb on, feedback 50-70 %, Saturator after, high-pass 200 Hz | snare, stabs | ride the feedback for a run-away into a drop |
+| Ducked reverb | Hybrid Reverb, 3-5 s, then a Compressor side-chained from the dry part | pads, vocal | tail blooms in the gaps, ducks while the part plays |
+| Short room | Reverb 0.6-1 s, pre-delay 10 ms | drums | glues the kit; low cut the return at 300 Hz |
+| Shimmer | Hybrid Reverb with its shimmer/pitch +12, long decay | pads in the breakdown | automate the send in, out before the drop |
+| Distortion bus | Roar or Saturator hard, then EQ Eight band-pass 500 Hz-5 kHz | drums, bass | blended low under the dry for grit without losing low end |
+| Freeze / riser | Grain Delay or Spectral Time, long feedback | any part, last bar | resample to audio for transitions (`live_record_resample`) |
+
+1. Create the return (`live_tracks_create(type="return", name="Dub")`), insert the chain with
+   `live_device_insert`, set the send with `live_mixer_set(track=..., sends={"B": "-15 dB"})`.
+2. Movement: automate the send or the effect's feedback with `live_automation_record` over the
+   bars it should happen, or audition with `live_engine_modulate` first and record when the
+   user likes it.
+3. Keep the low end out of every return (high-pass 150-300 Hz) and check mono: send effects
+   are the usual source of a wide, phasey low end (`live_engine_listen` -> `low_end_width`).
+

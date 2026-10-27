@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~197 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~199 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -179,6 +179,11 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   - *Hear the set*: `live_record_resample(...)` -> `clips[0].file_path` -> analyse (`kind="mix"`).
   - *Samples / Splice loops*: tempo + key before importing -> set warp/`pitch_coarse` to match.
   - *The user's reference track*: structure (`energy`), loudness and balance to aim for.
+- **`live_audio_problems`** (a part, a sample, a bounce): clipping, DC offset, a flipped side,
+  mains hum, noise floor and persistent resonances, each with the fix (resonances: an EQ Eight
+  bell `eq` {frequency_hz, gain_db, q}). **`live_audio_align(a=..., b=...)`**: kick vs sub (or any
+  two layers) — offset in ms/beats, polarity, and how much louder they sum aligned; `apply=true`
+  flips B's polarity with a Utility. Workflow: `WORKFLOWS.md` §12.
   It needs the optional audio libraries (`type: "unsupported"` carries the pip command - relay
   it). It measures; the user's ears decide.
 - **`live_engine_listen`** (real time, no bounce): when the optional LiveBridge Engine Max for

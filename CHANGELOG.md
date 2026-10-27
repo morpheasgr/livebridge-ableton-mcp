@@ -40,6 +40,14 @@ the MCP server package and the installer have their own version numbers. `live_s
   5x faster at 120 BPM at today's ~0.2 beat resolution); without one the Remote Script writes
   at ~300 BPM (0.5 beat, still exact for ramps). Refused for the tempo itself and when the song
   has tempo automation. `automation.record` gains `tempo` and `writer="external"`.
+- **Technical problems and layer alignment** (`live_audio_problems`, `live_audio_align`):
+  clipping, DC offset, left/right polarity, mains hum (50/60 Hz with harmonics, measured in the
+  quiet passages), noise floor and persistent resonances (each with an EQ Eight bell: frequency,
+  gain, Q, and the nearest note so a held note is not mistaken for ringing); the offset in
+  ms/beats and polarity of one layer against another (kick vs sub), with the level the aligned
+  sum gains, and `apply=true` to flip the polarity with a Utility. New skill workflows: technical
+  check and alignment, parallel compression, a mastering chain, creative send effects. Ideas from
+  the feature list of fadelabs/phantom (AGPL-3.0); no code was used.
 - **Arrangement automation by default** (`automation=true` on `live_arrangement_from_scenes`,
   `live_arrangement_duplicate_clip`, `live_arrangement_copy_range`): Live's API drops clip
   envelopes from arrangement copies (device parameters always, mixer ones on tracks with an
