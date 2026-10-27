@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~194 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~197 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -196,10 +196,16 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     `live_engine_follow(target="Drums", every="2 bars", actions={"next": 3, "other": 1},
     chance=0.8)` cycles clip variations; `target="scenes"` chains scenes. Stop with
     `live_engine_unfollow`. Needs launch quantization (1 bar is best) and a playing transport.
+  - *What the user plays*: with the LiveBridge MIDI device on a MIDI track (before the
+    instrument; the track armed or monitored), `live_midi_played(seconds=30, quantize="1/16")`
+    returns what was just played as `live_clip_add_notes`-ready notes — "turn what I played
+    into a clip", "harmonize that riff". `live_midi_play(notes=[...], start="next_bar")`
+    auditions a phrase live without writing a clip; `live_midi_stop` ends it.
   No device yet -> add it yourself when the task needs it (say so in one line):
   `live_browser_load(query="LiveBridge Engine", category="audio_effect", track="master")` (or
   a track name; MIDI tracks need their instrument first), then `live_engine_status` until it
-  is listed (~2 s). If the browser does not find it, Max for Live or the device is missing:
+  is listed (~2 s); LiveBridge MIDI: `query="LiveBridge MIDI", category="midi_effect"` on the
+  MIDI track. If the browser does not find it, Max for Live or the device is missing:
   tell the user, don't insist. Any other Max for Live device loads the same way
   (`category="audio_effect"|"midi_effect"|"instrument"`).
 

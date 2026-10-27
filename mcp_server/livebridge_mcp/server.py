@@ -318,7 +318,7 @@ TOOLSETS: dict[str, tuple[str, ...]] = {
     # session memory.
     "production": _CORE + ("arrangement", "automation", "racks", "plugins", "plugin_racks",
                            "samples", "sample_search", "splice", "record", "routing",
-                           "analysis", "generate", "sounds", "memory", "engine"),
+                           "analysis", "generate", "sounds", "memory", "engine", "midi"),
 }
 
 _ALL_NAMES = ("all", "full", "*")

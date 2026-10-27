@@ -227,6 +227,10 @@ module.exports = {
   addHandler: (name, fn) => { global.__maxHandlers[name] = fn; },
   outlet: (...args) => {
     fs.appendFileSync(process.env.OUTLET_LOG, JSON.stringify(args) + "\n");
+    if (args[0] === "play") {
+      fs.appendFileSync(process.env.OUTLET_LOG + ".play", JSON.stringify([Date.now(), ...args])
+        + "\n");
+    }
     if (args[0] === "resolve") {
       // like context.js: parameters 99 does not exist; everything else is a 20..20000 knob at
       // 1000 whose id is 100 + the parameter index
@@ -280,13 +284,13 @@ def engines(tmp_path, monkeypatch):
     monkeypatch.setenv("LIVEBRIDGE_CAPTURE_DIR", str(captures))
     started = []
 
-    def start(freq=None):
+    def start(freq=None, script=ENGINE_JS):
         outlets = tmp_path / f"outlets{len(started)}.log"
         env = dict(os.environ, NODE_PATH=str(tmp_path / "node_modules"),
                    LIVEBRIDGE_ENGINE_DIR=str(registry), LIVEBRIDGE_CAPTURE_DIR=str(captures),
                    OUTLET_LOG=str(outlets), STUB_FREQ=str(freq or "none"))
         before = set(registry.glob("*.json"))
-        process = subprocess.Popen([NODE, str(harness), str(ENGINE_JS)], stdin=subprocess.PIPE,
+        process = subprocess.Popen([NODE, str(harness), str(script)], stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
                                    text=True)
         started.append(process)

@@ -1165,9 +1165,17 @@ def test_engine_device_is_copied_into_the_user_library(tmp_path):
     assert (dest / "LiveBridge Engine.amxd").read_bytes() == \
         (source / "LiveBridge Engine.amxd").read_bytes()
     assert read(host.home / ".livebridge" / "install.json")["engine_dir"] == str(dest)
-    assert "Max Audio Effect -> LiveBridge Engine" in out and "live_engine_listen" in out
+    assert "Max Audio Effect -- Claude loads it" in out and "(live_engine_*)" in out
+    midi = (remote_dir_mac(host).parent.parent / "Presets" / "MIDI Effects" / "Max MIDI Effect"
+            / "LiveBridge MIDI")
+    assert sorted(p.name for p in midi.iterdir()) == ["LiveBridge MIDI.amxd", "lbmidi.js",
+                                                      "lbmidi_context.js"]
+    assert read(host.home / ".livebridge" / "install.json")["midi_dir"] == str(midi)
+    assert "Max MIDI Effect" in out and "(live_midi_*)" in out
     code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
-    assert "unchanged: " + str(dest) in out
+    assert "unchanged: " + str(dest) in out and "unchanged: " + str(midi) in out
+    code, out, _ = run_uninstall(host)
+    assert not dest.exists() and not midi.exists() and midi.parent.is_dir()
 
 
 def test_no_engine_and_foreign_folders(tmp_path):

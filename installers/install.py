@@ -64,6 +64,17 @@ ENGINE_NAME = "LiveBridge Engine"
 ENGINE_SOURCE = REPO_ROOT / "max_for_live" / ENGINE_NAME
 #: Where Live's browser shows Max audio effects of the User Library.
 ENGINE_PRESETS = ("Presets", "Audio Effects", "Max Audio Effect")
+MIDI_NAME = "LiveBridge MIDI"
+#: The Max for Live devices: (name, source folder, User Library folder, the file besides the
+#: .amxd that marks it as ours, manifest key, what Claude gets).
+M4L_DEVICES = (
+    (ENGINE_NAME, ENGINE_SOURCE, ENGINE_PRESETS, "engine.js", "engine_dir",
+     "onto the master track -- real-time listening, modulation and follow actions "
+     "(live_engine_*)"),
+    (MIDI_NAME, REPO_ROOT / "max_for_live" / MIDI_NAME,
+     ("Presets", "MIDI Effects", "Max MIDI Effect"), "lbmidi.js", "midi_dir",
+     "onto a MIDI track, before its instrument -- what you play and live notes (live_midi_*)"),
+)
 
 SCRIPT_NAME = "LiveBridge"
 MCP_NAME = "livebridge"
@@ -315,9 +326,14 @@ def is_livebridge_skill(folder: Path) -> bool:
     return re.search(r"(?m)^name:\s*%s\s*$" % re.escape(SKILL_NAME), text) is not None
 
 
+def is_m4l_device(folder: Path, name: str = ENGINE_NAME, marker: str = "engine.js") -> bool:
+    """True when ``folder`` holds the LiveBridge device ``name`` (its .amxd and ``marker``)."""
+    return (folder / (name + ".amxd")).is_file() and (folder / marker).is_file()
+
+
 def is_engine_device(folder: Path) -> bool:
     """True when ``folder`` holds the LiveBridge Engine device (its .amxd and engine.js)."""
-    return (folder / (ENGINE_NAME + ".amxd")).is_file() and (folder / "engine.js").is_file()
+    return is_m4l_device(folder)
 
 
 def live_preferences_root(host: Host) -> Optional[Path]:
@@ -809,6 +825,7 @@ class Installer(Ops):
             "skill_dir": None,
             "skill_zip": None,
             "engine_dir": None,
+            "midi_dir": None,
         }
 
     # -- main flow ---------------------------------------------------------
@@ -828,7 +845,7 @@ class Installer(Ops):
         if remote_scripts is not None:
             self.install_remote_script(remote_scripts)
             if self.args.engine:
-                self.install_engine(remote_scripts.parent)
+                self.install_m4l_devices(remote_scripts.parent)
         self.write_user_config()
         if self.args.mcp:
             self.mcp_command = self.install_mcp_server()
@@ -1082,43 +1099,45 @@ class Installer(Ops):
         if not (dest / "__init__.py").is_file():
             raise InstallError("copying to %s failed (no __init__.py afterwards)" % dest)
 
-    def install_engine(self, user_library: Path) -> None:
-        """Copy the LiveBridge Engine Max for Live device next to Live's other Max audio
-        effects in the User Library (``Presets/Audio Effects/Max Audio Effect``), where the
-        browser shows it. Optional: without Max for Live it simply is not used."""
-        self.step("Installing the LiveBridge Engine device (Max for Live, optional)")
-        if not (ENGINE_SOURCE / (ENGINE_NAME + ".amxd")).is_file():
-            self.warn("%s is missing -- the Engine device is not installed" % ENGINE_SOURCE)
-            return
-        dest = user_library.joinpath(*ENGINE_PRESETS) / ENGINE_NAME
-        source_files = tree_files(ENGINE_SOURCE)
-        if is_link_or_junction(dest):
-            self.info("%s is a symlink/junction (developer setup) -- left as it is" % dest)
-        elif dest.exists() and not is_engine_device(dest):
-            self.warn("%s exists but is not the LiveBridge Engine -- left alone (pass "
-                      "--no-engine to silence this)" % dest)
-            return
-        elif dest.is_dir() and tree_files(dest) == source_files:
-            self.info("unchanged: %s" % dest)
-        else:
-            self.action("%s %s" % ("update" if dest.exists() else "install", dest))
-            if not self.dry:
-                try:
-                    if dest.exists():
-                        remove_tree(dest)
-                    self.ensure_dir(dest.parent)
-                    shutil.copytree(str(ENGINE_SOURCE), str(dest), ignore=COPY_IGNORE)
-                except OSError as error:
-                    self.warn("could not copy the Engine device to %s (%s) -- if Live has it "
-                              "loaded, remove it from the set or quit Live and run again"
-                              % (dest, error))
-                    return
-        self.manifest["engine_dir"] = str(dest)
-        self.manual.append(
-            "Optional, needs Max for Live: in Live's browser open User Library {a} Presets {a} "
-            "Audio Effects {a} Max Audio Effect {a} {name} and drag it onto the master track -- "
-            "it gives Claude real-time listening (live_engine_listen).".format(
-                a=self.arrow, name=ENGINE_NAME))
+    def install_m4l_devices(self, user_library: Path) -> None:
+        """Copy the LiveBridge Max for Live devices next to Live's other Max devices in the
+        User Library (``Presets/Audio Effects/Max Audio Effect``, ``Presets/MIDI Effects/Max
+        MIDI Effect``), where the browser shows them. Optional: without Max for Live they are
+        simply not used."""
+        self.step("Installing the LiveBridge Max for Live devices (optional)")
+        for name, source, presets, marker, key, use in M4L_DEVICES:
+            if not (source / (name + ".amxd")).is_file():
+                self.warn("%s is missing -- %s is not installed" % (source, name))
+                continue
+            dest = user_library.joinpath(*presets) / name
+            source_files = tree_files(source)
+            if is_link_or_junction(dest):
+                self.info("%s is a symlink/junction (developer setup) -- left as it is" % dest)
+            elif dest.exists() and not is_m4l_device(dest, name, marker):
+                self.warn("%s exists but is not the %s -- left alone (pass --no-engine to "
+                          "silence this)" % (dest, name))
+                continue
+            elif dest.is_dir() and tree_files(dest) == source_files:
+                self.info("unchanged: %s" % dest)
+            else:
+                self.action("%s %s" % ("update" if dest.exists() else "install", dest))
+                if not self.dry:
+                    try:
+                        if dest.exists():
+                            remove_tree(dest)
+                        self.ensure_dir(dest.parent)
+                        shutil.copytree(str(source), str(dest), ignore=COPY_IGNORE)
+                    except OSError as error:
+                        self.warn("could not copy %s to %s (%s) -- if Live has it loaded, "
+                                  "remove it from the set or quit Live and run again"
+                                  % (name, dest, error))
+                        continue
+            self.manifest[key] = str(dest)
+            self.manual.append(
+                "Optional, needs Max for Live: {name} is in Live's browser under User Library "
+                "{a} {path} -- Claude loads it when needed, or drag it {use}.".format(
+                    name=name, a=self.arrow, path=" {} ".format(self.arrow).join(presets),
+                    use=use))
 
     # -- MCP side config -----------------------------------------------------
     def write_user_config(self) -> None:
@@ -1545,7 +1564,7 @@ class Installer(Ops):
         # A partial run (--no-remote-script, --no-mcp, --no-skill) keeps what an earlier run
         # installed, so uninstall.py still finds it.
         for key in ("remote_script_dir", "mcp_command", "mcp_args", "venv", "python",
-                    "skill_dir", "skill_zip", "engine_dir"):
+                    "skill_dir", "skill_zip", "engine_dir", "midi_dir"):
             if not data.get(key) and previous.get(key):
                 data[key] = previous[key]
         if not self.args.mcp:
@@ -1711,8 +1730,9 @@ def build_parser() -> argparse.ArgumentParser:
     live.add_argument("--no-remote-script", dest="remote_script", action="store_false",
                       help="do not install the Remote Script (a machine without Live)")
     live.add_argument("--engine", action=argparse.BooleanOptionalAction, default=True,
-                      help="copy the LiveBridge Engine Max for Live device into the User "
-                           "Library (Presets/Audio Effects/Max Audio Effect; default on)")
+                      help="copy the LiveBridge Engine and LiveBridge MIDI Max for Live "
+                           "devices into the User Library (Presets/Audio Effects/Max Audio "
+                           "Effect, Presets/MIDI Effects/Max MIDI Effect; default on)")
 
     claude = parser.add_argument_group("Claude side (MCP server)")
     claude.add_argument("--pair", metavar="HOST",

@@ -98,6 +98,7 @@ SAMPLE_ARGS = {
     "live_clip_note_chance": {"track": "Bass", "slot": 0, "probability": 0.8},
     "live_clip_write_euclid": {"track": "Drums", "slot": 3, "rhythms": {"kick": "4/16"}},
     "live_engine_compare": {"before": "before"},
+    "live_midi_play": {"notes": [{"pitch": 60, "start": 0, "duration": 1}]},
     "live_engine_follow": {"target": "Bass"},
     "live_engine_unfollow": {"target": "Bass"},
     "live_engine_modulate": {"track": "Bass", "device": "Operator", "parameter": "Filter Freq"},
@@ -268,7 +269,7 @@ def test_every_tool_runs_end_to_end(name, tcp_bridge, song, tmp_path, monkeypatc
     # sample search: never a real Live database on a developer's machine
     monkeypatch.setenv("LIVEBRIDGE_LIVE_DATABASE", str(tmp_path / "no Live database"))
     # Engine tools: no running LiveBridge Engine device
-    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path / "engine"))
+    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path / "engine"))  # + LiveBridge MIDI
     monkeypatch.setenv("LIVEBRIDGE_CAPTURE_DIR", str(tmp_path / "captures"))
     app = _APP
     token = ""

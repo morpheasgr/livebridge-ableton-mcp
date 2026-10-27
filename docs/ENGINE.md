@@ -120,4 +120,34 @@ readings), checks the patch wiring, and runs `engine.js` under Node with a stand
 
 ## Roadmap
 
-MIDI input and live note playing are the separate **LiveBridge MIDI** device.
+Arrangement automation lanes stay out of reach: Max for Live's LiveAPI is the same Live Object
+Model as the Remote Script's, without track automation envelopes, so `live_automation_record`
+still records them in real time.
+
+# LiveBridge MIDI (Max for Live)
+
+A MIDI effect for MIDI tracks (before the instrument). It passes MIDI through unchanged, keeps
+the last 10 minutes of notes and controllers that reach it — your keyboard while the track is
+armed or monitored, and the track's own clips — with Live's song position, and plays notes into
+the instrument after it.
+
+| Tool | What it does |
+|---|---|
+| `live_midi_played` | What was played in the last `seconds` (up to 600) as `live_clip_add_notes`-ready notes, starts in beats from the bar of the first note, optional `quantize`; notes still held (`held`) and controller summaries too |
+| `live_midi_play` | Play a phrase (`[{pitch, start, duration, velocity}]` in beats) into the instrument at the next bar / beat or now, `repeat` times every `loop_beats` — nothing written |
+| `live_midi_stop` | Stop it; sounding notes are released |
+
+Installed to `<User Library>/Presets/MIDI Effects/Max MIDI Effect/LiveBridge MIDI/`
+(`LiveBridge MIDI.amxd`, `lbmidi.js`, `lbmidi_context.js`); Claude loads it with
+`live_browser_load(query="LiveBridge MIDI", category="midi_effect", track=...)`.
+
+- **Patch**: `midiin` -> `midiout` (pass-through); `midiin` -> `midiparse` -> `note` / `cc`
+  messages to `node.script lbmidi.js`; its `play <pitch> <velocity>` -> `midiformat` ->
+  `midiout`. `lbmidi_context.js` is the Engine's `context.js` under its own name (Max finds js
+  files by name along its search path) and reports the track and the transport.
+- **Protocol**: like the Engine's, registry entry with `"kind": "midi"`; commands `hello`,
+  `played` (`seconds`), `play` (`notes`, `start`, `repeat`, `loop_beats`, `beats_per_bar`),
+  `stop`. The Engine tools ignore MIDI devices and the other way round.
+- **Timing**: played notes carry the song position (extrapolated from `context.js` reports);
+  notes played by the device are scheduled by Node's clock at the current tempo — good for
+  auditioning, a clip is tighter.

@@ -33,6 +33,13 @@ the MCP server package and the installer have their own version numbers. `live_s
   last, any, other, again, stop, jump:N with weights, a chance and a seed, optionally among
   chosen slots) and fires it just before the boundary so launch quantization lands it on the
   grid.
+- **LiveBridge MIDI, a Max for Live MIDI effect** (`live_midi_played`, `live_midi_play`,
+  `live_midi_stop`): passes MIDI through and remembers the last 10 minutes of notes and
+  controllers with Live's song position — `live_midi_played` returns what you just played as
+  clip-ready notes (optionally quantized) — and plays phrases into the instrument after it in
+  time with the song, without writing a clip. The installer copies it to User Library >
+  Presets > MIDI Effects > Max MIDI Effect; the Engine and MIDI tools tell Claude to load the
+  devices themselves through the browser when they are missing.
 - **Production knowledge for Claude**, next to the skill and served as MCP resources:
   `GENRES.md` (`livebridge://genres`: drum patterns, bass lines, chords and sounds for techno,
   hardgroove, house, UK and speed garage, trance, bass music, synthwave, acid, ambient and

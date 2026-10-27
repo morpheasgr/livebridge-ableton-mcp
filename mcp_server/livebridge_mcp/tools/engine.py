@@ -114,12 +114,18 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             `{devices:[{role ("master"|"track"), track, version, frames_buffered,
             frame_interval_ms, started, modulations:[{slot, path, name, shape, beats|hz,
             low, high, phase}], follow:[{target, kind, every_beats, actions, chance, current,
-            history}]}], hint?}`.
+            history}]}], midi_devices?:[{role, track, version, events_buffered, playing}],
+            hint?}` (midi_devices: the LiveBridge MIDI devices, see live_midi_played).
         """
         found = engine.devices()
         keep = ("role", "track", "version", "frames_buffered", "frame_interval_ms",
                 "started", "instance", "modulations", "follow")
         result: dict[str, Any] = {"devices": [{k: d.get(k) for k in keep} for d in found]}
+        midi = engine.devices(kind="midi")
+        if midi:
+            result["midi_devices"] = [{k: d.get(k) for k in ("role", "track", "version",
+                                                             "events_buffered", "playing")}
+                                      for d in midi]
         if not found:
             result["hint"] = _HOW_TO_ADD
         elif not any(d.get("frames_buffered") for d in found):

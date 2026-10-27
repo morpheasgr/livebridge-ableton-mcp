@@ -11,6 +11,11 @@
 * ``lb_engine.gendsp`` — the gen~ patcher with the analysis code (GenExpr, generated below).
 * ``engine.js`` (Node for Max) and ``context.js`` (Max js) are hand-written sources next to it.
 
+``LiveBridge MIDI`` (a MIDI effect) is written to ``max_for_live/LiveBridge MIDI/``: the
+``.amxd`` and ``lbmidi_context.js``, a copy of the Engine's ``context.js`` under its own name
+(Max finds js files by name along its search path, so two devices must not share one).
+``lbmidi.js`` (Node for Max) is hand-written next to it.
+
 The device passes audio through unchanged and measures it: per channel mean square and peak,
 BS.1770 K-weighted power (loudness), 8 band powers matching ``audio_analysis.BANDS``, mid/side
 and left*right (stereo width and correlation) and the low end's mid/side below 120 Hz. A metro
@@ -30,6 +35,10 @@ HERE = Path(__file__).resolve().parent
 ENGINE_DIR = HERE / "LiveBridge Engine"
 ENGINE_AMXD = ENGINE_DIR / "LiveBridge Engine.amxd"
 ENGINE_GENDSP = ENGINE_DIR / "lb_engine.gendsp"
+ENGINE_CONTEXT = ENGINE_DIR / "context.js"
+MIDI_DIR = HERE / "LiveBridge MIDI"
+MIDI_AMXD = MIDI_DIR / "LiveBridge MIDI.amxd"
+MIDI_CONTEXT = MIDI_DIR / "lbmidi_context.js"
 
 AUDIO_EFFECT = 0x61616161          # 'aaaa'
 MIDI_EFFECT = 0x6D6D6D6D           # 'mmmm'
@@ -324,6 +333,62 @@ def engine_patcher() -> dict:
     }}
 
 
+def midi_patcher() -> dict:
+    boxes = [
+        _box("obj-midiin", "midiin", [20.0, 20.0, 50.0, 22.0], 1, 1, ["int"]),
+        _box("obj-midiout", "midiout", [20.0, 420.0, 55.0, 22.0], 1, 0),
+        # a copy of what passes through: notes ("note <pitch> <velocity>") and controllers
+        _box("obj-midiparse", "midiparse", [120.0, 60.0, 120.0, 22.0], 1, 8,
+             ["", "", "", "int", "int", "int", "int", ""]),
+        _box("obj-note", "prepend note", [120.0, 100.0, 85.0, 22.0], 1, 1),
+        _box("obj-cc", "prepend cc", [220.0, 100.0, 75.0, 22.0], 1, 1),
+        _box("obj-node", "node.script lbmidi.js @autostart 1 @watch 0",
+             [120.0, 260.0, 260.0, 22.0], 1, 2),
+        _box("obj-thisdevice", "live.thisdevice", [420.0, 140.0, 90.0, 22.0], 1, 3,
+             ["bang", "int", "int"]),
+        _box("obj-context", "js lbmidi_context.js", [420.0, 180.0, 130.0, 22.0], 1, 1),
+        _box("obj-route", "route status log context play", [120.0, 300.0, 230.0, 22.0], 1, 5),
+        # notes played by lbmidi.js ("play <pitch> <velocity>") go out with the input
+        _box("obj-midiformat", "midiformat", [20.0, 380.0, 110.0, 22.0], 7, 1, ["int"]),
+        _box("obj-set", "prepend set", [240.0, 340.0, 80.0, 22.0], 1, 1),
+        _box("obj-print", "print LiveBridgeMIDI", [340.0, 380.0, 130.0, 22.0], 1, 0),
+        {"box": {"id": "obj-status", "maxclass": "message", "text": "starting...",
+                 "numinlets": 2, "numoutlets": 1, "outlettype": [""],
+                 "patching_rect": [240.0, 420.0, 200.0, 22.0], "presentation": 1,
+                 "presentation_rect": [8.0, 34.0, 184.0, 22.0]}},
+        {"box": {"id": "obj-title", "maxclass": "comment", "text": "LiveBridge MIDI",
+                 "numinlets": 1, "numoutlets": 0, "fontsize": 13.0, "fontface": 1,
+                 "patching_rect": [420.0, 420.0, 150.0, 22.0], "presentation": 1,
+                 "presentation_rect": [8.0, 8.0, 184.0, 22.0]}},
+    ]
+    lines = [
+        _line("obj-midiin", 0, "obj-midiout", 0), _line("obj-midiin", 0, "obj-midiparse", 0),
+        _line("obj-midiparse", 0, "obj-note", 0), _line("obj-midiparse", 2, "obj-cc", 0),
+        _line("obj-note", 0, "obj-node", 0), _line("obj-cc", 0, "obj-node", 0),
+        _line("obj-thisdevice", 0, "obj-context", 0), _line("obj-context", 0, "obj-node", 0),
+        _line("obj-node", 0, "obj-route", 0), _line("obj-route", 0, "obj-set", 0),
+        _line("obj-set", 0, "obj-status", 0), _line("obj-route", 1, "obj-print", 0),
+        _line("obj-route", 2, "obj-context", 0), _line("obj-route", 3, "obj-midiformat", 0),
+        _line("obj-midiformat", 0, "obj-midiout", 0), _line("obj-route", 4, "obj-print", 0),
+    ]
+    return {"patcher": {
+        "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
+        "rect": [80.0, 80.0, 700.0, 500.0], "openinpresentation": 1,
+        "default_fontsize": 12.0, "default_fontface": 0, "default_fontname": "Arial",
+        "gridsize": [15.0, 15.0], "devicewidth": 200.0, "description":
+        "LiveBridge MIDI: what you play, and notes from Claude, for the LiveBridge MCP server",
+        "boxes": boxes, "lines": lines,
+        "dependency_cache": [
+            {"name": "lbmidi.js", "bootpath": ".", "type": "TEXT", "implicit": 1},
+            {"name": "lbmidi_context.js", "bootpath": ".", "type": "TEXT", "implicit": 1},
+        ],
+        "project": {"version": 1, "amxdtype": MIDI_EFFECT, "readonly": 0, "devpathtype": 0,
+                    "devpath": ".", "sortmode": 0, "viewmode": 0,
+                    "contents": {"patchers": {}, "code": {}}, "layout": {},
+                    "searchpath": {}, "detailsvisible": 0},
+    }}
+
+
 def amxd(patcher: dict, device_type: int) -> bytes:
     """The bytes of an unfrozen .amxd: 'ampf' header, meta, then the patch JSON + NUL."""
     payload = json.dumps(patcher, indent="\t", ensure_ascii=False).encode("utf-8") + b"\x00"
@@ -345,6 +410,8 @@ def outputs() -> dict[Path, bytes]:
     return {
         ENGINE_GENDSP: (json.dumps(gendsp(), indent="\t", ensure_ascii=False) + "\n").encode(),
         ENGINE_AMXD: amxd(engine_patcher(), AUDIO_EFFECT),
+        MIDI_AMXD: amxd(midi_patcher(), MIDI_EFFECT),
+        MIDI_CONTEXT: ENGINE_CONTEXT.read_bytes(),
     }
 
 

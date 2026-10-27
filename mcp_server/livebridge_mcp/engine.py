@@ -90,9 +90,11 @@ def request(device: dict[str, Any], cmd: str, args: dict[str, Any] | None = None
     return answer.get("result")
 
 
-def devices(timeout: float = 1.5, clean: bool = True) -> list[dict[str, Any]]:
-    """Every running Engine: its registry entry merged with its ``hello`` answer. Registry
-    files of devices that no longer answer are removed (``clean``)."""
+def devices(timeout: float = 1.5, clean: bool = True,
+            kind: str | None = "engine") -> list[dict[str, Any]]:
+    """Every running device of ``kind`` ("engine" = LiveBridge Engine, "midi" = LiveBridge
+    MIDI, None = both): its registry entry merged with its ``hello`` answer. Registry files of
+    devices that no longer answer are removed (``clean``)."""
     found = []
     folder = engine_dir()
     try:
@@ -105,6 +107,8 @@ def devices(timeout: float = 1.5, clean: bool = True) -> list[dict[str, Any]]:
         except (OSError, ValueError):
             continue
         if not isinstance(entry, dict) or not _REGISTRY_KEYS <= set(entry):
+            continue
+        if kind is not None and str(entry.get("kind") or "engine") != kind:
             continue
         try:
             hello = request(entry, "hello", timeout=timeout)
@@ -120,10 +124,11 @@ def devices(timeout: float = 1.5, clean: bool = True) -> list[dict[str, Any]]:
     return found
 
 
-def choose(found: list[dict[str, Any]], track: str | None = None) -> dict[str, Any]:
+def choose(found: list[dict[str, Any]], track: str | None = None,
+           what: str = "LiveBridge Engine") -> dict[str, Any]:
     """The device on ``track`` (name, case-insensitive; "master"), default the master's."""
     if not found:
-        raise EngineError("not_found", "no LiveBridge Engine is running")
+        raise EngineError("not_found", f"no {what} is running")
     if track is None or track.strip().lower() in ("master", "main"):
         masters = [d for d in found if d.get("role") == "master"]
         if masters:
