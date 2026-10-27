@@ -18,6 +18,14 @@ transition toolbox, effect chains, harmony/melody rules, density, mix targets an
 checklist. A track must work as a whole: plan the sections first, make every part serve one
 idea, check theory and sound with the analysis tools.
 
+More companions next to this file (also MCP resources), read the one that fits the request:
+
+| File | Resource | Read it when |
+|---|---|---|
+| `GENRES.md` | `livebridge://genres` | writing drums, bass, chords or sounds in a named genre: techno, hardgroove, house, UK garage, speed garage, trance, Reese/growl/dubstep, synthwave, acid, ambient, hip-hop/trap/DnB grooves, loop-to-track |
+| `SERUM.md` | `livebridge://serum` | designing or tweaking a Serum 2 sound: parameter cheat sheet, recipes (sub, 808, Reese, growl, acid, supersaw, pluck, pad, riser), what the API cannot change |
+| `WORKFLOWS.md` | `livebridge://workflows` | extending an arrangement, co-writing parts with the user, starting a project, grooves and MIDI cleanup, chords, mix diagnosis, side-chain, reference matching, mix check / pre-master audit, vocal chain, session snapshot |
+
 ## 1. Start every session the same way
 
 1. `live_status` - is Live reachable, which version/edition, is `allow_eval` on?

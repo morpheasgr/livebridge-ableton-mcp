@@ -3,6 +3,18 @@
 LiveBridge's version is the Remote Script's (`VERSION` in `remote_script/LiveBridge/LiveBridge.py`);
 the MCP server package and the installer have their own version numbers. `live_status` shows both.
 
+## Unreleased
+
+- **Production knowledge for Claude**, next to the skill and served as MCP resources:
+  `GENRES.md` (`livebridge://genres`: drum patterns, bass lines, chords and sounds for techno,
+  hardgroove, house, UK and speed garage, trance, bass music, synthwave, acid, ambient and
+  hip-hop/trap/DnB grooves), `SERUM.md` (`livebridge://serum`: Serum 2 parameter cheat sheet,
+  recipes, API limits) and `WORKFLOWS.md` (`livebridge://workflows`: extending an arrangement,
+  co-writing, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit,
+  vocal chain). Adapted in part from the MIT-licensed ableton-mcp-pro and glincker/ableton-skills
+  (`THIRD_PARTY_NOTICES.md`).
+- `tests/test_skill_docs.py` checks that every tool and argument the skill files name exists.
+
 ## 1.0.0 — 2026-09-23
 
 The first public release: Claude controls Ableton Live 12 through MCP.

@@ -217,6 +217,21 @@ parameters per rack, the sound restarts from the preset/template when you re-exp
 `.SerumPreset` files cannot be embedded, Audio Units expose nothing this way (prefer VST3); the
 manual Configure route remains for AU / VST2. Details: [docs/PLUGIN_RACKS.md](docs/PLUGIN_RACKS.md).
 
+## Production skills
+
+Claude reads a set of guides next to the LiveBridge skill (`.claude/skills/livebridge/`, also
+served as MCP resources for Claude Desktop):
+
+| Guide | What it gives Claude |
+|---|---|
+| `PRODUCTION.md` | song structure, energy, build-ups, drops, effects, harmony, mixing targets |
+| `GENRES.md` | drum patterns, bass lines, chords and sounds per genre: techno, hardgroove, house, UK and speed garage, trance, Reese/growl, synthwave, acid, ambient, hip-hop/trap/DnB |
+| `SERUM.md` | Serum 2 sound design: which parameters do what, recipes (sub, 808, Reese, growl, acid, supersaw, pluck, pad, riser), what Live's API cannot change |
+| `WORKFLOWS.md` | extending an arrangement, co-writing parts, starting a project, MIDI cleanup, chords, mix doctor, side-chain, reference matching, pre-master audit, vocal chain |
+
+Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and two drops"*,
+*"design an acid line in Serum 2 that fits my kick"*, *"my mix is muddy, find out why"*.
+
 ## Tools
 
 168 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The

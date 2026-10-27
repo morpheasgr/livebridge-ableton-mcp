@@ -36,7 +36,8 @@ the module keeps is the original, so modules can still call their own tools dire
 Skill text: the production workflow in ``.claude/skills/livebridge/SKILL.md`` is also served to
 clients without the skill (Claude Desktop without the uploaded zip) as the MCP resource
 ``livebridge://skill`` and the prompt ``livebridge_workflow`` (:func:`register_skill`); its
-musical companion ``PRODUCTION.md`` as ``livebridge://production``.
+musical companion ``PRODUCTION.md`` as ``livebridge://production``, and the other companions
+(:data:`COMPANIONS`: genre recipes, Serum 2 sound design, workflows) as ``livebridge://<name>``.
 
 Compatibility: `mcp` 1.x exposes ``mcp.server.fastmcp.FastMCP``; `mcp` 2.x renamed it to
 ``mcp.server.mcpserver.MCPServer`` with the same decorator/`run` surface. Both are supported.
@@ -58,6 +59,7 @@ from .client import BridgeClient
 
 __all__ = [
     "ALWAYS_LOADED",
+    "COMPANIONS",
     "FastMCP",
     "INSTRUCTIONS",
     "SERVER_NAME",
@@ -130,8 +132,10 @@ Conventions:
   inventing a workaround.
 - For the full production workflow (beat, bass, chords, mix, arrangement, plug-ins, Splice) read
   the `livebridge://skill` resource or the `livebridge_workflow` prompt; for how a track is
-  built (sections, build-ups, transitions, effects, mix targets) read `livebridge://production`.
-  Check your work with `live_theory_analyze` (MIDI) and `live_audio_analyze` (audio).
+  built (sections, build-ups, transitions, effects, mix targets) read `livebridge://production`;
+  genre material in `livebridge://genres`, Serum 2 sound design in `livebridge://serum`,
+  co-writing, arranging and mix procedures in `livebridge://workflows`. Check your work with
+  `live_theory_analyze` (MIDI) and `live_audio_analyze` (audio).
 """
 
 #: The Claude skill with the production workflow (the MCP server is installed editable from the
@@ -141,6 +145,19 @@ SKILL_URI = "livebridge://skill"
 #: The musical companion of the skill (song structure, build-ups, effects, mixing).
 PRODUCTION_PATH = SKILL_PATH.with_name("PRODUCTION.md")
 PRODUCTION_URI = "livebridge://production"
+#: The other companions of the skill, served as resources: (file, uri, resource name, description).
+COMPANIONS = (
+    ("GENRES.md", "livebridge://genres", "livebridge_genres",
+     "LiveBridge genre recipes (GENRES.md): drum patterns, bass lines, chords and sound design "
+     "for techno, hardgroove, house, UK garage, trance, bass music, synthwave, acid, ambient, "
+     "hip-hop/trap/DnB"),
+    ("SERUM.md", "livebridge://serum", "livebridge_serum",
+     "LiveBridge Serum 2 sound design (SERUM.md): parameter cheat sheet, recipes (sub, Reese, "
+     "growl, acid, supersaw, pluck, pad), what the API cannot change"),
+    ("WORKFLOWS.md", "livebridge://workflows", "livebridge_workflows",
+     "LiveBridge workflows (WORKFLOWS.md): extend an arrangement, co-write parts, start a "
+     "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit"),
+)
 
 _SKILL_FALLBACK = """# LiveBridge workflow
 
@@ -208,10 +225,21 @@ def register_skill(mcp: Any, path: Path | None = None) -> bool:
                                 "sections, build-ups, transitions, effects, mix)")
         def livebridge_production_prompt() -> str:
             return skill_text(production)
+
+        for file_name, uri, name, description in COMPANIONS:
+            _register_companion(mcp, (path or SKILL_PATH).with_name(file_name), uri, name,
+                                description)
     except Exception:  # pragma: no cover - an mcp without resources/prompts must not break startup
         log.exception("could not register the livebridge://skill resource / prompt")
         return False
     return True
+
+
+def _register_companion(mcp: Any, path: Path, uri: str, name: str, description: str) -> None:
+    """Serve one companion file of the skill as the resource ``uri`` (read on every request)."""
+    @mcp.resource(uri, name=name, mime_type="text/markdown", description=description)
+    def companion() -> str:
+        return skill_text(path)
 
 
 def compact_result(result: Any) -> Any:
