@@ -228,6 +228,20 @@ function serve(socket) {
 
 // ---------------------------------------------------------------------------- start
 
+// live.thisdevice reports where the device sits as soon as the device loads, usually before
+// this Node process runs, and Max drops messages sent to a node.script that is not running
+// yet. So once listening, ask context.js (via the "context" outlet) until it has answered.
+const CONTEXT_RETRY_MS = 2000;
+const CONTEXT_ATTEMPTS = 30;
+
+function askForContext(attempt = 0) {
+  if (!maxApi || state.role !== "unknown" || attempt >= CONTEXT_ATTEMPTS) {
+    return;
+  }
+  maxApi.outlet("context");
+  setTimeout(() => askForContext(attempt + 1), CONTEXT_RETRY_MS).unref();
+}
+
 function start() {
   const server = net.createServer(serve);
   server.on("error", (error) => {
@@ -241,6 +255,7 @@ function start() {
     if (state.role === "unknown") {
       status("ready");
     }
+    askForContext();
   });
   const stop = () => {
     removeRegistry();

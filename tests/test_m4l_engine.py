@@ -203,7 +203,9 @@ require("readline").createInterface({ input: process.stdin }).on("line", (line) 
 MAX_API_STUB = r"""
 module.exports = {
   addHandler: (name, fn) => { global.__maxHandlers[name] = fn; },
-  outlet: (...args) => { process.stdout.write(JSON.stringify(args) + "\n"); },
+  outlet: (...args) => {
+    require("fs").appendFileSync(process.env.OUTLET_LOG, JSON.stringify(args) + "\n");
+  },
   post: () => {},
 };
 """
@@ -220,7 +222,7 @@ def running_engine(tmp_path, monkeypatch):
     harness.write_text(HARNESS, encoding="utf-8")
     registry = tmp_path / "engine"
     env = dict(os.environ, NODE_PATH=str(tmp_path / "node_modules"),
-               LIVEBRIDGE_ENGINE_DIR=str(registry))
+               LIVEBRIDGE_ENGINE_DIR=str(registry), OUTLET_LOG=str(tmp_path / "outlets.log"))
     process = subprocess.Popen([NODE, str(harness), str(ENGINE_JS)], stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
                                text=True)
@@ -233,7 +235,7 @@ def running_engine(tmp_path, monkeypatch):
     try:
         assert engine.wait_for(lambda: list(registry.glob("*.json")), 10), \
             process.stderr.read() if process.poll() is not None else "no registry file"
-        yield process, send, registry
+        yield process, send, registry, tmp_path / "outlets.log"
     finally:
         if process.poll() is None:
             process.terminate()
@@ -248,14 +250,23 @@ TONE_FRAME = [0.125, 0.125, 0.5, 0.5, 0.25, 1e-6, 1e-6, 1e-5, 1e-4, 0.12, 1e-4, 
 
 
 def test_engine_script_end_to_end(running_engine):
-    process, send, registry = running_engine
+    process, send, registry, outlets = running_engine
+
+    def sent():
+        return [json.loads(line) for line in outlets.read_text(encoding="utf-8").splitlines()]
+
+    # once listening, the script asks context.js where the device sits (the load-time report
+    # from live.thisdevice arrives before Node runs and is lost)
+    assert engine.wait_for(lambda: outlets.exists() and ["context"] in sent(), 5)
     entry = json.loads(next(registry.glob("*.json")).read_text(encoding="utf-8"))
+    assert entry["role"] == "unknown"
     assert entry["host"] == "127.0.0.1" and len(entry["token"]) == 48
     if os.name == "posix":
         assert (next(registry.glob("*.json")).stat().st_mode & 0o777) == 0o600
     send("context", "master", "Main")
     assert engine.wait_for(lambda: engine.devices() and engine.devices()[0]["role"] ==
                            "master", 5)
+    assert ["status", "master"] in sent()
     with pytest.raises(engine.EngineError, match="token") as refused:
         engine.request(dict(entry, token="wrong"), "hello")
     assert refused.value.type == "auth"
