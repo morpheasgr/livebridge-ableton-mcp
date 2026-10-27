@@ -9,6 +9,8 @@ Run it by hand on the Live machine -- or from another machine in LAN mode -- aft
     python tests/integration_check.py --read-only                  # never changes the set
     python tests/integration_check.py --scenario beat              # + an empty-set-to-beat chain
     python tests/integration_check.py --scenario arrangement       # + arrangement copy/resize/move
+    python tests/integration_check.py --scenario envelopes         # probe: which routes keep clip
+                                                                   # envelopes in the arrangement
     python tests/integration_check.py --no-play                    # never starts the transport
     python tests/integration_check.py --json                       # machine-readable report
 
@@ -36,6 +38,25 @@ Sequence (each step prints PASS / FAIL / SKIP):
    -- Live 12.4.5 copies envelopes on a track without devices), resized to 16 beats with its
    4-beat loop repeating (``arrangement.resize_clip``) and moved (``arrangement.move_clip``
    keeps the 16 beats). The track is deleted afterwards.
+
+5. ``--scenario envelopes`` (optional, a probe -- it reports, it does not judge): Live 12.4.5's
+   ``duplicate_clip_to_arrangement`` drops every clip envelope when the track holds an
+   instrument (LIVE_API_VERIFIED §19.5). Each case builds a temporary ``LB_env`` MIDI track with
+   a 4-beat session clip, writes envelopes (normalized 0.2 -> 0.8) and copies the clip into the
+   arrangement at beat 4000 (where nothing of the set lives), then reports per envelope whether
+   the copy KEPT or LOST it:
+
+   A. no devices (Track Volume) -- control, kept in §19.5
+   B. Operator (Filter Freq + Track Volume) -- control, lost in §19.5
+   C. only an audio effect, Auto Filter (Frequency + Track Volume)
+   D. only a MIDI effect, Arpeggiator (its first parameter + Track Volume)
+   E. Operator moved to a holder track before the copy and back after (do the session clip's
+      envelopes survive the move, does the copy keep them, does the instrument come back?)
+   F. Operator, the clip recorded into the arrangement instead of copied: Arrangement Record
+      on, the clip fired, ~1 bar at 480 BPM, everything restored (needs the transport stopped;
+      skipped with ``--no-play``; armed tracks are disarmed during the pass and re-armed)
+
+   A table at the end summarises it. Every temporary track is deleted again.
 
 ``--no-play`` skips firing clips (the only steps that touch the transport).
 
@@ -184,6 +205,9 @@ class Checker(object):
         self.beat_created: List[str] = []
         #: --scenario arrangement: path of the temporary track (None once deleted).
         self.arr_track: Optional[str] = None
+        #: --scenario envelopes: temporary track names still to delete, and the findings.
+        self.env_tracks: List[str] = []
+        self.env_findings: List[Tuple[str, str, Dict[str, bool], str]] = []
 
     # -- helpers -------------------------------------------------------------
     def step(self, name: str, func: Callable[[], Tuple[Any, str]], soft: bool = False) -> Any:
@@ -701,6 +725,190 @@ class Checker(object):
         return result, "deleted %s" % deleted
 
 
+    # -- --scenario envelopes (probe) ---------------------------------------------
+    ENV_AT = 4000.0                     # arrangement position of the copies (out of the way)
+    ENV_POINTS = [[0, 0.2], [2, 0.8]]   # normalized
+    ENV_RECORD_TIMEOUT = 10.0           # seconds the recording case waits for 9 beats
+
+    def run_envelopes_scenario(self) -> None:
+        """Which ways of getting a session clip into the arrangement keep its envelopes."""
+        tag = uuid.uuid4().hex[:4]
+        cases = [
+            ("A", "no devices", None, ["Volume"]),
+            ("B", "Operator", ("Operator", "Filter Freq"), ["Volume"]),
+            ("C", "Auto Filter only", ("Auto Filter", "Frequency"), ["Volume"]),
+            ("D", "Arpeggiator only", ("Arpeggiator", 1), ["Volume"]),
+        ]
+        try:
+            for key, label, device, mixer in cases:
+                self.step("env %s: %s" % (key, label),
+                          lambda k=key, l=label, d=device, m=mixer: self._env_copy_case(
+                              tag, k, l, d, m), soft=True)
+            self.step("env E: Operator moved out and back",
+                      lambda: self._env_move_case(tag), soft=True)
+            if self.play:
+                self.step("env F: recorded, not copied", lambda: self._env_record_case(tag),
+                          soft=True)
+            else:
+                self.report.add("SKIP", "env F: recorded, not copied", "--no-play")
+        finally:
+            self._env_cleanup()
+            self._env_table()
+
+    # helpers
+    def _env_track(self, tag: str, key: str) -> str:
+        self.need("tracks.create", "automation.write", "arrangement.duplicate_clip",
+                  "automation.list", "arrangement.list")
+        name = "LB_env %s %s" % (key, tag)
+        self.call("tracks.create", type="midi", name=name, index=-1)
+        self.env_tracks.append(name)
+        return name
+
+    def _env_clip(self, track: str, device: Optional[Tuple[str, Any]], mixer: List[str]
+                  ) -> List[str]:
+        """A 4-beat session clip in slot 0 with envelopes; returns their names as Live lists
+        them on the session clip."""
+        self.call("clips.create", track=track, slot=0, length=4)
+        self.call("notes.add", track=track, slot=0, notes=[[60, 0.0, 1.0, 100]])
+        if device is not None:
+            try:
+                self.call("automation.write", track=track, slot=0, device=device[0],
+                          parameter=device[1], points=self.ENV_POINTS, normalized=True)
+            except BridgeFailure as error:
+                if error.type != "not_found":
+                    raise
+                # another name in this Live: the device's first parameter after "Device On"
+                self.call("automation.write", track=track, slot=0, device=device[0],
+                          parameter=1, points=self.ENV_POINTS, normalized=True)
+        for parameter in mixer:
+            self.call("automation.write", track=track, slot=0, parameter=parameter,
+                      points=self.ENV_POINTS, normalized=True)
+        return self._env_names(track=track, slot=0)
+
+    def _env_names(self, **where: Any) -> List[str]:
+        listing = self.call("automation.list", **where)
+        return [str(e.get("name")) for e in listing.get("envelopes", []) if isinstance(e, dict)]
+
+    def _env_arrangement_names(self, track: str) -> Tuple[List[str], Optional[str]]:
+        listing = self.call("arrangement.list", track=track)
+        clips = listing.get("clips", []) if isinstance(listing, dict) else listing
+        if not clips:
+            return [], None
+        path = clips[-1].get("path")
+        return self._env_names(clip=path), path
+
+    def _env_record(self, key: str, label: str, source: List[str], copy: List[str],
+                    note: str = "") -> Tuple[Any, str]:
+        kept = {name: name in copy for name in source}
+        self.env_findings.append((key, label, kept, note))
+        verdict = ", ".join("%s %s" % (name, "KEPT" if ok else "LOST")
+                            for name, ok in kept.items()) or "the session clip had no envelopes"
+        return kept, verdict + (" -- " + note if note else "")
+
+    # cases
+    def _env_copy_case(self, tag: str, key: str, label: str,
+                       device: Optional[Tuple[str, Any]], mixer: List[str]) -> Tuple[Any, str]:
+        track = self._env_track(tag, key)
+        if device is not None:
+            self.call("devices.insert", name=device[0], track=track)
+        source = self._env_clip(track, device, mixer)
+        placed = self.call("arrangement.duplicate_clip", track=track, slot=0, time=self.ENV_AT)
+        time.sleep(1.0)
+        copy, _path = self._env_arrangement_names(track)
+        return self._env_record(key, label, source, copy,
+                                "reported %s" % (placed.get("envelopes"),))
+
+    def _env_move_case(self, tag: str) -> Tuple[Any, str]:
+        self.need("devices.move")
+        track = self._env_track(tag, "E")
+        holder = self._env_track(tag, "E-hold")
+        self.call("devices.insert", name="Operator", track=track)
+        source = self._env_clip(track, ("Operator", "Filter Freq"), ["Volume"])
+        self.call("devices.move", track=track, device="Operator", target_track=holder)
+        after_move = self._env_names(track=track, slot=0)
+        self.call("arrangement.duplicate_clip", track=track, slot=0, time=self.ENV_AT)
+        time.sleep(1.0)
+        copy, path = self._env_arrangement_names(track)
+        self.call("devices.move", track=holder, device="Operator", target_track=track,
+                  position=0)
+        time.sleep(1.0)
+        back = self._env_names(clip=path) if path else []
+        devices = self.call("devices.list", track=track)
+        names = [str(d.get("name")) for d in (devices.get("devices", []) if isinstance(
+            devices, dict) else devices) if isinstance(d, dict)]
+        note = ("session clip after moving Operator out: %s; arrangement copy after moving it "
+                "back: %s; devices on the track: %s" % (after_move, back, names))
+        return self._env_record("E", "Operator moved out and back", source, copy, note)
+
+    def _env_record_case(self, tag: str) -> Tuple[Any, str]:
+        self.need("lom.get", "lom.set", "lom.call", "clips.fire", "record.status")
+        props = {prop: self._song_prop(prop) for prop in (
+            "is_playing", "record_mode", "tempo", "current_song_time", "loop",
+            "session_automation_record")}
+        if props.get("is_playing") or props.get("record_mode"):
+            raise BridgeFailure({"type": "invalid_state",
+                                 "message": "stop the transport (and recording) first"})
+        track = self._env_track(tag, "F")
+        self.call("devices.insert", name="Operator", track=track)
+        source = self._env_clip(track, ("Operator", "Filter Freq"), ["Volume"])
+        saved = {prop: props.get(prop) for prop in ("tempo", "current_song_time", "loop",
+                                                    "session_automation_record")}
+        armed = [t.get("path") for t in (self.call("record.status").get("armed_tracks") or [])
+                 if isinstance(t, dict) and t.get("path")]
+        start = 0.0
+        try:
+            for path in armed:
+                self.call("lom.set", path=path, prop="arm", value=False)
+            for prop, value in (("loop", False), ("session_automation_record", False),
+                                ("tempo", 480.0), ("current_song_time", start),
+                                ("record_mode", True)):
+                self.call("lom.set", path="song", prop=prop, value=value)
+            self.call("clips.fire", track=track, slot=0)
+            time.sleep(0.3)
+            if not self._song_prop("is_playing"):
+                self.call("lom.call", path="song", method="start_playing")
+            deadline = time.time() + self.ENV_RECORD_TIMEOUT
+            while time.time() < deadline and float(self._song_prop("current_song_time")
+                                                   or 0.0) < start + 9.0:
+                time.sleep(0.1)
+        finally:
+            self.call("lom.call", path="song", method="stop_playing")
+            self.call("lom.set", path="song", prop="record_mode", value=False)
+            self.call("clips.stop", track=track)
+            for prop, value in saved.items():
+                if value is not None:
+                    self.call("lom.set", path="song", prop=prop, value=value)
+            for path in armed:
+                self.call("lom.set", path=path, prop="arm", value=True)
+            if self.has("transport.back_to_arranger"):
+                self.call("transport.back_to_arranger")
+        time.sleep(1.0)
+        copy, path = self._env_arrangement_names(track)
+        note = "recorded clip %s" % (path or "MISSING -- nothing was recorded")
+        return self._env_record("F", "recorded into the arrangement", source, copy, note)
+
+    def _song_prop(self, prop: str) -> Any:
+        answer = self.call("lom.get", path="song", prop=prop)
+        return answer.get("value") if isinstance(answer, dict) else answer
+
+    def _env_cleanup(self) -> None:
+        for name in reversed(list(self.env_tracks)):
+            self.step("env: delete %s (cleanup)" % name,
+                      lambda n=name: (self.call("tracks.delete", track=n), "deleted"))
+            self.env_tracks.remove(name)
+
+    def _env_table(self) -> None:
+        if not self.env_findings:
+            return
+        print("-" * 72)
+        print("Clip envelopes in the arrangement (KEPT / LOST per envelope):")
+        for key, label, kept, note in self.env_findings:
+            cells = ", ".join("%s %s" % (n, "KEPT" if ok else "LOST") for n, ok in kept.items())
+            print("  %s  %-32s %s" % (key, label, cells or "-"))
+            if note:
+                print("     %s" % note)
+
+
 def _size(value: Any) -> str:
     return "%d bytes" % len(json.dumps(value, default=str))
 
@@ -722,12 +930,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float, default=15.0,
                         help="seconds per command (default 15)")
     parser.add_argument("--read-only", action="store_true", help="skip every mutating step")
-    parser.add_argument("--scenario", choices=["beat", "arrangement"], action="append",
+    parser.add_argument("--scenario", choices=["beat", "arrangement", "envelopes"],
+                        action="append",
                         default=[],
                         help="also run a workflow scenario on temporary tracks (cleaned up): "
                              "'beat' = drum kit + pattern, chords, dB mixer, side-chain, "
                              "automation, arrangement; 'arrangement' = envelope copy, resize, "
-                             "move")
+                             "move; 'envelopes' = probe which routes keep clip envelopes in "
+                             "the arrangement")
     parser.add_argument("--no-play", dest="play", action="store_false",
                         help="never fire clips (leaves the transport alone)")
     parser.add_argument("--kit", default="909 Core Kit",
@@ -776,6 +986,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 checker.run_beat_scenario()
             if "arrangement" in args.scenario:
                 checker.run_arrangement_scenario()
+            if "envelopes" in args.scenario:
+                checker.run_envelopes_scenario()
     except KeyboardInterrupt:
         report.add("FAIL", "interrupted", "Ctrl-C")
         if checker.track_path:
@@ -785,6 +997,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                          lambda r=role: checker._beat_delete(r))
         if checker.arr_track:
             checker.step("arr: delete track (cleanup)", checker._arr_delete)
+        checker._env_cleanup()
     finally:
         client.close()
     passed, failed, skipped = report.count("PASS"), report.count("FAIL"), report.count("SKIP")
