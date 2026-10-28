@@ -323,6 +323,19 @@ def test_a_host_reopened_with_its_plugin_adopts_it(engines, monkeypatch):  # noq
     assert ["status", "Serum 2"] in [json.loads(l) for l in outlets.read_text().splitlines()]
 
 
+def test_unnamed_host_takes_a_serum_preset_name(engines, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_PRELOAD", "FakeSynth")
+    _process, send, outlets = engines(script=HOST_JS)
+    (host,) = engine.devices(kind="host")
+    engine.request(host, "params", {})                 # adopted, no name came back
+    assert engine.devices(kind="host")[0]["plugin"]["name"] == "plug-in"
+    engine.request(host, "preset", {"path": "x.vstpreset", "plugin_name": "Serum 2"})
+    assert engine.devices(kind="host")[0]["plugin"]["name"] == "Serum 2"
+    assert ["context", "rename", "Serum 2"] in [json.loads(l) for l in
+                                                outlets.read_text().splitlines()]
+
+
 def test_requests_adopt_before_the_startup_check(engines, monkeypatch):  # noqa: F811
     monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
     monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_PRELOAD", "FakeSynth")
