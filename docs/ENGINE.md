@@ -184,6 +184,8 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 | `live_plugin_host_load` | Find the plug-in's `.vst3` (system VST3 folders, `LIVEBRIDGE_VST3_PATH`), load the host on a new MIDI track or at the end of a track, load the plug-in into it |
 | `live_plugin_host_parameters` | Every parameter (the per-MIDI-CC stand-ins VST3 adds are hidden), searchable and paged, with value and display text |
 | `live_plugin_host_set` | Set many parameters by name or id (`h12`), to 0..1 or display text ("800 Hz"); open/close the plug-in window |
+
+By hand: the device's **Open plug-in** button opens the hosted plug-in's own window.
 | `live_plugin_host_preset` | Load a `.vstpreset` (or a Serum 2 design, packed first with your template) into the hosted plug-in (`vst~` `read`); a before/after sample of values says whether it took; bank dials follow |
 | `live_plugin_host_bank` | Make chosen parameters automatable: a per-plug-in host whose Live dials carry their names, swapped in on the same track with every parameter value copied |
 
