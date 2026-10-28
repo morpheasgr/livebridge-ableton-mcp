@@ -9,7 +9,11 @@
 // Requests: {"id", "token", "cmd": "hello" | "load" | "params" | "set" | "editor", "args"}
 // Answers:  {"id", "ok": true, "result"} or {"id", "ok": false, "error": {"type", "message"}}
 //
-// Experimental: vst~'s replies are parsed tolerantly (any outlet, names or "<n> <value> <text>").
+// vst~ (with valuemode 2): "params" streams the parameter names out of outlet 2, one message
+// per parameter; "get <n>" answers "<n> <normalized value> <display text>" out of outlet 3, and
+// "get -4" the parameter count, "get -7" 1 for an instrument. Parameter indices are 1-based; a
+// list "<n> <value>" sets one. The patch tags every message outlet ("vstout <outlet> ...").
+// Internally names[] is 0-based; ids ("h<n>") are vst~'s own 1-based indices.
 // LIVEBRIDGE_HOST_FAKE=1 swaps vst~ for a small simulated plug-in (tests).
 
 "use strict";
@@ -31,6 +35,8 @@ const NAME = "LiveBridge Host";
 const VERSION = "0.1.0";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
+const NAMES_OUTLET = 2;
+const VALUES_OUTLET = 3;
 const REPLY_MS = 60;            // how long a vst~ answer may take to arrive
 const LIST_MS = 600;            // "params" on a big plug-in
 const SAMPLES = 33;             // values tried when setting by display text
@@ -95,7 +101,7 @@ function removeRegistry() {
 // The real driver: send a message to vst~, collect what comes back for `waitMs`.
 let pending = null;
 function vstReply(...atoms) {
-  if (pending) pending.push(atoms.slice(1));          // drop the outlet number
+  if (pending) pending.push(atoms);                    // [outlet, ...message]
 }
 
 function realAsk(message, waitMs) {
@@ -131,14 +137,16 @@ const fake = {
 
 function fakeAsk(message) {
   const [head, ...rest] = message;
+  const out = (...atoms) => [VALUES_OUTLET, ...atoms];
   if (head === "plug_vst3") { fake.load(String(rest[0])); return Promise.resolve([]); }
-  if (head === "params") return Promise.resolve(fake.params.map((n) => [n]));
+  if (head === "params") return Promise.resolve(fake.params.map((n) => [NAMES_OUTLET, n]));
   if (head === "get") {
-    const i = Number(rest[0]);
-    if (i === -7) return Promise.resolve([[-7, fake.loaded && /synth/i.test(fake.loaded) ? 1 : 0]]);
-    return Promise.resolve([[i, fake.values[i], fake.text(i)]]);
+    const n = Number(rest[0]);
+    if (n === -4) return Promise.resolve([out(-4, fake.params.length)]);
+    if (n === -7) return Promise.resolve([out(-7, fake.loaded && /synth/i.test(fake.loaded) ? 1 : 0)]);
+    return Promise.resolve([out(n, fake.values[n - 1], ...fake.text(n - 1).split(" "))]);
   }
-  if (typeof head === "number") { fake.values[head] = Math.max(0, Math.min(1, rest[0])); }
+  if (typeof head === "number") { fake.values[head - 1] = Math.max(0, Math.min(1, rest[0])); }
   return Promise.resolve([]);
 }
 
@@ -171,18 +179,38 @@ function hideMidiRun(names) {
   return best && best[1] - best[0] >= MIDI_RUN ? best : null;
 }
 
+// A message from outlet `outlet` (or from any outlet when that one never answered).
+function fromOutlet(replies, outlet) {
+  const tagged = replies.filter((r) => Number(r[0]) === outlet);
+  return (tagged.length ? tagged : replies).map((r) => r.slice(1));
+}
+
+async function infoValue(code) {
+  for (const atoms of fromOutlet(await ask(["get", code]), VALUES_OUTLET)) {
+    if (Number(atoms[0]) === code && atoms.length > 1) return Number(atoms[1]);
+  }
+  return null;
+}
+
+// Names arrive one message per parameter; should a plug-in send several names in one message,
+// the count from "get -4" tells us to take every atom as a name instead.
 async function listNames() {
-  const replies = await ask(["params"], LIST_MS);
-  state.names = replies.map((atoms) => atoms.filter((a) => typeof a === "string").join(" ")
-    .trim()).filter((n) => n.length);
+  const count = await infoValue(-4);
+  const messages = fromOutlet(await ask(["params"], LIST_MS), NAMES_OUTLET)
+    .filter((atoms) => atoms.length);
+  const atoms = messages.reduce((all, m) => all.concat(m), []);
+  const perAtom = count && messages.length !== count && atoms.length === count;
+  state.names = (perAtom ? atoms.map((a) => [a]) : messages)
+    .map((m) => m.map(String).join(" ").trim());
   state.hidden = hideMidiRun(state.names);
   return state.names;
 }
 
+// Parameter `index` (0-based in names[]) is vst~'s index + 1.
 async function read(index) {
-  const replies = await ask(["get", index]);
-  for (const atoms of replies) {
-    if (atoms.length >= 2 && Number(atoms[0]) === index && typeof atoms[1] === "number") {
+  const n = index + 1;
+  for (const atoms of fromOutlet(await ask(["get", n]), VALUES_OUTLET)) {
+    if (atoms.length >= 2 && Number(atoms[0]) === n && typeof atoms[1] === "number") {
       return { value: atoms[1], text: atoms.slice(2).map(String).join(" ").trim() };
     }
   }
@@ -197,7 +225,7 @@ function findIndex(key) {
   if (typeof key === "number") return key;
   const text = String(key);
   const match = /^h(\d+)$/.exec(text);
-  if (match) return Number(match[1]);
+  if (match) return Number(match[1]) - 1;
   const exact = state.names.indexOf(text);
   if (exact >= 0) return exact;
   const norm = (s) => s.toLowerCase().replace(/\s+/g, "");
@@ -221,7 +249,7 @@ function norm(text) {
 }
 
 async function setValue(index, value) {
-  await ask([index, value], 5);
+  await ask([index + 1, value], 5);
   return read(index);
 }
 
@@ -278,10 +306,10 @@ async function setText(index, wanted) {
 async function load(args) {
   const file = String(args.file || "").trim();
   if (!file) throw { type: "bad_args", message: "load needs file (the VST3 file name)" };
+  await ask(["valuemode", 2], 5);
   await ask(["plug_vst3", file], 1500);
   if (args.sub) await ask(["subname", String(args.sub)], 500);
-  const synth = await ask(["get", -7]);
-  const isSynth = synth.some((a) => Number(a[0]) === -7 && Number(a[1]) === 1);
+  const isSynth = (await infoValue(-7)) === 1;
   const names = await listNames();
   if (!names.length) throw { type: "not_found", message: `vst~ could not load "${file}"` };
   state.plugin = { file: file, name: String(args.name || args.sub || file), synth: isSynth };
@@ -307,7 +335,7 @@ async function params(args) {
   const items = [];
   for (const i of page) {
     const got = await read(i);
-    items.push({ id: "h" + i, name: state.names[i], value: got ? got.value : null,
+    items.push({ id: "h" + (i + 1), name: state.names[i], value: got ? got.value : null,
                  display: got ? got.text : null });
   }
   const result = { plugin: state.plugin.name, total: indices.length, offset: offset,
@@ -338,13 +366,13 @@ async function set(args) {
     }
     if (typeof wanted === "number") {
       const got = await setValue(index, Math.max(0, Math.min(1, wanted)));
-      results.push({ name: state.names[index], id: "h" + index, ok: true,
+      results.push({ name: state.names[index], id: "h" + (index + 1), ok: true,
                      value: got ? got.value : wanted, display: got ? got.text : null });
     } else {
       const got = await setText(index, String(wanted));
-      results.push(got.ok ? { name: state.names[index], id: "h" + index, ok: true,
+      results.push(got.ok ? { name: state.names[index], id: "h" + (index + 1), ok: true,
                               value: got.value, display: got.text }
-        : { name: state.names[index], id: "h" + index, ok: false,
+        : { name: state.names[index], id: "h" + (index + 1), ok: false,
             error: `no value displays "${wanted}"; it still reads "${got.text}"` });
     }
   }
