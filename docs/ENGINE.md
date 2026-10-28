@@ -199,7 +199,10 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 - **By display text**: 33 values are tried and read back; an exact text wins, else the leading
   number is bisected between the two samples that bracket it. No match puts the old value back.
 - **State**: `vst~` saves the plug-in's state with the Set (`parameter_enable`, `autosave`);
-  one undo restores the whole state. Opening the Set needs Max for Live.
+  one undo restores the whole state. When a Set reopens, `lbhost.js` finds the restored
+  plug-in (`get -4` > 0) and adopts it — names, kind, status — without loading anything; its
+  file name is not saved, so `live_plugin_host_bank` finds it by the plug-in's name (or
+  `file=`). Opening the Set needs Max for Live.
 - **Automation bank**: Live reads a device's parameters once, when it loads, so automatable
   names have to be in the file. `live_plugin_host_bank` writes `<plug-in> Bank.amxd` (User
   Library > LiveBridge Presets > Plug-in Hosts, next to copies of the scripts) with up to 128
