@@ -74,6 +74,12 @@ M4L_DEVICES = (
     (MIDI_NAME, REPO_ROOT / "max_for_live" / MIDI_NAME,
      ("Presets", "MIDI Effects", "Max MIDI Effect"), "lbmidi.js", "midi_dir",
      "onto a MIDI track, before its instrument -- what you play and live notes (live_midi_*)"),
+    ("LiveBridge Host Effect", REPO_ROOT / "max_for_live" / "LiveBridge Host",
+     ("Presets", "Audio Effects", "Max Audio Effect"), "lbhost.js", "host_effect_dir",
+     "-- Claude loads it with live_plugin_host_load: a VST3 effect with all its parameters"),
+    ("LiveBridge Host Instrument", REPO_ROOT / "max_for_live" / "LiveBridge Host",
+     ("Presets", "Instruments", "Max Instrument"), "lbhost.js", "host_instrument_dir",
+     "-- Claude loads it with live_plugin_host_load: a VST3 synth with all its parameters"),
 )
 
 SCRIPT_NAME = "LiveBridge"
@@ -828,6 +834,8 @@ class Installer(Ops):
             "skill_zip": None,
             "engine_dir": None,
             "midi_dir": None,
+            "host_effect_dir": None,
+            "host_instrument_dir": None,
         }
 
     # -- main flow ---------------------------------------------------------
@@ -1574,7 +1582,8 @@ class Installer(Ops):
         # A partial run (--no-remote-script, --no-mcp, --no-skill) keeps what an earlier run
         # installed, so uninstall.py still finds it.
         for key in ("remote_script_dir", "mcp_command", "mcp_args", "venv", "python",
-                    "skill_dir", "skill_zip", "engine_dir", "midi_dir"):
+                    "skill_dir", "skill_zip", "engine_dir", "midi_dir", "host_effect_dir",
+                    "host_instrument_dir"):
             if not data.get(key) and previous.get(key):
                 data[key] = previous[key]
         if not self.args.mcp:
