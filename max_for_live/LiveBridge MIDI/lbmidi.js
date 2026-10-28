@@ -28,7 +28,7 @@ try {
 }
 
 const NAME = "LiveBridge MIDI";
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const PROTOCOL = 1;
 const KEEP_MS = 10 * 60 * 1000;
 const MAX_EVENTS = 20000;
@@ -422,6 +422,9 @@ function start() {
     maxApi.addHandler("transport", setTransport);
     maxApi.addHandler("resolved", () => {});
     maxApi.addHandler("info", () => {});
+  }
+  if (maxApi) {
+    maxApi.outlet("ready");          // opens the patch's gate: messages may come in now
   }
 }
 

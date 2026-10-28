@@ -427,8 +427,8 @@ def read_amxd(data: bytes) -> tuple[int, dict]:
 def outputs() -> dict[Path, bytes]:
     return {
         ENGINE_GENDSP: (json.dumps(gendsp(), indent="\t", ensure_ascii=False) + "\n").encode(),
-        ENGINE_AMXD: amxd(engine_patcher(), AUDIO_EFFECT),
-        MIDI_AMXD: amxd(midi_patcher(), MIDI_EFFECT),
+        ENGINE_AMXD: amxd(host_device.gate_until_ready(engine_patcher()), AUDIO_EFFECT),
+        MIDI_AMXD: amxd(host_device.gate_until_ready(midi_patcher()), MIDI_EFFECT),
         MIDI_CONTEXT: ENGINE_CONTEXT.read_bytes(),
         HOST_EFFECT_AMXD: amxd(host_patcher(False), AUDIO_EFFECT),
         HOST_INSTRUMENT_AMXD: amxd(host_patcher(True), INSTRUMENT),

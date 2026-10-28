@@ -154,7 +154,7 @@ def host_patcher(instrument: bool, config: dict[str, Any] | None = None,
                       _line("obj-bankroute", i, back, 0), _line(back, 0, dial, 0)]
         width = 200.0 + _DIAL_W * ((len(entries) + _ROWS - 1) // _ROWS) + 8.0
     kind = INSTRUMENT if instrument else AUDIO_EFFECT
-    return {"patcher": {
+    return gate_until_ready({"patcher": {
         "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
         "rect": [80.0, 80.0, 1100.0, 600.0], "openinpresentation": 1,
         "default_fontsize": 12.0, "default_fontface": 0, "default_fontname": "Arial",
@@ -170,7 +170,39 @@ def host_patcher(instrument: bool, config: dict[str, Any] | None = None,
                     "devpath": ".", "sortmode": 0, "viewmode": 0,
                     "contents": {"patchers": {}, "code": {}}, "layout": {},
                     "searchpath": {}, "detailsvisible": 0},
-    }}
+    }})
+
+
+def gate_until_ready(patcher: dict, node: str = "obj-node", route: str = "obj-route") -> dict:
+    """Hold back every message to the Node script until it says "ready".
+
+    A device's helpers (context.js, meters, MIDI) start talking at once, while Node for Max
+    needs a second or two to start; each message in that gap printed "Node script not ready
+    can't handle message ..." in the Max window. Everything bound for ``node`` now passes a
+    closed ``gate``; the script's "ready" (a new last selector of ``route``) opens it.
+    """
+    boxes = patcher["patcher"]["boxes"]
+    lines = patcher["patcher"]["lines"]
+    route_box = next(b["box"] for b in boxes if b["box"]["id"] == route)
+    selectors = route_box["text"].split()[1:]
+    if "ready" in selectors:
+        return patcher
+    reject = len(selectors)
+    route_box["text"] += " ready"
+    route_box["numoutlets"] = reject + 2
+    route_box["outlettype"] = [""] * (reject + 2)
+    for line in lines:
+        source = line["patchline"]["source"]
+        if source == [route, reject]:
+            line["patchline"]["source"] = [route, reject + 1]
+        if line["patchline"]["destination"] == [node, 0]:
+            line["patchline"]["destination"] = ["obj-gate", 1]
+    x, y = route_box["patching_rect"][0], route_box["patching_rect"][1]
+    boxes.append(_box("obj-gate", "gate 1 0", [x - 120.0, y - 80.0, 55.0, 22.0], 2, 1))
+    boxes.append(_box("obj-ready", "t 1", [x - 120.0, y - 40.0, 30.0, 22.0], 1, 1, ["int"]))
+    lines += [_line("obj-gate", 0, node, 0), _line(route, reject, "obj-ready", 0),
+              _line("obj-ready", 0, "obj-gate", 0)]
+    return patcher
 
 
 def amxd(patcher: dict, device_type: int) -> bytes:
