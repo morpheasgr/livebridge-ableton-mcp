@@ -108,9 +108,11 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
   workflows, a sound library, generative rhythms and note chance, and project notes Claude
   remembers.
 - **Big plug-ins, fully controllable:** Serum 2 and other VST3 synths without clicking
-  *Configure* for every knob, every parameter of any VST3 through the experimental LiveBridge
-  Host device (past Live's 128) — and complete Serum 2 preset files (wavetables, mod matrix, FX
-  order) designed, edited and loaded onto a track.
+  *Configure* for every knob; complete Serum 2 preset files (wavetables, mod matrix, FX order)
+  designed, edited and loaded onto a track — your packs from older Serum builds too; and, with
+  the LiveBridge Host device, **every** parameter of any VST3 past Live's 128: Claude sees what
+  you turn in the plug-in's own window, saves the patch and hands it over to a native rack with
+  the ≤128 controls that matter.
 - **Splice in the same conversation**, through Splice's official MCP server.
 - **Two computers:** Claude on your laptop, Live on the studio PC (or the other way round),
   with discovery and a token.
@@ -240,6 +242,24 @@ parameters per rack, the sound restarts from the preset/template when you re-exp
 `.SerumPreset` files cannot be embedded, Audio Units expose nothing this way (prefer VST3); the
 manual Configure route remains for AU / VST2. Details: [docs/PLUGIN_RACKS.md](docs/PLUGIN_RACKS.md).
 
+**Every parameter of any VST3 — scout in a host, play natively** (needs Max for Live). Live's
+API only reaches the parameters in a plug-in's Configure list. The LiveBridge Host device loads
+a VST3 inside Max's `vst~`, which reaches all of them (Massive ~200, Serum 2 ~540):
+
+1. `live_plugin_host_load(plugin="Massive")` — or bring a sound you saved natively in with
+   `live_plugin_host_preset(source_path=...)` (a `.vstpreset`; a preset for another plug-in is
+   refused by its VST3 class ID). The device's **Open plug-in** button opens its window.
+2. Tweak in the plug-in's window; `live_plugin_host_parameters(touched=true)` lists what you
+   moved, in order, with before and after values (restores such as undo are kept apart;
+   `touched="reset"` starts a clean round). `search=` and `live_plugin_host_set` reach every
+   other parameter by name and display text.
+3. `live_plugin_host_expose(parameters=[...≤128])` saves the hosted patch as a `.vstpreset`
+   (complete state: samples, wavetables, routings), maps the plug-in once, loads it natively in
+   a rack with those parameters exposed — automation, macros, undo as usual — and removes the
+   host (`remove_host=false` keeps it and puts the native rack on its own track to compare).
+   `live_plugin_host_save` alone writes the patch; `live_plugin_host_bank` makes hosted
+   parameters automatable without leaving the host. Details: [docs/ENGINE.md](docs/ENGINE.md).
+
 ## Production skills
 
 Claude reads a set of guides next to the LiveBridge skill (`.claude/skills/livebridge/`, also
@@ -278,7 +298,8 @@ colours are a palette index, `"#RRGGBB"`, `[r, g, b]` or a name.
 | Scenes | `live_scene_create/fire/set/capture` | Scene tempo/signature, launch, capture |
 | Devices & racks | `live_device_insert/set_parameter/set_parameters/randomize`, `live_rack_macros`, `live_drumrack_overview`, `live_simpler_*` | Any parameter by name/display text ("-12 dB", "1/8"), macros, drum pads, Simpler |
 | Plug-ins | `live_plugin_expose/param_map/preset_files`, `live_plugin_list/presets/set/parameters` | Serum 2 / any VST3 fully controllable without Configure; presets and exposed parameters |
-| Serum 2 preset files | `live_preset_find`, `live_preset_inspect`, `live_preset_read`, `live_preset_search`, `live_preset_edit`, `live_preset_convert`, `live_preset_compare`, `live_preset_load` | The whole Serum 2 patch beyond the 128 exposed knobs: read, search and edit complete `.SerumPreset` files (wavetables, oscillator modes, mod matrix, FX order), design new ones, compare them, and load one into Live as Serum 2 on a track (packed into a `.vstpreset` with a template saved from your own Serum) — guide in `SERUM_PRESETS.md`; Omnisphere reference in `OMNISPHERE.md` |
+| Plug-in host (Max for Live) | `live_plugin_host_load`, `live_plugin_host_parameters`, `live_plugin_host_set`, `live_plugin_host_preset`, `live_plugin_host_save`, `live_plugin_host_expose`, `live_plugin_host_bank` | Every parameter of any VST3 (past 128) by name and display text; what you turn in the plug-in's window (`touched`); load `.vstpreset`s (checked by class ID) and save the patch; hand over to a native rack with the controls that matter, or make hosted parameters automatable |
+| Serum 2 preset files | `live_preset_find`, `live_preset_inspect`, `live_preset_read`, `live_preset_search`, `live_preset_edit`, `live_preset_convert`, `live_preset_compare`, `live_preset_load` | The whole Serum 2 patch beyond the 128 exposed knobs: read, search and edit complete `.SerumPreset` files (wavetables, oscillator modes, mod matrix, FX order), design new ones, compare them, and load one into Live as Serum 2 on a track or into a hosted Serum (packed into a `.vstpreset` with a template saved from your own Serum; presets from older Serum builds are upgraded) — guide in `SERUM_PRESETS.md`; Omnisphere reference in `OMNISPHERE.md` |
 | Browser | `live_browser_search/load/hotswap/preview` | Load anything from Live's browser by name (`category="instrument"`, `"drum_kit"`, `"plugin"` …) |
 | Sample search | `live_sample_search`, `live_sample_tags`, `live_sample_duplicates`, `live_sample_index`, `live_plugin_search` | Everything Live's browser shows under Library > Samples (Core Library, packs, User Library, your added folders) by words and Live's browser tags ("Drums\|Kick", "Character\|Punchy"), most used first, "sounds like this one" (Live's audio features), identical-audio duplicates, Live's browser categories, several searches per call (a whole kit), every installed plug-in; absolute paths — [details](docs/SAMPLE_SEARCH.md) |
 | Samples & Splice | `live_sample_import/upload/list`, `live_drumrack_set_pad/convert`, `live_splice_import_downloaded` | Files from disk (or from Claude's machine in LAN mode) into slots, the arrangement, Simpler or drum pads |
@@ -318,7 +339,10 @@ These are limits of Live's Python API, not of LiveBridge (details and alternativ
   tracks without an instrument (Live 12.4.5) — LiveBridge reports it.
 - Third-party plug-ins expose only the parameters in their Configure list (at most 128). For
   VST3 plug-ins `live_plugin_expose` builds that list without a click (Serum 2 fully mapped);
-  AU / VST2 plug-ins need the device's **Configure** button once.
+  AU / VST2 plug-ins need the device's **Configure** button once. The experimental LiveBridge
+  Host (Max for Live, VST3) reaches every parameter; hosted parameters are not Live parameters
+  until handed over (`live_plugin_host_expose`) or banked, and Live's undo covers a hosted
+  plug-in's whole state at once.
 - `live_device_insert` (built-in devices without the browser) needs Live 12.3+; older 12.x load
   through the browser tools.
 - Claude cannot hear audio, but can read Live's level meters and CPU load (`live_mixer_meters`)

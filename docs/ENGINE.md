@@ -179,6 +179,14 @@ parameter (Serum 2 about 540, Diva about 280). Two devices, installed next to th
 `LiveBridge Host Effect` (audio effect: `plugin~` -> `vst~ 2 2` -> `plugout~`) and `LiveBridge
 Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 
+**The workflow — scout in a host, play natively** (tried in Live with Massive and Serum 2):
+load the plug-in in a host (or a saved `.vstpreset` into one), let the user tweak in its window
+and read what they moved (`touched`), pick the ≤128 parameters that matter (moved first, then
+what the patch uses, then the role's defaults), and `live_plugin_host_expose` them: the patch is
+saved, the plug-in loads natively in a rack with those parameters exposed, the host goes. For
+Serum 2 the preset-file tools (`SERUM_PRESETS.md`) also reach everything that is not a
+parameter.
+
 | Tool | What it does |
 |---|---|
 | `live_plugin_host_load` | Find the plug-in's `.vst3` (system VST3 folders, `LIVEBRIDGE_VST3_PATH`), load the host on a new MIDI track or at the end of a track, load the plug-in into it |
