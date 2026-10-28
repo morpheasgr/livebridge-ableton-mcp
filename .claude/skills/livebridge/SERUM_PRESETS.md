@@ -75,6 +75,11 @@ requirement to unrelated parts of an existing patch.
    a new `.vstpreset` and never overwrites the source or the template. If Live is not
    available, report the `.SerumPreset` path and that the load did not happen. Listening
    remains the user's step.
+10. To fine-tune by ear afterwards with every knob reachable, load it into a LiveBridge Host
+   instead: `live_plugin_host_load(plugin="Serum 2")`, then
+   `live_plugin_host_preset(source_path=output)` (same packing), then
+   `live_plugin_host_parameters` / `live_plugin_host_set`; `live_plugin_host_bank` makes the
+   knobs you will automate into Live dials. Experimental (Max for Live).
 
 Suggestion-only requests permit reads, not file writes. `live_preset_load` is the
 way a file gets into Live.

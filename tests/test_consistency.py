@@ -123,6 +123,7 @@ SAMPLE_ARGS = {
     "live_plugin_host_load": {"plugin": "Smoke", "file": "Smoke"},
     "live_plugin_host_set": {"values": {"Cutoff": 0.5}},
     "live_plugin_host_bank": {"parameters": ["Cutoff"]},
+    "live_plugin_host_preset": {"source_path": "Smoke.vstpreset"},
     "live_memory_update": {"id": 1, "done": True},
     "live_memory_forget": {"id": 1},
     "live_sound_save": {"name": "Smoke", "track": "Bass", "device": "Operator"},

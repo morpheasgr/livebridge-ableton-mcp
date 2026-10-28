@@ -155,6 +155,10 @@ function fakeAsk(message) {
   const [head, ...rest] = message;
   const out = (...atoms) => [VALUES_OUTLET, ...atoms];
   if (head === "plug_vst3") { fake.load(String(rest[0])); return Promise.resolve([]); }
+  if (head === "read") {                       // a preset: every value moves (tests)
+    if (/\.vstpreset$/i.test(String(rest[0]))) fake.values = fake.values.map(() => 0.25);
+    return Promise.resolve([]);
+  }
   if (head === "params") return Promise.resolve(fake.params.map((n) => [NAMES_OUTLET, n]));
   if (head === "get") {
     const n = Number(rest[0]);
@@ -402,6 +406,34 @@ async function set(args) {
            applied: results.filter((r) => r.ok).length };
 }
 
+// A preset file into the hosted plug-in (vst~ "read": .vstpreset for VST3). vst~ answers
+// nothing, so a sample of values read before and after tells whether it took.
+async function preset(args) {
+  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  const file = String(args.path || "").replace(/\\/g, "/");
+  if (!file) throw { type: "bad_args", message: "preset needs path" };
+  if (!state.names.length) await listNames();
+  const sample = state.names.map((n, i) => i).filter(visible).slice(0, 64);
+  const before = [];
+  for (const i of sample) before.push(await read(i));
+  await ask(["read", file], 1500);
+  let changed = 0;
+  for (let k = 0; k < sample.length; k++) {
+    const got = await read(sample[k]);
+    if (before[k] && got && (got.value !== before[k].value || got.text !== before[k].text)) {
+      changed++;
+      follow(sample[k], got.value);
+    }
+  }
+  for (const n of state.bank.keys()) {          // bank dials outside the sample follow too
+    if (!sample.includes(n - 1)) {
+      const got = await read(n - 1);
+      if (got) follow(n - 1, got.value);
+    }
+  }
+  return { path: file, sampled: sample.length, changed: changed };
+}
+
 // Names -> vst~ indices (for a bank), and every value at once / back (moving a sound).
 async function resolve(args) {
   if (!state.names.length) await listNames();
@@ -480,6 +512,8 @@ function handle(request, reply) {
     done(serial(() => params(args)));
   } else if (request.cmd === "set") {
     done(serial(() => set(args)));
+  } else if (request.cmd === "preset") {
+    done(serial(() => preset(args)));
   } else if (request.cmd === "resolve") {
     done(serial(() => resolve(args)));
   } else if (request.cmd === "values") {

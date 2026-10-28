@@ -208,3 +208,50 @@ def test_bank_end_to_end(engines, monkeypatch, tmp_path):  # noqa: F811
     assert call_tool(bad, "live_plugin_host_bank", {"parameters": []})["type"] == "bad_args"
     assert call_tool(bad, "live_plugin_host_bank", {"parameters": ["Nope"], "track": "Lead"})[
         "type"] == "not_found"
+
+
+# ----------------------------------------------------------------------------- presets
+
+def test_preset_into_the_host(engines, monkeypatch, tmp_path):  # noqa: F811
+    from fake_bridge import FakeBridge
+    pytest.importorskip("cbor2")
+    pytest.importorskip("zstandard")
+    from test_serum_presets import _preset, _template
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "home"))
+    _process, send, outlets = engines(script=HOST_JS)
+    send("context", "track", "Lead")
+    assert engine.wait_for(lambda: any(d.get("track") == "Lead"
+                                       for d in engine.devices(kind="host")), 5)
+    (host,) = engine.devices(kind="host")
+    engine.request(host, "load", {"file": "Serum2", "sub": "Serum 2", "name": "Serum 2"})
+
+    library = tmp_path / "User Library"
+    library.mkdir()
+    bridge = FakeBridge().start()
+    bridge.set_result("samples.locations", {"user_library": [{"path": str(library),
+                                                               "exists": True}]})
+    app = create_app(BridgeClient(host=bridge.host, port=bridge.port, timeout=5.0))
+    try:
+        direct = tmp_path / "Pad.vstpreset"
+        direct.write_bytes(b"VST3")
+        loaded = call_tool(app, "live_plugin_host_preset", {"source_path": str(direct)})
+        assert loaded["changed"] == 4 and loaded["notes"] == []
+        again = call_tool(app, "live_plugin_host_preset", {"source_path": str(direct)})
+        assert again["changed"] == 0 and "No sampled parameter changed" in again["notes"][0]
+
+        source = _preset(tmp_path / "Glass Comet.SerumPreset")
+        missing = call_tool(app, "live_plugin_host_preset", {"source_path": str(source)})
+        assert missing["type"] == "invalid_state" and "template" in missing["error"]
+        _template(library / "Serum 2 Init.vstpreset")
+        packed = call_tool(app, "live_plugin_host_preset", {"source_path": str(source)})
+        assert packed["preset_name"] == "Glass Comet"
+        assert packed["path"].endswith("LiveBridge Presets/Serum 2/Glass Comet.vstpreset")
+        assert Path(packed["path"]).is_file()
+
+        assert call_tool(app, "live_plugin_host_preset", {
+            "source_path": str(tmp_path / "none.vstpreset")})["type"] == "not_found"
+    finally:
+        bridge.stop()
+    sent = [json.loads(line) for line in outlets.read_text().splitlines()]
+    assert not any(m[0] == "bank" for m in sent)        # no bank on this host
