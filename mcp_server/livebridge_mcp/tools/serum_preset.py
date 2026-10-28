@@ -383,8 +383,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             source_path: The `.SerumPreset` (e.g. from live_preset_edit / live_preset_find).
             track: Replace this MIDI track's instrument (default: a new MIDI track).
             track_name: Name of the new track (default: the preset's name).
-            template: A Serum 2 `.vstpreset` of the same build to pack with (default: the
-                newest one found in the User Library — see live_preset_find).
+            template: A Serum 2 `.vstpreset` to pack with, of the preset's build or newer
+                (default: the same build if found, else the oldest newer one in the User
+                Library — see live_preset_find; older factory presets are upgraded).
 
         Returns:
             `{loaded, preset_name, output_path, browser_path, track, device?, version,
@@ -417,15 +418,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     return tool_error(f"{chosen} is not a Serum 2 .vstpreset", cmd=cmd)
             else:
                 templates = serum.find_templates(libraries)
-                matching = [t for t in templates
-                            if (t["product_version"], t["version"]) == wanted]
-                if not matching:
-                    found = sorted({str(t["product_version"]) for t in templates})
-                    return tool_error(
-                        f"no Serum 2 template of build {wanted[0]} in the User Library"
-                        + (f" (found: {', '.join(found)})" if found else "") + ". "
-                        + _HOW_TO_TEMPLATE, type="not_found", cmd=cmd)
-                chosen = Path(matching[0]["path"])
+                try:
+                    chosen = serum.pick_template(templates, wanted)
+                except ValueError as exc:
+                    return tool_error(str(exc).split(": save")[0] + ". " + _HOW_TO_TEMPLATE,
+                                      type="not_found", cmd=cmd)
             payload, report = serum.pack.pack_serum2(source, chosen)
             name = report.get("preset_name") or source.stem
             folder = libraries[0].joinpath(*serum.PUBLISHED)
@@ -451,6 +448,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             "version": report.get("version"), "template": str(chosen),
             "notes": ["Loaded with the preset's complete state; Live reads none of it back "
                       "(Serum's knobs stay hidden until configured). Listen to check it."]}
+        if report.get("upgraded_from"):
+            result["upgraded_from"] = report["upgraded_from"]
+            result["notes"].append(
+                f"Saved by Serum {report['upgraded_from']}, packed with your "
+                f"{report.get('version')} template: settings newer than the preset keep the "
+                "template's defaults, as when Serum opens an old preset. Listen against the "
+                "original if it matters.")
         if not isinstance(answer, dict) or "error" in answer:
             result["loaded"] = False
             result["error"] = (answer.get("error") if isinstance(answer, dict) else str(answer))

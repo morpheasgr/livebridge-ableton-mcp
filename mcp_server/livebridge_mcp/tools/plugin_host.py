@@ -468,7 +468,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         fine-tuned parameter by parameter on the same instance: a `.vstpreset` (any VST3),
         or a Serum 2 `.SerumPreset` / design JSON from `live_preset_edit`, which is first packed
         into a `.vstpreset` the way `live_preset_load` does (User Library > LiveBridge Presets >
-        Serum 2, with your same-build template). Bank dials follow the new values.
+        Serum 2, with your template of that build or newer — older factory presets are upgraded). Bank dials follow the new values.
 
         Args:
             source_path: the preset: absolute path, or a bare name in the Serum designs folder.
@@ -500,7 +500,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                          if isinstance(p, dict) and p.get("exists") and p.get("path")] \
                 if isinstance(places, dict) and not _is_error(places) else []
             try:
-                path, name, _report = serum.vstpreset_for(source_path, libraries, template)
+                path, name, report = serum.vstpreset_for(source_path, libraries, template)
             except FileNotFoundError as exc:
                 return tool_error(str(exc), type="not_found", cmd=cmd)
             except ImportError as exc:
@@ -509,6 +509,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             except (ValueError, OSError) as exc:
                 return tool_error(str(exc), type="invalid_state", cmd=cmd)
             result["preset_name"] = name
+            if report.get("upgraded_from"):
+                result["upgraded_from"] = report["upgraded_from"]
+                result["notes"].append(
+                    f"Saved by Serum {report['upgraded_from']}, packed with your "
+                    f"{report.get('version')} template: settings newer than the preset keep "
+                    "the template's defaults.")
         try:
             answer = engine.request(host, "preset", {"path": str(path)}, timeout=_SET_TIMEOUT)
         except engine.EngineError as exc:
