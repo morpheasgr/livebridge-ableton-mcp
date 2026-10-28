@@ -1991,6 +1991,7 @@ Make chosen parameters of a hosted plug-in automatable: writes a per-plug-in hos
 | `track` | str \| null | `null` |
 | `name` | str \| null | `null` |
 | `replace` | bool | `true` |
+| `file` | str \| null | `null` |
 
 Bridge: `browser.load`, `devices.delete`, `devices.list`, `samples.locations`
 

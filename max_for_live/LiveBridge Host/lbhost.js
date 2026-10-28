@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.2.1";
+const VERSION = "0.2.2";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -164,10 +164,16 @@ function fakeAsk(message) {
     const n = Number(rest[0]);
     if (n === -4) return Promise.resolve([out(-4, fake.params.length)]);
     if (n === -7) return Promise.resolve([out(-7, fake.loaded && /synth/i.test(fake.loaded) ? 1 : 0)]);
+    if (n === -1) return Promise.resolve(fake.loaded ? [out(-1, "Fake", "Synth")] : []);
     return Promise.resolve([out(n, fake.values[n - 1], ...fake.text(n - 1).split(" "))]);
   }
   if (typeof head === "number") { fake.values[head - 1] = Math.max(0, Math.min(1, rest[0])); }
   return Promise.resolve([]);
+}
+
+// tests: a plug-in vst~ restored from the Set before the script started
+if (process.env.LIVEBRIDGE_HOST_FAKE === "1" && process.env.LIVEBRIDGE_HOST_FAKE_PRELOAD) {
+  fake.load(process.env.LIVEBRIDGE_HOST_FAKE_PRELOAD);
 }
 
 function ask(message, waitMs = REPLY_MS) {
@@ -350,7 +356,7 @@ function hiddenCount() {
 }
 
 async function params(args) {
-  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  await needPlugin();
   if (!state.names.length) await listNames();
   const search = args.search ? String(args.search).toLowerCase() : null;
   const indices = state.names.map((n, i) => i).filter((i) => visible(i) &&
@@ -371,7 +377,7 @@ async function params(args) {
 }
 
 async function set(args) {
-  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  await needPlugin();
   if (!state.names.length) await listNames();
   const values = args.values && typeof args.values === "object" ? args.values : null;
   if (!values || !Object.keys(values).length) {
@@ -409,7 +415,7 @@ async function set(args) {
 // A preset file into the hosted plug-in (vst~ "read": .vstpreset for VST3). vst~ answers
 // nothing, so a sample of values read before and after tells whether it took.
 async function preset(args) {
-  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  await needPlugin();
   const file = String(args.path || "").replace(/\\/g, "/");
   if (!file) throw { type: "bad_args", message: "preset needs path" };
   if (!state.names.length) await listNames();
@@ -451,7 +457,7 @@ async function resolve(args) {
 }
 
 async function values() {
-  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  await needPlugin();
   if (!state.names.length) await listNames();
   const all = [];
   for (let i = 0; i < state.names.length; i++) {
@@ -463,7 +469,7 @@ async function values() {
 }
 
 async function restore(args) {
-  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  await needPlugin();
   let count = 0;
   for (const pair of Array.isArray(args.values) ? args.values : []) {
     const n = Number(pair[0]);
@@ -478,15 +484,41 @@ async function restore(args) {
 
 // A bank device loads its plug-in the first time it runs; after that vst~ restores it from
 // the Set (a parameter count already there means: leave it alone).
-async function autoload() {
-  if (!config.autoload) return;
+// After a Set is reopened (or the script restarted), vst~ already holds the plug-in and its
+// state: adopt it — names, kind, status — without loading anything. The plug-in's name comes
+// from the bank config, else from what vst~ reports for its info indices, else "plug-in".
+async function adopt() {
+  if (state.plugin) return true;
   const present = await infoValue(-4);
-  if (present && present > 0) {
-    await listNames();
-    state.plugin = { file: config.autoload.file, name: config.autoload.name || config.autoload.file,
-                     synth: (await infoValue(-7)) === 1 };
-    writeRegistry();
-    status(state.plugin.name);
+  if (!present || present <= 0) return false;
+  await listNames();
+  let name = config.autoload ? (config.autoload.name || config.autoload.file) : null;
+  if (!name) {
+    for (const code of [-1, -2]) {
+      const words = fromOutlet(await ask(["get", code]), VALUES_OUTLET)
+        .filter((atoms) => Number(atoms[0]) === code)
+        .map((atoms) => atoms.slice(1).filter((a) => typeof a === "string").join(" ").trim())
+        .filter((text) => text.length);
+      if (words.length) { name = words[0]; break; }
+    }
+  }
+  state.plugin = { file: config.autoload ? config.autoload.file : null, name: name || "plug-in",
+                   synth: (await infoValue(-7)) === 1, restored: true };
+  writeRegistry();
+  status(state.plugin.name);
+  return true;
+}
+
+async function needPlugin() {
+  if (!state.plugin && !(await adopt())) {
+    throw { type: "invalid_state", message: "no plug-in loaded" };
+  }
+}
+
+async function autoload() {
+  if (await adopt()) return;
+  if (!config.autoload) {
+    status("ready — no plug-in");
     return;
   }
   try {
@@ -583,9 +615,10 @@ function start() {
     state.port = server.address().port;
     writeRegistry();
     log(NAME + " " + VERSION + " listening on 127.0.0.1:" + state.port);
-    status(config.autoload ? "loading..." : "ready — no plug-in");
+    status("starting...");
     askForContext();
-    setTimeout(() => serial(autoload), config.autoload ? 1000 : 0).unref();
+    // vst~ restores a saved plug-in while the device loads: look for it a moment later
+    setTimeout(() => serial(autoload), 1000).unref();
   });
   const stop = () => { removeRegistry(); process.exit(0); };
   process.on("SIGTERM", stop);

@@ -5,6 +5,10 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Fix: a reopened set's LiveBridge Host knows its plug-in again** (Host 0.2.2): `vst~`
+  restored the plug-in and its sound, but the host script started blank ("ready — no
+  plug-in", tools refused). It now adopts the restored plug-in at startup and before any
+  request, without reloading it.
 - **Older Serum presets load** (`live_preset_load`, `live_plugin_host_preset`): a preset saved by
   an older Serum 2 (factory and commercial packs) is packed with a newer template instead of
   being refused; settings it lacks keep the template's defaults and the result says

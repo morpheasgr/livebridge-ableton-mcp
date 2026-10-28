@@ -294,3 +294,25 @@ def test_every_device_holds_messages_until_node_is_ready(engines):  # noqa: F811
                    m4l_build.HERE / "LiveBridge MIDI" / "lbmidi.js", HOST_JS):
         _process, _send, outlets = engines(script=script)
         assert engine.wait_for(lambda: '["ready"]' in outlets.read_text().splitlines(), 5)
+
+
+def test_a_host_reopened_with_its_plugin_adopts_it(engines, monkeypatch):  # noqa: F811
+    # vst~ restored the plug-in from the Set before the script ran: no load, no reset
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_PRELOAD", "FakeSynth")
+    _process, send, outlets = engines(script=HOST_JS)
+    send("context", "track", "Pad")
+    assert engine.wait_for(lambda: any(d.get("plugin") for d in engine.devices(kind="host")), 5)
+    (host,) = engine.devices(kind="host")
+    assert host["plugin"]["name"] == "Fake Synth" and host["plugin"]["restored"] is True
+    listed = engine.request(host, "params", {"search": "cutoff"})
+    assert listed["total"] == 1 and listed["parameters"][0]["value"] == 0.5   # state kept
+    assert ["status", "Fake Synth"] in [json.loads(l) for l in outlets.read_text().splitlines()]
+
+
+def test_requests_adopt_before_the_startup_check(engines, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_PRELOAD", "FakeSynth")
+    _process, send, _outlets = engines(script=HOST_JS)
+    (host,) = engine.devices(kind="host")
+    assert engine.request(host, "params", {})["total"] == 4               # no "no plug-in"

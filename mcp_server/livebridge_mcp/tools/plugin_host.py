@@ -331,6 +331,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         track: str | None = None,
         name: str | None = None,
         replace: bool = True,
+        file: str | None = None,
     ) -> Any:
         """Make chosen parameters of a hosted plug-in automatable: writes a per-plug-in host
         device whose Live dials are named after them (up to 128 — Live reads a device's
@@ -345,6 +346,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             name: device file name (default "<plug-in> Bank"); saved to User Library >
                 LiveBridge Presets > Plug-in Hosts and reusable from the browser.
             replace: remove the old host after the values are copied (false: keep both).
+            file: the plug-in's VST3 file name, when the host was restored from a reopened
+                set and does not know it (default: found by the plug-in's name).
 
         Returns:
             `{device_file, browser_path, track, bank:[{name, id}], restored, removed_old,
@@ -387,10 +390,18 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if scripts is None:
             return tool_error("lbhost.js was not found — re-run the LiveBridge installer",
                               type="not_found", cmd=cmd)
+        plugin_file = file or plugin.get("file")
+        if not plugin_file:
+            matches = find_vst3(str(plugin.get("name") or ""))
+            if not matches:
+                return tool_error("this host was restored from the set and does not know its "
+                                  "plug-in's file — pass file= (the .vst3 name, e.g. "
+                                  "\"Serum2\")", type="bad_args", cmd=cmd)
+            plugin_file = matches[0]["file"]
         instrument = old.get("host_kind") == "instrument" or hello.get("host_kind") == \
             "instrument"
         bank = [{"name": p["name"], "index": p["index"]} for p in resolved]
-        payload = host_device.bank_device({"file": plugin.get("file"),
+        payload = host_device.bank_device({"file": plugin_file,
                                            "sub": plugin.get("name"),
                                            "name": plugin.get("name")}, instrument, bank)
         try:
