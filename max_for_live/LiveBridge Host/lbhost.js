@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -43,12 +43,28 @@ const SAMPLES = 33;             // values tried when setting by display text
 const MIDI_RUN = 128;           // the per-CC stand-in parameters VST3 plug-ins add
 const MIDI_NAME = /^(midi\s*)?(cc\s*\d+|cc\b)|pitch\s*bend|after\s*touch|channel\s*pressure/i;
 
+// The device's config: "@args lbhost:<hex JSON>" on node.script (LIVEBRIDGE_HOST_CONFIG in
+// tests): {kind, autoload?: {file, sub, name}, bank?: [{name, index}]}.
+function readConfig() {
+  const token = process.argv.find((a) => String(a).startsWith("lbhost:")) ||
+    process.env.LIVEBRIDGE_HOST_CONFIG || "";
+  if (!token) return {};
+  try {
+    const hex = String(token).replace(/^lbhost:/, "");
+    return JSON.parse(Buffer.from(hex, "hex").toString("utf8"));
+  } catch (error) {
+    return {};
+  }
+}
+const config = readConfig();
+
 const state = {
   instance: crypto.randomBytes(6).toString("hex"),
   token: crypto.randomBytes(24).toString("hex"),
   role: "unknown",
   track: "",
-  kind: process.env.LIVEBRIDGE_HOST_KIND || "effect",
+  kind: config.kind || process.env.LIVEBRIDGE_HOST_KIND || "effect",
+  bank: new Map((config.bank || []).map((e) => [Number(e.index), e.name])),
   started: new Date().toISOString(),
   plugin: null,           // {file, name, synth}
   names: [],              // every parameter name, vst~ order
@@ -80,7 +96,7 @@ function writeRegistry() {
     name: NAME, kind: "host", host_kind: state.kind, version: VERSION, protocol: PROTOCOL,
     instance: state.instance, pid: process.pid, host: "127.0.0.1", port: state.port,
     token: state.token, role: state.role, track: state.track, started: state.started,
-    plugin: state.plugin ? state.plugin.name : null,
+    plugin: state.plugin ? state.plugin.name : null, bank: state.bank.size,
   };
   try {
     fs.mkdirSync(registryDir(), { recursive: true });
@@ -248,8 +264,14 @@ function norm(text) {
   return String(text).toLowerCase().replace(/\s+/g, "");
 }
 
+// A bank dial follows values LiveBridge sets ("set" in the patch: no echo back to vst~).
+function follow(index, value) {
+  if (maxApi && state.bank.has(index + 1)) maxApi.outlet("bank", index + 1, value);
+}
+
 async function setValue(index, value) {
   await ask([index + 1, value], 5);
+  follow(index, value);
   return read(index);
 }
 
@@ -380,6 +402,69 @@ async function set(args) {
            applied: results.filter((r) => r.ok).length };
 }
 
+// Names -> vst~ indices (for a bank), and every value at once / back (moving a sound).
+async function resolve(args) {
+  if (!state.names.length) await listNames();
+  const out = [];
+  for (const name of Array.isArray(args.names) ? args.names : []) {
+    try {
+      const index = findIndex(name);
+      if (index < 0 || index >= state.names.length) throw { message: "no such parameter" };
+      out.push({ name: state.names[index], id: "h" + (index + 1), index: index + 1 });
+    } catch (error) {
+      out.push({ name: String(name), error: error.message });
+    }
+  }
+  return { parameters: out };
+}
+
+async function values() {
+  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  if (!state.names.length) await listNames();
+  const all = [];
+  for (let i = 0; i < state.names.length; i++) {
+    if (!visible(i)) continue;
+    const got = await read(i);
+    if (got) all.push([i + 1, got.value]);
+  }
+  return { plugin: state.plugin, values: all };
+}
+
+async function restore(args) {
+  if (!state.plugin) throw { type: "invalid_state", message: "no plug-in loaded" };
+  let count = 0;
+  for (const pair of Array.isArray(args.values) ? args.values : []) {
+    const n = Number(pair[0]);
+    const value = Number(pair[1]);
+    if (!Number.isInteger(n) || n < 1 || !Number.isFinite(value)) continue;
+    await ask([n, Math.max(0, Math.min(1, value))], 0);
+    follow(n - 1, value);
+    count++;
+  }
+  return { restored: count };
+}
+
+// A bank device loads its plug-in the first time it runs; after that vst~ restores it from
+// the Set (a parameter count already there means: leave it alone).
+async function autoload() {
+  if (!config.autoload) return;
+  const present = await infoValue(-4);
+  if (present && present > 0) {
+    await listNames();
+    state.plugin = { file: config.autoload.file, name: config.autoload.name || config.autoload.file,
+                     synth: (await infoValue(-7)) === 1 };
+    writeRegistry();
+    status(state.plugin.name);
+    return;
+  }
+  try {
+    await load(config.autoload);
+  } catch (error) {
+    status("could not load " + (config.autoload.name || config.autoload.file));
+    log("autoload failed: " + (error.message || error));
+  }
+}
+
 function handle(request, reply) {
   const args = request.args && typeof request.args === "object" ? request.args : {};
   const done = (promise) => promise.then((r) => reply(null, r),
@@ -387,6 +472,7 @@ function handle(request, reply) {
   if (request.cmd === "hello") {
     reply(null, { name: NAME, version: VERSION, protocol: PROTOCOL, role: state.role,
                   track: state.track, host_kind: state.kind, plugin: state.plugin,
+                  bank: [...state.bank.values()],
                   started: state.started });
   } else if (request.cmd === "load") {
     done(serial(() => load(args)));
@@ -394,6 +480,12 @@ function handle(request, reply) {
     done(serial(() => params(args)));
   } else if (request.cmd === "set") {
     done(serial(() => set(args)));
+  } else if (request.cmd === "resolve") {
+    done(serial(() => resolve(args)));
+  } else if (request.cmd === "values") {
+    done(serial(values));
+  } else if (request.cmd === "restore") {
+    done(serial(() => restore(args)));
   } else if (request.cmd === "editor") {
     done(serial(async () => { await ask([args.open === false ? "wclose" : "open"], 5);
                               return { open: args.open !== false }; }));
@@ -457,8 +549,9 @@ function start() {
     state.port = server.address().port;
     writeRegistry();
     log(NAME + " " + VERSION + " listening on 127.0.0.1:" + state.port);
-    status("ready — no plug-in");
+    status(config.autoload ? "loading..." : "ready — no plug-in");
     askForContext();
+    setTimeout(() => serial(autoload), config.autoload ? 1000 : 0).unref();
   });
   const stop = () => { removeRegistry(); process.exit(0); };
   process.on("SIGTERM", stop);
@@ -466,7 +559,6 @@ function start() {
   process.on("exit", removeRegistry);
   if (maxApi) {
     maxApi.addHandler("vstout", vstReply);
-    maxApi.addHandler("kind", (kind) => { state.kind = String(kind); writeRegistry(); });
     maxApi.addHandler("context", (role, ...track) => setContext(String(role), track.map(String)));
     maxApi.addHandler("transport", () => {});
     maxApi.addHandler("resolved", () => {});

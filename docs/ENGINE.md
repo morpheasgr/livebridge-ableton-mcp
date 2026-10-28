@@ -181,6 +181,7 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 | `live_plugin_host_load` | Find the plug-in's `.vst3` (system VST3 folders, `LIVEBRIDGE_VST3_PATH`), load the host on a new MIDI track or at the end of a track, load the plug-in into it |
 | `live_plugin_host_parameters` | Every parameter (the per-MIDI-CC stand-ins VST3 adds are hidden), searchable and paged, with value and display text |
 | `live_plugin_host_set` | Set many parameters by name or id (`h12`), to 0..1 or display text ("800 Hz"); open/close the plug-in window |
+| `live_plugin_host_bank` | Make chosen parameters automatable: a per-plug-in host whose Live dials carry their names, swapped in on the same track with every parameter value copied |
 
 - **Patch**: `lbhost.js` (Node for Max) sends `vst~` messages (`plug_vst3`, `subname`,
   `params`, `get`, `<index> <value>`, `open`/`wclose`) and hears every message outlet as
@@ -195,8 +196,17 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
   number is bisected between the two samples that bracket it. No match puts the old value back.
 - **State**: `vst~` saves the plug-in's state with the Set (`parameter_enable`, `autosave`);
   one undo restores the whole state. Opening the Set needs Max for Live.
-- **Limits**: hosted parameters are not Live parameters — no automation lanes (load the plug-in
-  natively with `live_plugin_expose` for that, or `live_engine_modulate`); a user's existing
+- **Automation bank**: Live reads a device's parameters once, when it loads, so automatable
+  names have to be in the file. `live_plugin_host_bank` writes `<plug-in> Bank.amxd` (User
+  Library > LiveBridge Presets > Plug-in Hosts, next to copies of the scripts) with up to 128
+  `live.dial`s named after the chosen parameters (`livebridge_mcp/host_device.py`): dial ->
+  `prepend <vst index>` -> `vst~`; values LiveBridge sets go back to the dial with `set` (no
+  echo). The device loads its plug-in itself the first time (config as one hex `@args`
+  token) and leaves it alone when the Set restored it. The tool loads it on the same track,
+  copies every parameter value (`values` / `restore`) and deletes the old host. Not carried
+  over: plug-in state that is not a parameter (wavetables, samples); edits in the plug-in's
+  window do not move the dials. Approach from xxnoodl's ableton_device_vst_wrapper (MIT).
+- **Limits**: hosted parameters are not Live parameters unless banked; a user's existing
   plug-in can't be moved in with its settings (the API can't read plug-in state); VST3 only;
   latency changes of the plug-in are not reported to Live; not yet run in real Max by us — if
   a plug-in sends several names in one message, the count from `get -4` switches to one
