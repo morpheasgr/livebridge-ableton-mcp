@@ -270,3 +270,27 @@ def test_load_asks_the_browser_for_a_new_midi_track(tmp_path, monkeypatch):
     load = [r for r in bridge.requests if r["cmd"] == "browser.load"][-1]["args"]
     assert load == {"query": "LiveBridge Host Instrument", "category": "instrument",
                     "new_track": "midi", "track_name": "Diva"}
+
+
+def test_every_device_holds_messages_until_node_is_ready(engines):  # noqa: F811
+    for path in (m4l_build.ENGINE_AMXD, m4l_build.MIDI_AMXD, m4l_build.HOST_EFFECT_AMXD,
+                 m4l_build.HOST_INSTRUMENT_AMXD):
+        _type, patcher = m4l_build.read_amxd(path.read_bytes())
+        boxes = {b["box"]["id"]: b["box"] for b in patcher["patcher"]["boxes"]}
+        lines = [(tuple(l["patchline"]["source"]), tuple(l["patchline"]["destination"]))
+                 for l in patcher["patcher"]["lines"]]
+        into_node = [src for src, dst in lines if dst == ("obj-node", 0)]
+        assert into_node == [("obj-gate", 0)], (path.name, into_node)
+        assert boxes["obj-gate"]["text"] == "gate 1 0"              # closed at load
+        route = boxes["obj-route"]["text"].split()[1:]
+        ready = route.index("ready")
+        assert ready == len(route) - 1
+        assert (("obj-route", ready), ("obj-ready", 0)) in lines
+        assert (("obj-ready", 0), ("obj-gate", 0)) in lines
+        # what route rejects still reaches the print box (its outlet moved one along)
+        assert (("obj-route", ready + 1), ("obj-print", 0)) in lines, path.name
+    # each script says "ready" once Node for Max runs it
+    for script in (m4l_build.HERE / "LiveBridge Engine" / "engine.js",
+                   m4l_build.HERE / "LiveBridge MIDI" / "lbmidi.js", HOST_JS):
+        _process, _send, outlets = engines(script=script)
+        assert engine.wait_for(lambda: '["ready"]' in outlets.read_text().splitlines(), 5)

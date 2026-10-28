@@ -5,6 +5,9 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Fix: no more "Node script not ready" lines in the Max window** (Engine 1.5.2, MIDI 1.0.1,
+  Host 0.2.1): each device holds its messages to Node for Max behind a closed gate until the
+  script says it is ready.
 - **Fix: `live_engine_unmodulate` restores the parameter's value** (Engine 1.5.1). It let go of
   the parameter in the same instant it sent the saved value, so the knob kept the LFO's last
   position; it now lets go a few audio vectors later and writes the saved value once more.

@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.2.0";
+const VERSION = "0.2.1";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -597,6 +597,9 @@ function start() {
     maxApi.addHandler("transport", () => {});
     maxApi.addHandler("resolved", () => {});
     maxApi.addHandler("info", () => {});
+  }
+  if (maxApi) {
+    maxApi.outlet("ready");          // opens the patch's gate: messages may come in now
   }
 }
 
