@@ -5,6 +5,10 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Fix: `live_plugin_host_expose(remove_host=false)` keeps the host** — an instrument's
+  native rack goes on a new "<plug-in> (native)" track (one instrument per MIDI track), an
+  effect's next to the host; `host_removed` is checked afterwards, and parameters a plug-in
+  adds to the rack on its own are listed as `extra`.
 - **Scout in the host, play natively** (`live_plugin_host_save`, `live_plugin_host_expose`,
   `live_plugin_host_parameters(snapshot=..., changed_since=...)`; Host 0.3.0): see what the user
   moves in a plug-in's window across all its parameters, save the hosted patch as a
