@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.2.2";
+const VERSION = "0.2.3";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -347,6 +347,8 @@ async function load(args) {
   state.plugin = { file: file, name: String(args.name || args.sub || file), synth: isSynth };
   writeRegistry();
   status(state.plugin.name);
+  // name the Live device after the plug-in: Live keeps it in the Set, adopt() reads it back
+  if (maxApi && args.rename !== false) maxApi.outlet("context", "rename", state.plugin.name);
   return { plugin: state.plugin, parameters: names.length - hiddenCount(),
            hidden_midi: hiddenCount() };
 }
@@ -494,19 +496,26 @@ async function adopt() {
   await listNames();
   let name = config.autoload ? (config.autoload.name || config.autoload.file) : null;
   if (!name) {
-    for (const code of [-1, -2]) {
-      const words = fromOutlet(await ask(["get", code]), VALUES_OUTLET)
-        .filter((atoms) => Number(atoms[0]) === code)
-        .map((atoms) => atoms.slice(1).filter((a) => typeof a === "string").join(" ").trim())
-        .filter((text) => text.length);
-      if (words.length) { name = words[0]; break; }
-    }
+    const saved = await deviceName();          // the name load() gave the device
+    if (saved && !GENERIC_NAMES.includes(saved)) name = saved;
   }
   state.plugin = { file: config.autoload ? config.autoload.file : null, name: name || "plug-in",
                    synth: (await infoValue(-7)) === 1, restored: true };
   writeRegistry();
   status(state.plugin.name);
   return true;
+}
+
+// The Live device's own name (context.js reads it; see load(): it is the plug-in's name).
+const GENERIC_NAMES = ["LiveBridge Host Instrument", "LiveBridge Host Effect"];
+let nameWaiter = null;
+function deviceName() {
+  if (!maxApi) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    nameWaiter = resolve;
+    maxApi.outlet("context", "devicename");
+    setTimeout(() => { if (nameWaiter === resolve) { nameWaiter = null; resolve(null); } }, 500);
+  });
 }
 
 async function needPlugin() {
@@ -630,6 +639,11 @@ function start() {
     maxApi.addHandler("transport", () => {});
     maxApi.addHandler("resolved", () => {});
     maxApi.addHandler("info", () => {});
+    maxApi.addHandler("devicename", (...words) => {
+      const waiter = nameWaiter;
+      nameWaiter = null;
+      if (waiter) waiter(words.map(String).join(" ").trim());
+    });
   }
   if (maxApi) {
     maxApi.outlet("ready");          // opens the patch's gate: messages may come in now

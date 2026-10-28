@@ -227,5 +227,7 @@ def bank_device(plugin: dict[str, Any], instrument: bool, bank: list[dict[str, A
     """A per-plug-in host with ``bank`` dials that loads ``plugin`` ({file, sub, name}) itself
     the first time it runs."""
     title = f"{plugin.get('name') or plugin['file']} (LiveBridge)"
-    patcher = host_patcher(instrument, {"autoload": plugin}, bank, title=title[:40])
+    # a bank device keeps its file's name ("<plug-in> Bank"), so it is told apart from a host
+    patcher = host_patcher(instrument, {"autoload": dict(plugin, rename=False)}, bank,
+                           title=title[:40])
     return amxd(patcher, INSTRUMENT if instrument else AUDIO_EFFECT)

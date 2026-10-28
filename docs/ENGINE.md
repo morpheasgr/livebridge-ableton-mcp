@@ -202,9 +202,10 @@ By hand: the device's **Open plug-in** button opens the hosted plug-in's own win
   number is bisected between the two samples that bracket it. No match puts the old value back.
 - **State**: `vst~` saves the plug-in's state with the Set (`parameter_enable`, `autosave`);
   one undo restores the whole state. When a Set reopens, `lbhost.js` finds the restored
-  plug-in (`get -4` > 0) and adopts it — names, kind, status — without loading anything; its
-  file name is not saved, so `live_plugin_host_bank` finds it by the plug-in's name (or
-  `file=`). Opening the Set needs Max for Live.
+  plug-in (`get -4` > 0) and adopts it — names, kind, status — without loading anything. Its
+  name comes from the Live device: loading a plug-in renames the host device after it (Live
+  saves device names in the Set; bank devices keep their file's name). The `.vst3` file name
+  is not saved, so `live_plugin_host_bank` finds it by the plug-in's name (or `file=`). Opening the Set needs Max for Live.
 - **Automation bank**: Live reads a device's parameters once, when it loads, so automatable
   names have to be in the file. `live_plugin_host_bank` writes `<plug-in> Bank.amxd` (User
   Library > LiveBridge Presets > Plug-in Hosts, next to copies of the scripts) with up to 128

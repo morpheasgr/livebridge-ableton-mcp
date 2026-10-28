@@ -71,6 +71,9 @@ def test_host_device_end_to_end(engines, monkeypatch):  # noqa: F811
     loaded = engine.request(host, "load", {"file": "Serum2", "sub": "Serum 2",
                                            "name": "Serum 2"})
     assert loaded["parameters"] == 4 and loaded["hidden_midi"] == 130
+    # the Live device is named after the plug-in (kept in the Set, read back after a reopen)
+    assert ["context", "rename", "Serum 2"] in [json.loads(l) for l in
+                                                _outlets.read_text().splitlines()]
 
     app = create_app(BridgeClient(host="127.0.0.1", port=1, timeout=1.0))
     listed = call_tool(app, "live_plugin_host_parameters", {"track": "Lead"})
@@ -167,7 +170,7 @@ def test_bank_end_to_end(engines, monkeypatch, tmp_path):  # noqa: F811
                                                                "exists": True}]})
     bridge.set_result("browser.load", {"track": "Lead", "inserted": []})
     bridge.set_result("devices.list", {"devices": [
-        {"name": "LiveBridge Host Instrument", "path": "song.tracks[0].devices[0]"},
+        {"name": "Fake", "path": "song.tracks[0].devices[0]"},          # renamed by load()
         {"name": "Fake Bank", "path": "song.tracks[0].devices[1]"}]})
     bridge.set_result("devices.delete", {"deleted": True})
 
@@ -307,12 +310,17 @@ def test_a_host_reopened_with_its_plugin_adopts_it(engines, monkeypatch):  # noq
     monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_PRELOAD", "FakeSynth")
     _process, send, outlets = engines(script=HOST_JS)
     send("context", "track", "Pad")
+    # it asks for the device's name (load() named it after the plug-in); answer like
+    # context.js does
+    assert engine.wait_for(lambda: ["context", "devicename"] in
+                           [json.loads(l) for l in outlets.read_text().splitlines()], 5)
+    send("devicename", "Serum", "2")
     assert engine.wait_for(lambda: any(d.get("plugin") for d in engine.devices(kind="host")), 5)
     (host,) = engine.devices(kind="host")
-    assert host["plugin"]["name"] == "Fake Synth" and host["plugin"]["restored"] is True
+    assert host["plugin"]["name"] == "Serum 2" and host["plugin"]["restored"] is True
     listed = engine.request(host, "params", {"search": "cutoff"})
     assert listed["total"] == 1 and listed["parameters"][0]["value"] == 0.5   # state kept
-    assert ["status", "Fake Synth"] in [json.loads(l) for l in outlets.read_text().splitlines()]
+    assert ["status", "Serum 2"] in [json.loads(l) for l in outlets.read_text().splitlines()]
 
 
 def test_requests_adopt_before_the_startup_check(engines, monkeypatch):  # noqa: F811

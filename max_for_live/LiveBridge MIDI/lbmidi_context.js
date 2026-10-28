@@ -207,3 +207,21 @@ function report() {
     var label = name && name.length ? String(name.join(" ")) : "";
     outlet(0, "context", track.id == master.id ? "master" : "track", label || "Master");
 }
+
+// The LiveBridge Host names its device after the plug-in it holds (Live saves the name with
+// the Set) and reads it back after the Set is reopened.
+function rename() {
+    var name = arrayfromargs(arguments).join(" ");
+    var api = new LiveAPI("this_device");
+    if (api.id != 0 && name) {
+        api.set("name", name);
+    }
+}
+
+function devicename() {
+    var api = new LiveAPI("this_device");
+    if (api.id != 0) {
+        var name = api.get("name");
+        outlet(0, "devicename", name instanceof Array ? name.join(" ") : String(name));
+    }
+}
