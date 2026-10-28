@@ -348,6 +348,7 @@ def test_requests_adopt_before_the_startup_check(engines, monkeypatch):  # noqa:
 
 def _fake_host(engines, monkeypatch, name="Fake"):  # noqa: F811
     monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_KIND", "instrument")
     _process, send, outlets = engines(script=HOST_JS)
     send("context", "track", "Keys")
     assert engine.wait_for(lambda: any(d.get("track") == "Keys"
@@ -414,6 +415,18 @@ def test_save_and_hand_over_to_a_native_rack(engines, monkeypatch, tmp_path):  #
         assert expose["preset_file"].endswith("Handover.vstpreset") and expose["track"] == "Keys"
         delete = [r for r in bridge.requests if r["cmd"] == "devices.delete"][-1]["args"]
         assert delete["device"] == "song.tracks[0].devices[0]"            # the host, not the rack
+
+        # keep the host (still running: the fake delete above does not stop it): the native
+        # rack goes on a new track, extra parameters are reported
+        bridge.set_result("plugin_racks.expose", {
+            "status": "done", "track": "Fake (native)", "device": "song.tracks[5].devices[0]",
+            "parameters": [{"name": "Cutoff"}, {"name": "UNISONO"}]})
+        kept = call_tool(app, "live_plugin_host_expose", {"parameters": ["Cutoff"],
+                                                          "remove_host": False})
+        expose = [r for r in bridge.requests if r["cmd"] == "plugin_racks.expose"][-1]["args"]
+        assert expose["new_track"] is True and expose["track_name"] == "Fake (native)"
+        assert "track" not in expose and kept["host_removed"] is False
+        assert kept["extra"] == ["UNISONO"] and kept["native_track"] == "Fake (native)"
 
         bridge.set_result("plugin_racks.map", {"status": "done", "count": 0, "source": "probed"})
         unmapped = call_tool(app, "live_plugin_host_expose", {"parameters": ["Cutoff"]})

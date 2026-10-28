@@ -681,13 +681,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             parameters: 1..128 parameter names (as `live_plugin_host_parameters` lists them).
             track: the track whose LiveBridge Host to hand over (optional when there is one).
             name: the saved preset's name (default: plug-in name + date and time).
-            remove_host: delete the host afterwards (it stays when false or when the native
-                load failed).
+            remove_host: true: the native rack takes the host's place on its track. false: the
+                rack goes on a new track ("<plug-in> (native)") and the host stays, to compare
+                (a MIDI track holds one instrument, so they cannot share one).
             wait_seconds: how long the map probe and rack indexing may take (0..600).
 
         Returns:
-            `{saved, map:{source, count}, exposed: <live_plugin_expose result>, host_removed,
-            notes}`.
+            `{saved, map:{source, count}, exposed: <live_plugin_expose result>, extra?:
+            [exposed though not asked for], missing?: [asked for, not exposed], host_removed
+            (checked afterwards), native_track, notes}`.
 
         Gotchas: plug-ins whose ParameterIds cannot be probed (some JUCE builds) cannot be
         exposed — the preset is still saved; load it from the browser and Configure by hand.
@@ -734,8 +736,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                    "cannot be exposed: load the saved preset from the browser "
                                    f"({saved['browser_path']}) and use Configure.")
             return result
-        expose = {"parameters": parameters, "plugin": plugin, "preset_file": saved["path"],
-                  "track": where, "replace": True, "new_track": False}
+        instrument = saved.get("kind") == "instrument"
+        if remove_host or not instrument:     # an effect rack can sit next to its host
+            expose = {"parameters": parameters, "plugin": plugin,
+                      "preset_file": saved["path"], "track": where,
+                      "replace": bool(remove_host), "new_track": False}
+        else:                                 # keep the host: the rack needs its own track
+            expose = {"parameters": parameters, "plugin": plugin,
+                      "preset_file": saved["path"], "new_track": True, "replace": False,
+                      "track_name": f"{plugin} (native)"}
         while True:
             exposed = bridge_call(bridge, "plugin_racks.expose", expose, 45.0)
             if _is_error(exposed) or not isinstance(exposed, dict) or \
@@ -743,9 +752,24 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 break
             time.sleep(1.0)
         result["exposed"] = exposed
+        if isinstance(exposed, dict) and not _is_error(exposed):
+            result["native_track"] = exposed.get("track")
+            got = [str(p.get("name")) for p in exposed.get("parameters") or []]
+            asked = {" ".join(n.lower().split()) for n in parameters}
+            extra = [n for n in got if " ".join(n.lower().split()) not in asked]
+            if extra and len(got) > len(parameters):
+                result["extra"] = extra
+                result["notes"].append(
+                    f"{', '.join(extra)} came along without being asked for: the plug-in (or "
+                    "Live) adds it to the rack's parameter list itself.")
+            if exposed.get("missing"):
+                result["missing"] = exposed["missing"]
+
+        def host_present() -> bool:
+            return any(d.get("instance") == host.get("instance") for d in _hosts())
+
         removed = False
-        if not _is_error(exposed) and remove_host and \
-                any(d.get("instance") == host.get("instance") for d in _hosts()):
+        if not _is_error(exposed) and remove_host and host_present():
             listing = bridge_call(bridge, "devices.list", {"track": where})
             devices = listing.get("devices") if isinstance(listing, dict) else None
             candidates = [d for d in devices or [] if str(d.get("name")) in _GENERIC
@@ -758,7 +782,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 result["notes"].append("The host is still on the track: delete it once the "
                                        "native plug-in sounds right.")
         elif not _is_error(exposed) and remove_host:
-            removed = True                # the rack replaced it
+            removed = True                # the rack took its place
+        if not _is_error(exposed) and not remove_host:
+            removed = not host_present()
+            if removed:
+                result["notes"].append("The host was replaced although remove_host=false.")
         result["host_removed"] = removed
         if _is_error(exposed):
             result["notes"].append(f"The native load failed; the host is untouched and the "
