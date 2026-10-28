@@ -1474,7 +1474,7 @@ Remember something about this project (or the user) for later sessions: a decisi
 | `project` | str \| null | `null` |
 | `tags` | list[str] \| null | `null` |
 
-Bridge: `tracks.list`, `transport.get`
+Bridge: `song.summary`, `tracks.list`, `transport.get`
 
 #### `live_memory_recall`
 
@@ -1488,11 +1488,11 @@ Recall what was decided and what is still open in this project, plus the user's 
 | `include_done` | bool | `false` |
 | `limit` | int | `40` |
 
-Bridge: `tracks.list`, `transport.get`
+Bridge: `song.summary`, `tracks.list`, `transport.get`
 
 #### `live_memory_update`
 
-Change a remembered entry: mark an idea or todo done (it stops showing in recall), reopen it, rewrite its text or change its kind (an idea that became a decision).
+Change a remembered entry: mark an idea or todo done (it stops showing in recall), reopen it, rewrite its text, change its kind (an idea that became a decision) or move it to another project — with `whole_project` every entry of its project moves (notes written before the set was saved, under "default", to the set's name).
 
 | Argument | Type | Default |
 |---|---|---|
@@ -1500,6 +1500,8 @@ Change a remembered entry: mark an idea or todo done (it stops showing in recall
 | `done` | bool \| null | `null` |
 | `text` | str \| null | `null` |
 | `kind` | str \| null | `null` |
+| `project` | str \| null | `null` |
+| `whole_project` | bool | `false` |
 
 Bridge: none (runs in the MCP server)
 
@@ -3610,7 +3612,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `simpler.get` |  | track=null, device=null, max_slices=64 | `live_simpler_get` | Simpler: sample file, length, markers, warp, slices, modes |
 | `simpler.set` | M | track=null, device=null, playback_mode=null, slicing_playback_mode=null, voices=null, retrigger=null, pad_slicing=null, warping=null, warp_mode=null, slicing_style=null, slicing_sensitivity=null, slicing_beat_division=null, slicing_region_count=null, start_marker=null, end_marker=null, gain=null | `live_simpler_set` | Simpler: playback/slicing modes, voices, sample warp/slicing settings |
 | `song.snapshot` |  | detail="summary", include_clips=true, include_devices=true, include_returns=true, include_scenes=true, offset=0, limit=null | `live_set_snapshot` | The whole set in one compact payload (call this first) |
-| `song.summary` |  | detail="summary" | `live_set_snapshot` | Song-level overview: tempo, signature, transport, counts |
+| `song.summary` |  | detail="summary" | `live_memory_note`, `live_memory_recall`, `live_set_snapshot` | Song-level overview: tempo, signature, transport, counts |
 | `system.batch` | M | commands, stop_on_error=true | `live_command_batch` | Run several commands in one round trip, on one main-thread pass, as one undo step |
 | `system.commands` |  | namespace=null, include_doc=true | `live_commands` | List every registered command with its docs |
 | `system.dialog` |  |  | `live_dialog_get` | Read Live's open modal dialog: message and button count |

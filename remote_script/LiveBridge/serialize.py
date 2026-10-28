@@ -17,6 +17,10 @@ per-attribute exceptions and omit what fails.  Every summary carries the
 canonical ``path`` so Claude can navigate straight on with ``lom.*``.
 """
 
+import os
+
+import os
+
 from . import compat
 from . import lom
 
@@ -290,6 +294,26 @@ def _path_index(path):
 # per type
 # --------------------------------------------------------------------------
 
+def set_file(song):
+    """Which set is open: ``{set_name, set_path, project_path?}`` (``Song.name`` and
+    ``Song.file_path``), or ``{unsaved: true}`` for a set never saved (Live answers "")."""
+    get = compat.safe_getattr
+    path = get(song, "file_path")
+    if not isinstance(path, str) or not path.strip():
+        return {"unsaved": True}
+    path = path.strip()
+    cut = max(path.rfind("/"), path.rfind("\\"))
+    folder, base = path[:max(cut, 0)], path[cut + 1:]
+    name = get(song, "name")
+    if not isinstance(name, str) or not name.strip():
+        name = base[:-4] if base.lower().endswith(".als") else base
+    data = {"set_name": name.strip(), "set_path": path}
+    # A Live Project is the folder holding the set and its "Ableton Project Info" folder.
+    if folder and os.path.isdir(os.path.join(folder, "Ableton Project Info")):
+        data["project_path"] = folder
+    return data
+
+
 def summarize_song(song, detail, ctx):
     """Song summary — the one-call overview of the set."""
     get = compat.safe_getattr
@@ -306,6 +330,7 @@ def summarize_song(song, detail, ctx):
         "scene_count": len(get(song, "scenes", ()) or ()),
         "live_version": compat.live_version_string(),
     }
+    data.update(set_file(song))
     if detail == "minimal":
         return data
     data.update({

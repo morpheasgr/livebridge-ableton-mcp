@@ -376,3 +376,16 @@ def test_take_lanes_and_vectors_are_summarised(ctx, song):
     assert isinstance(lanes, list) and lanes[0]["kind"] == "take_lane"
     scalars = serialize.scalar(song.tracks[0].take_lanes)
     assert isinstance(scalars, list) and len(scalars) == 1
+
+
+def test_song_summary_names_the_open_set(ctx, song):
+    data = _json_safe(ctx.summarize(song, "minimal"))
+    assert data["unsaved"] is True and "set_name" not in data       # never saved
+    song._file_path = r"D:\Projects\aitest2 Project\aitest2.als"
+    song._name = "aitest2"
+    data = _json_safe(ctx.summarize(song, "minimal"))
+    assert data["set_name"] == "aitest2"
+    assert data["set_path"] == r"D:\Projects\aitest2 Project\aitest2.als"
+    assert "unsaved" not in data
+    song._name = ""                                                  # older Live: no Song.name
+    assert _json_safe(ctx.summarize(song, "minimal"))["set_name"] == "aitest2"

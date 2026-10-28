@@ -193,6 +193,35 @@ def test_memory_notes_recall_and_preferences(live_app, lib):
     assert (lib / "memory.json").is_file()
 
 
+def test_memory_follows_the_open_set(live_app, song):
+    # Never saved: the note goes to "default" and says so.
+    early = call_tool(live_app, "live_memory_note", {"text": "four-chord loop", "kind": "idea"})
+    assert early["project"] == "default" and early["unsaved_set"] is True
+    assert call_tool(live_app, "live_memory_recall", {})["unsaved_set"] is True
+
+    # Saved as aitest2: move the early notes over, then new notes land there by themselves.
+    song._file_path = r"D:\Projects\aitest2 Project\aitest2.als"
+    song._name = "aitest2"
+    moved = call_tool(live_app, "live_memory_update", {"id": early["id"], "project": "aitest2",
+                                                       "whole_project": True})
+    assert moved["project"] == "aitest2" and moved["moved"] == 1
+    note = call_tool(live_app, "live_memory_note", {"text": "kept the pad", "kind": "decision"})
+    assert note["project"] == "aitest2" and "unsaved_set" not in note
+
+    # Another set is open meanwhile; coming back finds aitest2 by its file.
+    song._file_path, song._name = r"D:\Projects\Other Project\Other.als", "Other"
+    call_tool(live_app, "live_memory_note", {"text": "other set", "kind": "note"})
+    song._file_path, song._name = r"d:/projects/aitest2 project/aitest2.als", "aitest2"
+    recall = call_tool(live_app, "live_memory_recall", {})
+    assert recall["matched_by"] == "set" and recall["project"] == "aitest2"
+    assert recall["set"] == "aitest2"
+    assert [e["text"] for e in recall["entries"]] == ["four-chord loop", "kept the pad"]
+    assert "default" not in [p["name"] for p in recall["projects"]]
+    assert call_tool(live_app, "live_memory_update",
+                     {"id": note["id"], "whole_project": True, "done": True})["type"] == \
+        "bad_args"
+
+
 def test_memory_validation(live_app):
     assert call_tool(live_app, "live_memory_note",
                      {"text": "x", "kind": "rumour"})["type"] == "bad_args"

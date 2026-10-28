@@ -600,7 +600,9 @@ def song_summary(ctx, detail="summary"):
             return, master and scene summary — prefer ``song.snapshot``).
 
     Returns:
-        The song summary dict (``path: "song"``) plus ``position_bbs``.
+        The song summary dict (``path: "song"``) plus ``position_bbs``; ``set_name`` /
+        ``set_path`` (and ``project_path`` for a Live Project) name the open set, and a set
+        never saved has ``unsaved: true`` instead.
     """
     detail = _detail(detail)
     data = ctx.summarize(ctx.song, detail)
