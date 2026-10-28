@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from . import bridge_call, tool_error
-from .. import engine, host_device, serum
+from .. import engine, host_device, plugin_ids, serum
 from ..client import BridgeClient
 
 _DEVICES = {"effect": ("LiveBridge Host Effect", "audio_effect"),
@@ -249,8 +249,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error(f"{device_name} was loaded but did not start (Node for Max): "
                               "check Max for Live, then retry", type="invalid_state", cmd=cmd)
         try:
-            result = engine.request(host, "load", {"file": file, "sub": plugin,
-                                                   "name": plugin}, timeout=_LOAD_TIMEOUT)
+            class_id = plugin_ids.class_for(file, plugin, vst3_folders())
+            load = {"file": file, "sub": plugin, "name": plugin}
+            if class_id:
+                load["class_id"] = class_id
+            result = engine.request(host, "load", load, timeout=_LOAD_TIMEOUT)
         except engine.EngineError as exc:
             return _failure(exc, cmd)
         result = dict(result or {})
@@ -492,8 +495,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             `{path, preset_name?, sampled, changed, notes}` — `changed`: how many of the first
             parameters moved (0 = the preset did not take).
 
-        Gotchas: the preset must be for the hosted plug-in. vst~ reports nothing back, so the
-        check is a before/after comparison. `.fxp`/`.fxb` files load too (VST2 formats).
+        Gotchas: a `.vstpreset` names its plug-in by VST3 class ID: one for a different
+        plug-in than the host holds is refused (known from the plug-in's moduleinfo.json or
+        from earlier loads), and an unnamed restored host takes the preset's plug-in name.
+        vst~ reports nothing back, so success is a before/after comparison. `.fxp`/`.fxb` files load too (VST2 formats).
         """
         cmd = "plugin_host.preset"
         path = Path(os.path.expanduser(source_path))
@@ -527,14 +532,44 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     f"Saved by Serum {report['upgraded_from']}, packed with your "
                     f"{report.get('version')} template: settings newer than the preset keep "
                     "the template's defaults.")
+        # which plug-in is the preset for, and which one does the host hold?
+        preset_cid = plugin_ids.class_id_of(path)
+        if result.get("preset_name") and preset_cid:     # packed for Serum 2 by us
+            plugin_ids.learn(preset_cid, "Serum 2")
+        try:
+            hosted = (engine.request(host, "hello") or {}).get("plugin") or {}
+        except engine.EngineError as exc:
+            return _failure(exc, cmd)
+        folders = vst3_folders()
+        host_name = hosted.get("name") if hosted.get("name") != "plug-in" else None
+        host_cid = (hosted.get("class_id") or
+                    (plugin_ids.class_for(hosted.get("file"), host_name, folders)
+                     if host_name else None))
+        meant = plugin_ids.lookup(preset_cid, folders) if preset_cid else None
+        meant_name = meant.get("name") if meant else None
+        if preset_cid:
+            result["preset_class_id"] = preset_cid
+            if meant_name:
+                result["preset_plugin"] = meant_name
+        if preset_cid and host_cid and preset_cid != host_cid or (
+                not host_cid and host_name and meant_name and
+                not plugin_ids.same_plugin(host_name, meant_name)):
+            return tool_error(f"this preset is for {meant_name or 'another plug-in'} "
+                              f"(class {preset_cid}); the host holds "
+                              f"{host_name or 'a different plug-in'} — nothing was changed",
+                              type="bad_args", cmd=cmd)
         try:
             args = {"path": str(path)}
-            if result.get("preset_name"):            # packed for Serum 2 by us
-                args["plugin_name"] = "Serum 2"
+            if meant_name:
+                args["plugin_name"] = meant_name
+            if preset_cid and (host_cid in (None, preset_cid)):
+                args["class_id"] = preset_cid
             answer = engine.request(host, "preset", args, timeout=_SET_TIMEOUT)
         except engine.EngineError as exc:
             return _failure(exc, cmd)
         result.update(answer or {})
+        if preset_cid and result.get("changed"):          # it worked: remember the pairing
+            plugin_ids.learn(preset_cid, host_name or meant_name, hosted.get("file"))
         if not result.get("changed"):
             result["notes"].append("No sampled parameter changed: the preset may be for another "
                                    "plug-in, or already match — open the plug-in's window "

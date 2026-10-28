@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.2.4";
+const VERSION = "0.2.5";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -345,6 +345,7 @@ async function load(args) {
   const names = await listNames();
   if (!names.length) throw { type: "not_found", message: `vst~ could not load "${file}"` };
   state.plugin = { file: file, name: String(args.name || args.sub || file), synth: isSynth };
+  if (args.class_id) state.plugin.class_id = String(args.class_id);
   writeRegistry();
   status(state.plugin.name);
   // name the Live device after the plug-in: Live keeps it in the Set, adopt() reads it back
@@ -419,6 +420,7 @@ async function set(args) {
 async function preset(args) {
   await needPlugin();
   // a host restored without its name learns it from a preset made for a known plug-in
+  if (args.class_id && !state.plugin.class_id) state.plugin.class_id = String(args.class_id);
   if (args.plugin_name && state.plugin.name === "plug-in") {
     state.plugin.name = String(args.plugin_name);
     writeRegistry();
