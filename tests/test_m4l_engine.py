@@ -684,8 +684,14 @@ def test_live_modulation_end_to_end(engines, tcp_bridge, song):
     stopped = call_tool(app, "live_engine_unmodulate", {"track": "Bass", "device": "Operator",
                                                         "parameter": "Filter Freq"})
     assert [m["slot"] for m in stopped["stopped"]] == [0]
+    # the original goes in first, the parameter is let go a few audio vectors later (not in
+    # the same instant, or live.remote~ keeps the LFO's last value), then written once more
+    assert engine.wait_for(lambda: any(m[:2] == ["setvalue", 1000] for m in sent()), 3)
     log = sent()
-    assert log.index(["mod", 0, "value", 1000]) < log.index(["mod", 0, "id", 0])
+    restore = next(i for i, m in enumerate(log) if m[:2] == ["setvalue", 1000])
+    assert log.index(["mod", 0, "value", 1000]) < log.index(["mod", 0, "id", 0]) < restore
+    path = " ".join(str(a) for a in log[restore][2:])
+    assert path.startswith("live_set tracks") and path.endswith("parameters 2"), path
     assert len(call_tool(app, "live_engine_status", {})["devices"][0]["modulations"]) == 1
     everything = call_tool(app, "live_engine_unmodulate", {"all": True})
     assert [m["slot"] for m in everything["stopped"]] == [1]

@@ -93,7 +93,10 @@ together.
   shapes run free at the song tempo. `context.js` also turns the parameter's path into the id
   `live.remote~` needs (`resolve` / `resolved`), and reads min, max and the value to restore.
   `live.remote~` changes the parameter without automation or undo steps; while it holds a
-  parameter, Live greys it out and ignores its automation. Modulations live in the device's
+  parameter, Live greys it out and ignores its automation. Unmodulating sends the saved value,
+  lets go 80 ms later (`live.remote~` reads its signal once per audio vector: letting go at
+  once kept the LFO's last value) and then writes the saved value through the LiveAPI as well
+  — that last write is one undo step. Modulations live in the device's
   Node process: they end with the device and are not saved with the set.
 
 - **Follow actions**: Live 12.4.5's API has no follow-action properties, so the device plays

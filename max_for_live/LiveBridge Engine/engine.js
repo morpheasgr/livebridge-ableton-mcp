@@ -50,7 +50,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -66,6 +66,10 @@ const MAX_CAPTURE_SECONDS = 60;
 const MAX_CAPTURE_DELAY_MS = 5000;
 const CAPTURE_NAME = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,119}\.wav$/;
 const MOD_SLOTS = 8;                  // live.remote~ objects in the patch
+// Unmodulate: let go of a parameter this long after sending its original value (several
+// audio vectors even at large buffer sizes), then write the original once more.
+const RELEASE_DELAY_MS = 80;
+const RESTORE_WRITE_MS = 30;
 const MOD_TICK_MS = 20;               // 50 updates a second, each glided over by line~
 const MOD_RESOLVE_MS = 3000;
 const MAX_PATH = /^live_set( [a-z_]+( \d+)?){1,12}$/;
@@ -373,11 +377,21 @@ function stopTickerIfIdle() {
 }
 
 function release(mod) {
-  // back to the value the parameter had, then let go of it
-  maxApi.outlet("mod", mod.slot, "value", mod.original);
-  maxApi.outlet("mod", mod.slot, "id", 0);
+  // Back to the value the parameter had, then let go of it. live.remote~ reads its signal
+  // once per audio vector, so letting go at once would leave the LFO's last value: send the
+  // original, release a few vectors later, then write the original through the LiveAPI too
+  // (the knob is a normal parameter again by then).
   state.mods.delete(mod.slot);
   stopTickerIfIdle();
+  maxApi.outlet("mod", mod.slot, "value", mod.original);
+  setTimeout(() => {
+    if (!state.mods.has(mod.slot)) {
+      maxApi.outlet("mod", mod.slot, "id", 0);
+    }
+    setTimeout(() => {
+      maxApi.outlet("setvalue", mod.original, ...atoms(mod.path));
+    }, RESTORE_WRITE_MS);
+  }, RELEASE_DELAY_MS);
 }
 
 function parseModulation(args) {
