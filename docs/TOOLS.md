@@ -1996,7 +1996,7 @@ Bridge: `browser.load`, `devices.delete`, `devices.list`, `samples.locations`
 
 #### `live_plugin_host_preset`
 
-Load a preset file into a hosted plug-in, so a patch designed as a file can then be fine-tuned parameter by parameter on the same instance: a `.vstpreset` (any VST3), or a Serum 2 `.SerumPreset` / design JSON from `live_preset_edit`, which is first packed into a `.vstpreset` the way `live_preset_load` does (User Library > LiveBridge Presets > Serum 2, with your same-build template). Bank dials follow the new values.
+Load a preset file into a hosted plug-in, so a patch designed as a file can then be fine-tuned parameter by parameter on the same instance: a `.vstpreset` (any VST3), or a Serum 2 `.SerumPreset` / design JSON from `live_preset_edit`, which is first packed into a `.vstpreset` the way `live_preset_load` does (User Library > LiveBridge Presets > Serum 2, with your template of that build or newer — older factory presets are upgraded). Bank dials follow the new values.
 
 | Argument | Type | Default |
 |---|---|---|

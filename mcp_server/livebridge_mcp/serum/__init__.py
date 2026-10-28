@@ -11,8 +11,10 @@ The codec, tree, VST3 container and packing are ported from ableton-mcp-pro (MIT
 templates and presets are, and publishing a new ``.vstpreset`` into the User Library.
 
 Packing needs a *template*: a ``.vstpreset`` saved from the user's own Serum 2 of the same build
+or a newer one
 (in Live: the plug-in device's title bar -> Save Preset, into the User Library). It supplies the
-VST3 class id and the processor/controller schemas; different Serum builds are refused.
+VST3 class id and the processor/controller schemas; a preset from an older Serum goes into a
+newer template (an upgrade, reported), a preset from a newer Serum than every template is refused.
 Needs ``cbor2`` and ``zstandard`` (the ``serum`` extra).
 """
 
@@ -181,10 +183,34 @@ def publish(folder: Path, name: str, payload: bytes, forbidden: Iterable[Path]) 
 from . import codec, pack, tree, vst3  # noqa: E402  (the ported modules, as serum.<module>)
 
 
+def pick_template(templates: list[dict[str, Any]], wanted: tuple[Any, Any]) -> Path:
+    """The template for a preset of build ``wanted`` (productVersion, version): the same build
+    if there is one, else the oldest newer one (Serum upgrades older presets). Raises
+    ValueError when every template is older than the preset, or there is none."""
+    from .pack import build_relation
+    source = {"productVersion": wanted[0], "version": wanted[1]}
+    same, newer = [], []
+    for template in templates:
+        relation = build_relation(source, {"productVersion": template["product_version"],
+                                           "version": template["version"]})
+        (same if relation == "same" else newer if relation == "older" else []).append(template)
+    if same:
+        return Path(same[0]["path"])
+    if newer:
+        from .pack import build_key
+        newer.sort(key=lambda t: (build_key(t["product_version"]), build_key(t["version"])))
+        return Path(newer[0]["path"])
+    found = sorted({str(t["product_version"]) for t in templates})
+    raise ValueError(f"no Serum 2 template of build {wanted[0]} or newer in the User Library"
+                     + (f" (found: {', '.join(found)})" if found else "")
+                     + ": save any preset from your Serum 2 in Live (the device's title bar > "
+                       "Save Preset) once, then retry")
+
+
 def vstpreset_for(source: str, user_libraries: list[Path], template: str | None = None
                   ) -> tuple[Path, str, dict[str, Any]]:
     """Pack a ``.SerumPreset`` (or design JSON) into a new ``.vstpreset`` in the User Library
-    (``PUBLISHED`` folder) with a same-build template: ``(path, preset name, report)``.
+    (``PUBLISHED`` folder) with a template of the same or a newer build (see :func:`pick_template`): ``(path, preset name, report)``.
 
     Raises ValueError with a readable message (no template, wrong build ...).
     """
@@ -198,13 +224,7 @@ def vstpreset_for(source: str, user_libraries: list[Path], template: str | None 
         if template_info(chosen) is None:
             raise ValueError(f"{chosen} is not a Serum 2 .vstpreset")
     else:
-        matching = [t for t in find_templates(user_libraries)
-                    if (t["product_version"], t["version"]) == wanted]
-        if not matching:
-            raise ValueError(f"no Serum 2 template of build {wanted[0]} in the User Library: "
-                             "save any preset from your Serum 2 in Live (the device's title "
-                             "bar > Save Preset) once, then retry")
-        chosen = Path(matching[0]["path"])
+        chosen = pick_template(find_templates(user_libraries), wanted)
     payload, report = pack.pack_serum2(path, chosen)
     name = report.get("preset_name") or path.stem
     output = publish(user_libraries[0].joinpath(*PUBLISHED), name, payload, [path, chosen])

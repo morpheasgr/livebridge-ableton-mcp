@@ -559,14 +559,17 @@ call encoded modulation missing merely because no instance was requested.
 
 ## Loading
 
-`live_preset_load(source_path=...)` packs the `.SerumPreset` into a new same-build
+`live_preset_load(source_path=...)` packs the `.SerumPreset` into a new
 `.vstpreset` and loads it through Live's browser:
 
 - **Template**: a `.vstpreset` saved from the user's own Serum 2 (in Live: the plug-in device's
   title bar -> Save Preset, into the User Library). It supplies the VST3 class id and the
-  processor/controller schemas. LiveBridge finds the newest one of the preset's Serum build in
-  the User Library (`live_preset_find` lists them); `template=` picks another. A different
-  build is refused — no cross-version packing.
+  processor/controller schemas. LiveBridge picks one of the preset's Serum build in the User
+  Library, else the oldest newer one (`live_preset_find` lists them); `template=` picks
+  another. Presets saved by an **older** Serum (factory and commercial packs) are upgraded:
+  settings the old preset does not have keep the template's defaults, as when Serum opens an
+  old preset, and the result says `upgraded_from` — listen against the original if it
+  matters. A preset from a **newer** Serum than every template is refused (update Serum).
 - **Output**: `User Library/LiveBridge Presets/Serum 2/<preset name>.vstpreset`. The same
   preset again reuses its file; a different one with the same name gets a short hash; nothing
   is overwritten. Source and template stay unchanged.

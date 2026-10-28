@@ -53,6 +53,28 @@ def pack_serum_state(meta: dict, data: dict) -> bytes:
     )
 
 
+def build_key(value) -> tuple:
+    """"2.0.11" / 3 -> comparable tuple (non-numeric parts compare as 0)."""
+    parts = []
+    for part in str(value if value is not None else "").replace("-", ".").split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def build_relation(source_meta: dict, template_meta: dict) -> str:
+    """"same", "older" (the preset comes from an older Serum than the template — Serum
+    upgrades such state when it loads it) or "newer" (refused)."""
+    relation = "same"
+    for key in ("productVersion", "version"):
+        src, tpl = build_key(source_meta.get(key)), build_key(template_meta.get(key))
+        if src > tpl:
+            return "newer"
+        if src < tpl:
+            relation = "older"
+    return relation
+
+
 def pack_serum2(source: Path, template: Path) -> tuple[bytes, dict]:
     source, preset, source_sha, _kind = codec.load(str(source))
     template = template.resolve(strict=True)
@@ -65,11 +87,15 @@ def pack_serum2(source: Path, template: Path) -> tuple[bytes, dict]:
         meta, data = unpack_serum_state(chunks[tag])
         if meta.get("product") != "Serum2" or meta.get("component") != component:
             raise ValueError("Template is not a Serum processor/controller pair.")
-        for key in ("productVersion", "version"):
-            if meta.get(key) != preset["metadata"].get(key):
-                raise ValueError(
-                    f"Source/template {key} differs; no cross-build conversion."
-                )
+        # LiveBridge: an older preset goes into a newer template (fields it lacks keep the
+        # template's defaults, as when Serum opens an old preset); a newer one is refused.
+        relation = build_relation(preset["metadata"], meta)
+        if relation == "newer":
+            raise ValueError(
+                f"The preset is from Serum {preset['metadata'].get('productVersion')}, newer "
+                f"than the template's {meta.get('productVersion')}: update Serum 2 and save a "
+                "new template."
+            )
         schemas[tag] = meta, data
     known = set().union(*(data for _meta, data in schemas.values()))
     unsupported = set(preset["data"]) - known - METADATA_KEYS
@@ -96,8 +122,11 @@ def pack_serum2(source: Path, template: Path) -> tuple[bytes, dict]:
         raise ValueError("Source changed while packaging.")
     if codec.digest(template.read_bytes()) != codec.digest(template_raw):
         raise ValueError("Template changed while packaging.")
+    template_version = schemas[b"Comp"][0].get("productVersion")
+    upgraded = build_relation(preset["metadata"], schemas[b"Comp"][0]) == "older"
     return payload, {
-        "version": preset["metadata"].get("productVersion"),
+        "version": template_version if upgraded else preset["metadata"].get("productVersion"),
+        **({"upgraded_from": preset["metadata"].get("productVersion")} if upgraded else {}),
         "preset_name": preset["metadata"].get("presetName") or source.stem,
         "source_sha256": source_sha,
         "template_sha256": codec.digest(template_raw),

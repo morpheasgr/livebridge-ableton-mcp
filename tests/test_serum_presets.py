@@ -119,9 +119,26 @@ def test_pack_into_a_vstpreset(tmp_path):
     assert meta["component"] == "processor" and data["Filter0"] == _data()["Filter0"]
     controller_meta, _ = serum.pack.unpack_serum_state(chunks[b"Cont"])
     assert controller_meta["presetName"] == "Glass Comet"
+    # a preset from a newer Serum than the template is refused
     other = _template(tmp_path / "lib" / "Old.vstpreset", version="2.0.14")
-    with pytest.raises(ValueError, match="no cross-build"):
+    with pytest.raises(ValueError, match="newer than the template"):
         serum.pack.pack_serum2(source, other)
+    # an older preset (factory packs) goes into a newer template: an upgrade, reported
+    old = _preset(tmp_path / "Factory.SerumPreset", version="2.0.11")
+    payload, report = serum.pack.pack_serum2(old, template)
+    assert report["upgraded_from"] == "2.0.11" and report["version"] == "2.0.16"
+    meta, data = serum.pack.unpack_serum_state(serum.vst3.read_vst3_preset(payload)[1][b"Comp"])
+    assert meta["productVersion"] == "2.0.16" and data["Filter0"] == _data()["Filter0"]
+    assert serum.pack.build_key("2.1.5") > serum.pack.build_key("2.0.11")
+
+
+def test_template_choice_for_older_presets(tmp_path):
+    templates = [{"path": str(tmp_path / f"{v}.vstpreset"), "product_version": v, "version": 6}
+                 for v in ("2.1.5", "2.0.14", "2.0.16")]
+    assert serum.pick_template(templates, ("2.0.16", 6)).name == "2.0.16.vstpreset"   # same
+    assert serum.pick_template(templates, ("2.0.11", 6)).name == "2.0.14.vstpreset"  # newer
+    with pytest.raises(ValueError, match="2.2.0 or newer"):
+        serum.pick_template(templates, ("2.2.0", 6))
 
 
 def test_templates_are_found_in_the_user_library(tmp_path):
@@ -227,7 +244,7 @@ def test_load_packs_publishes_and_loads(fake, tmp_path):
     refused = call_tool(app, "live_preset_load", {"source_path": source})
     assert refused["type"] == "not_found" and "Save Preset" in refused["error"]
     _template(library / "Old.vstpreset", version="2.0.14")
-    wrong = call_tool(app, "live_preset_load", {"source_path": source})
+    wrong = call_tool(app, "live_preset_load", {"source_path": source})    # preset is newer
     assert "found: 2.0.14" in wrong["error"]
     _template(library / "Mine.vstpreset")
     bridge.set_result("browser.load", {"loaded": {"name": "Dark Reese"},
@@ -270,3 +287,15 @@ def test_missing_libraries_are_reported(fake, tmp_path, monkeypatch):
     monkeypatch.setattr(serum.codec, "libraries", missing)
     assert call_tool(app, "live_preset_inspect", {"file_path": source})["type"] == \
         "unsupported"
+
+
+def test_load_an_older_factory_preset(fake, tmp_path):
+    app, bridge, library = fake
+    source = str(_preset(tmp_path / "presets" / "Pluck.SerumPreset", name="Pluck",
+                         version="2.0.11"))
+    _template(library / "Serum 2 Init.vstpreset", version="2.1.5")
+    bridge.set_result("browser.load", {"inserted": [{"name": "Serum 2",
+                                                     "path": "song.tracks[3].devices[0]"}]})
+    loaded = call_tool(app, "live_preset_load", {"source_path": source})
+    assert loaded["loaded"] is True and loaded["upgraded_from"] == "2.0.11"
+    assert loaded["version"] == "2.1.5" and "Saved by Serum 2.0.11" in loaded["notes"][-1]

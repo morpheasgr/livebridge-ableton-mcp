@@ -5,6 +5,10 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Older Serum presets load** (`live_preset_load`, `live_plugin_host_preset`): a preset saved by
+  an older Serum 2 (factory and commercial packs) is packed with a newer template instead of
+  being refused; settings it lacks keep the template's defaults and the result says
+  `upgraded_from`. Presets newer than every template are still refused.
 - **Fix: no more "Node script not ready" lines in the Max window** (Engine 1.5.2, MIDI 1.0.1,
   Host 0.2.1): each device holds its messages to Node for Max behind a closed gate until the
   script says it is ready.
