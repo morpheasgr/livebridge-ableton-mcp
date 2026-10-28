@@ -3,6 +3,10 @@
 LiveBridge's version is the Remote Script's (`VERSION` in `remote_script/LiveBridge/LiveBridge.py`);
 the MCP server package and the installer have their own version numbers. `live_status` shows both.
 
+## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
+
+- Version bump so `live_status` shows whether the new code runs; `live_status` also reports the MCP server's `pid` and `started` time.
+
 ## Unreleased
 
 - **Fix: the touch log no longer counts restores** (Host 0.3.2): Live's undo or a reopened set
