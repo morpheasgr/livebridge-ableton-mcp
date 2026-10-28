@@ -4,16 +4,19 @@ Live's API reaches only the plug-in parameters added with Configure (at most 128
 LiveBridge Host Max for Live devices (``max_for_live/LiveBridge Host``: an effect and an
 instrument) load the plug-in inside Max's ``vst~`` instead, which lists and sets all of them:
 `live_plugin_host_load` puts one on a track and loads the plug-in, `live_plugin_host_parameters`
-lists and searches its parameters, `live_plugin_host_set` sets them by number or display text.
+lists and searches its parameters, `live_plugin_host_set` sets them by number or display text,
+and `live_plugin_host_bank` swaps in a per-plug-in host whose chosen parameters are Live dials
+(automatable).
 
-Limits: hosted parameters are not Live parameters (no automation lanes — use
-`live_engine_modulate` or `live_plugin_expose` for a natively loaded copy), the plug-in runs
+Limits: hosted parameters are not Live parameters until a bank makes dials of them, the
+plug-in runs
 inside Max (Max for Live needed to open the set), VST3 only. Device protocol: like the
 Engine's (:mod:`livebridge_mcp.engine`), registry kind "host".
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 import platform
 import re
@@ -22,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from . import bridge_call, tool_error
-from .. import engine
+from .. import engine, host_device
 from ..client import BridgeClient
 
 _DEVICES = {"effect": ("LiveBridge Host Effect", "audio_effect"),
@@ -30,6 +33,47 @@ _DEVICES = {"effect": ("LiveBridge Host Effect", "audio_effect"),
 _WAIT_S = 12.0
 _LOAD_TIMEOUT = 30.0
 _SET_TIMEOUT = 60.0
+_BANK_FOLDER = ("LiveBridge Presets", "Plug-in Hosts")
+_HOST_JS = ("lbhost.js", "lbhost_context.js")
+_GENERIC = ("LiveBridge Host Instrument", "LiveBridge Host Effect")
+_BROWSER_TRIES = 4
+
+
+def _js_sources(libraries: list[Path]) -> Path | None:
+    """A folder holding lbhost.js + lbhost_context.js: the repo's, else the installed host's."""
+    candidates = [Path(__file__).resolve().parents[3] / "max_for_live" / "LiveBridge Host"]
+    for library in libraries:
+        candidates += [library / "Presets" / "Instruments" / "Max Instrument" / _GENERIC[0],
+                       library / "Presets" / "Audio Effects" / "Max Audio Effect" / _GENERIC[1]]
+    for folder in candidates:
+        if all((folder / name).is_file() for name in _HOST_JS):
+            return folder
+    return None
+
+
+def _stem(name: str) -> str:
+    cleaned = "".join(" " if c in '<>:"/\\|?*' or ord(c) < 32 else c for c in name)
+    return (" ".join(cleaned.split()).strip().rstrip(".") or "Plug-in")[:60]
+
+
+def write_bank(folder: Path, name: str, payload: bytes, scripts: Path) -> Path:
+    """``<name>.amxd`` (or ``<name> <hash>.amxd`` when that name holds another bank) next to
+    copies of the host scripts; an identical file is reused."""
+    folder.mkdir(parents=True, exist_ok=True)
+    for script in _HOST_JS:
+        source = (scripts / script).read_bytes()
+        target = folder / script
+        if not target.is_file() or target.read_bytes() != source:
+            target.write_bytes(source)
+    digest = hashlib.sha256(payload).hexdigest()[:8]
+    for path in (folder / f"{_stem(name)}.amxd", folder / f"{_stem(name)} {digest}.amxd"):
+        if path.exists():
+            if path.read_bytes() == payload:
+                return path
+            continue
+        path.write_bytes(payload)
+        return path
+    raise OSError("could not write the bank device without overwriting another one")
 
 
 def vst3_folders() -> list[Path]:
@@ -279,3 +323,136 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return result
         except engine.EngineError as exc:
             return _failure(exc, cmd)
+
+    @mcp.tool()
+    def live_plugin_host_bank(
+        parameters: list[str],
+        track: str | None = None,
+        name: str | None = None,
+        replace: bool = True,
+    ) -> Any:
+        """Make chosen parameters of a hosted plug-in automatable: writes a per-plug-in host
+        device whose Live dials are named after them (up to 128 — Live reads a device's
+        parameters when it loads, so they are baked into the file), loads it on the same track,
+        copies every parameter value across and removes the old host. Then record the dials
+        like any device knob (`live_automation_record`, clip envelopes, Arrangement Record) or
+        map them to rack macros.
+
+        Args:
+            parameters: names or ids ("h12") from `live_plugin_host_parameters`, 1..128.
+            track: the track whose LiveBridge Host to bank (optional when there is one).
+            name: device file name (default "<plug-in> Bank"); saved to User Library >
+                LiveBridge Presets > Plug-in Hosts and reusable from the browser.
+            replace: remove the old host after the values are copied (false: keep both).
+
+        Returns:
+            `{device_file, browser_path, track, bank:[{name, id}], restored, removed_old,
+            notes}`.
+
+        Gotchas: parameter values move across; plug-in state that is not a parameter
+        (wavetables, samples, a preset's internal data) does not — make the bank before
+        designing such a sound, or reload the preset in the plug-in's window. The dials run
+        0..1 (the plug-in's window shows the real value). Edits in the plug-in's own window do
+        not move the dials. Needs Live connected on this machine.
+        """
+        cmd = "plugin_host.bank"
+        if not isinstance(parameters, list) or not 1 <= len(parameters) <= host_device.MAX_BANK:
+            return tool_error(f"parameters must list 1..{host_device.MAX_BANK} names or ids",
+                              cmd=cmd)
+        try:
+            old = _host_on(track)
+            hello = engine.request(old, "hello")
+            plugin = (hello or {}).get("plugin")
+            if not plugin:
+                return tool_error("that host has no plug-in loaded", type="invalid_state",
+                                  cmd=cmd)
+            resolved = engine.request(old, "resolve", {"names": parameters},
+                                      timeout=_SET_TIMEOUT)["parameters"]
+            missing = [p["name"] for p in resolved if p.get("error")]
+            if missing:
+                return tool_error(f"unknown parameter(s) {missing} — see "
+                                  "live_plugin_host_parameters", type="not_found", cmd=cmd)
+            snapshot = engine.request(old, "values", timeout=_SET_TIMEOUT)["values"]
+        except engine.EngineError as exc:
+            return _failure(exc, cmd)
+        places = bridge_call(bridge, "samples.locations")
+        libraries = [Path(p["path"]) for p in (places.get("user_library") or [])
+                     if isinstance(p, dict) and p.get("exists") and p.get("path")] \
+            if isinstance(places, dict) and not _is_error(places) else []
+        if not libraries:
+            return tool_error("Live's User Library was not found (is Live connected and on "
+                              "this machine?)", type="not_found", cmd=cmd)
+        scripts = _js_sources(libraries)
+        if scripts is None:
+            return tool_error("lbhost.js was not found — re-run the LiveBridge installer",
+                              type="not_found", cmd=cmd)
+        instrument = old.get("host_kind") == "instrument" or hello.get("host_kind") == \
+            "instrument"
+        bank = [{"name": p["name"], "index": p["index"]} for p in resolved]
+        payload = host_device.bank_device({"file": plugin.get("file"),
+                                           "sub": plugin.get("name"),
+                                           "name": plugin.get("name")}, instrument, bank)
+        try:
+            path = write_bank(libraries[0].joinpath(*_BANK_FOLDER),
+                              name or f"{plugin.get('name') or plugin.get('file')} Bank",
+                              payload, scripts)
+        except OSError as exc:
+            return tool_error(f"could not write the bank device: {exc}", type="invalid_state",
+                              cmd=cmd)
+        browser_path = "user_library/" + "/".join(_BANK_FOLDER) + "/" + path.name
+        where = old.get("track")
+        before = {d.get("instance") for d in _hosts()}
+        args: dict[str, Any] = {"path": browser_path, "track": where}
+        answer: Any = None
+        for attempt in range(_BROWSER_TRIES):
+            answer = bridge_call(bridge, "browser.load", args, timeout=60.0)
+            if not (isinstance(answer, dict) and answer.get("type") == "not_found"):
+                break
+            if attempt == 0:
+                args["path"] = browser_path[:-len(".amxd")]
+            time.sleep(1.5)
+        result: dict[str, Any] = {"device_file": str(path), "browser_path": browser_path,
+                                  "track": where, "notes": []}
+        if _is_error(answer):
+            result.update(loaded=False, error=answer.get("error"))
+            result["notes"].append("The device is saved: drag it from User Library > "
+                                   "LiveBridge Presets > Plug-in Hosts onto the track.")
+            return result
+        end = time.time() + _WAIT_S + _LOAD_TIMEOUT
+        new = None
+        while time.time() < end:
+            fresh = [d for d in _hosts() if d.get("instance") not in before and d.get("plugin")]
+            if fresh:
+                new = fresh[0]
+                break
+            time.sleep(0.5)
+        if new is None:
+            result.update(loaded=False, error="the bank device did not report its plug-in")
+            return result
+        try:
+            restored = engine.request(new, "restore", {"values": snapshot},
+                                      timeout=_SET_TIMEOUT)["restored"]
+        except engine.EngineError as exc:
+            restored = 0
+            result["notes"].append(f"values not copied: {exc}")
+        result.update(loaded=True, restored=restored,
+                      bank=[{"name": p["name"], "id": p["id"]} for p in resolved])
+        removed = False
+        if replace and any(d.get("instance") == old.get("instance") for d in _hosts()):
+            listing = bridge_call(bridge, "devices.list", {"track": where})
+            devices = listing.get("devices") if isinstance(listing, dict) else None
+            candidates = [d for d in devices or [] if str(d.get("name")) in _GENERIC
+                          or (str(d.get("name")) == str(hello.get("device_name") or ""))]
+            if len(candidates) == 1:
+                gone = bridge_call(bridge, "devices.delete", {"track": where,
+                                                             "device": candidates[0]["path"]})
+                removed = not _is_error(gone)
+            if not removed:
+                result["notes"].append("The old host is still on the track: delete it once "
+                                       "the bank sounds right.")
+        else:
+            removed = replace          # Live replaced the instrument itself
+        result["removed_old"] = removed
+        result["notes"].append("Dials run 0..1; the plug-in's window shows real values. "
+                               "Record them like any knob (live_automation_record).")
+        return result

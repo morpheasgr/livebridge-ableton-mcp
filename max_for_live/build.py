@@ -32,6 +32,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "mcp_server"))
+from livebridge_mcp import host_device  # noqa: E402
 ENGINE_DIR = HERE / "LiveBridge Engine"
 ENGINE_AMXD = ENGINE_DIR / "LiveBridge Engine.amxd"
 ENGINE_GENDSP = ENGINE_DIR / "lb_engine.gendsp"
@@ -47,8 +49,6 @@ HOST_CONTEXT = HOST_DIR / "lbhost_context.js"
 AUDIO_EFFECT = 0x61616161          # 'aaaa'
 MIDI_EFFECT = 0x6D6D6D6D           # 'mmmm'
 INSTRUMENT = 0x69696969            # 'iiii'
-#: vst~'s message outlets (after its 2 signal outlets) all go to lbhost.js, tagged
-HOST_VST_OUTLETS = 5
 FRAME_MS = 100
 MOD_SLOTS = 8                       # live.remote~ objects (engine.js MOD_SLOTS)
 APP_VERSION = {"major": 9, "minor": 0, "revision": 7, "architecture": "x64", "modernui": 1}
@@ -402,84 +402,9 @@ def midi_patcher() -> dict:
 
 
 def host_patcher(instrument: bool) -> dict:
-    """The plug-in host: vst~ holds any VST3 and lbhost.js reaches all of its parameters.
-
-    Effect: plugin~ -> vst~ 2 2 -> plugout~. Instrument: midiin -> midiparse (every message as
-    "midievent") -> vst~ -> plugout~. vst~ keeps the plug-in's state in the Set
-    (parameter_enable + autosave); lbhost.js talks to it with "vst ..." messages and hears every
-    message outlet as "vstout <outlet> ...".
-    """
-    vst_out = 2 + HOST_VST_OUTLETS
-    boxes = [
-        _box("obj-vst", "vst~ 2 2 @autosave 1 @valuemode 2", [20.0, 140.0, 160.0, 22.0], 2, vst_out,
-             ["signal", "signal"] + [""] * HOST_VST_OUTLETS, varname="plug",
-             parameter_enable=1, saved_attribute_attributes={"valueof": {
-                 "parameter_longname": "LiveBridge Host state", "parameter_shortname": "state",
-                 "parameter_type": 3, "parameter_invisible": 1}}),
-        _box("obj-plugout", "plugout~", [20.0, 200.0, 60.0, 22.0], 2, 0),
-        _box("obj-node", "node.script lbhost.js @autostart 1 @watch 0",
-             [240.0, 300.0, 260.0, 22.0], 1, 2),
-        _box("obj-route", "route status log context vst", [240.0, 340.0, 200.0, 22.0], 1, 5),
-        _box("obj-thisdevice", "live.thisdevice", [520.0, 200.0, 90.0, 22.0], 1, 3,
-             ["bang", "int", "int"]),
-        _box("obj-context", "js lbhost_context.js", [520.0, 240.0, 130.0, 22.0], 1, 1),
-        _box("obj-kind", "loadmess kind " + ("instrument" if instrument else "effect"),
-             [520.0, 160.0, 140.0, 22.0], 1, 1),
-        _box("obj-set", "prepend set", [240.0, 380.0, 80.0, 22.0], 1, 1),
-        _box("obj-print", "print LiveBridgeHost", [340.0, 420.0, 130.0, 22.0], 1, 0),
-        {"box": {"id": "obj-status", "maxclass": "message", "text": "starting...",
-                 "numinlets": 2, "numoutlets": 1, "outlettype": [""],
-                 "patching_rect": [240.0, 420.0, 200.0, 22.0], "presentation": 1,
-                 "presentation_rect": [8.0, 34.0, 184.0, 22.0]}},
-        {"box": {"id": "obj-title", "maxclass": "comment", "text": "LiveBridge Host",
-                 "numinlets": 1, "numoutlets": 0, "fontsize": 13.0, "fontface": 1,
-                 "patching_rect": [520.0, 420.0, 150.0, 22.0], "presentation": 1,
-                 "presentation_rect": [8.0, 8.0, 184.0, 22.0]}},
-    ]
-    lines = [
-        _line("obj-vst", 0, "obj-plugout", 0), _line("obj-vst", 1, "obj-plugout", 1),
-        _line("obj-node", 0, "obj-route", 0), _line("obj-route", 0, "obj-set", 0),
-        _line("obj-set", 0, "obj-status", 0), _line("obj-route", 1, "obj-print", 0),
-        _line("obj-route", 2, "obj-context", 0), _line("obj-route", 3, "obj-vst", 0),
-        _line("obj-route", 4, "obj-print", 0),
-        _line("obj-thisdevice", 0, "obj-context", 0), _line("obj-context", 0, "obj-node", 0),
-        _line("obj-kind", 0, "obj-node", 0),
-    ]
-    for outlet in range(HOST_VST_OUTLETS):
-        tag = f"obj-vstout{outlet}"
-        boxes.append(_box(tag, f"prepend vstout {outlet + 2}",
-                          [200.0 + 110.0 * outlet, 220.0, 105.0, 22.0], 1, 1))
-        lines += [_line("obj-vst", 2 + outlet, tag, 0), _line(tag, 0, "obj-node", 0)]
-    if instrument:
-        boxes += [
-            _box("obj-midiin", "midiin", [20.0, 20.0, 50.0, 22.0], 1, 1, ["int"]),
-            _box("obj-midiparse", "midiparse", [20.0, 60.0, 120.0, 22.0], 1, 8,
-                 ["", "", "", "int", "int", "int", "int", ""]),
-        ]
-        lines += [_line("obj-midiin", 0, "obj-midiparse", 0),
-                  _line("obj-midiparse", 7, "obj-vst", 0)]
-    else:
-        boxes.append(_box("obj-plugin", "plugin~", [20.0, 20.0, 60.0, 22.0], 2, 2,
-                          ["signal", "signal"]))
-        lines += [_line("obj-plugin", 0, "obj-vst", 0), _line("obj-plugin", 1, "obj-vst", 1)]
-    kind = INSTRUMENT if instrument else AUDIO_EFFECT
-    return {"patcher": {
-        "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
-        "rect": [80.0, 80.0, 800.0, 500.0], "openinpresentation": 1,
-        "default_fontsize": 12.0, "default_fontface": 0, "default_fontname": "Arial",
-        "gridsize": [15.0, 15.0], "devicewidth": 200.0, "description":
-        "LiveBridge Host: any VST3 plug-in with all of its parameters reachable by the "
-        "LiveBridge MCP server (experimental)",
-        "boxes": boxes, "lines": lines,
-        "dependency_cache": [
-            {"name": "lbhost.js", "bootpath": ".", "type": "TEXT", "implicit": 1},
-            {"name": "lbhost_context.js", "bootpath": ".", "type": "TEXT", "implicit": 1},
-        ],
-        "project": {"version": 1, "amxdtype": kind, "readonly": 0, "devpathtype": 0,
-                    "devpath": ".", "sortmode": 0, "viewmode": 0,
-                    "contents": {"patchers": {}, "code": {}}, "layout": {},
-                    "searchpath": {}, "detailsvisible": 0},
-    }}
+    """The generic plug-in hosts (patch built by livebridge_mcp.host_device, shared with the
+    per-plug-in bank devices live_plugin_host_bank writes)."""
+    return host_device.host_patcher(instrument)
 
 
 def amxd(patcher: dict, device_type: int) -> bytes:
