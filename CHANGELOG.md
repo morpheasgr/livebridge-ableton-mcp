@@ -5,6 +5,10 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Presets know their plug-in** (`live_plugin_host_preset`, Host 0.2.5): a `.vstpreset`'s VST3
+  class ID is looked up in the installed plug-ins' `moduleinfo.json` and in a table learned
+  from loads that worked. A preset for a different plug-in than the host holds is refused
+  before anything changes, and an unnamed host takes the preset's plug-in name.
 - **LiveBridge Host names itself after its plug-in** (Host 0.2.3): the device's title becomes
   "Serum 2", and a reopened set shows that name instead of "plug-in".
 - **LiveBridge Host: an "Open plug-in" button** on the device (and on bank devices) opens the
