@@ -146,6 +146,21 @@ def find_vst3(name: str, folders: list[Path] | None = None) -> list[dict[str, st
     return unique
 
 
+def _seconds(span: Any) -> float | None:
+    """90 / "90" / "30 s" / "2 min" / "1.5 minutes" -> seconds (None when unreadable)."""
+    if isinstance(span, bool):
+        return None
+    if isinstance(span, (int, float)):
+        return float(span) if span > 0 else None
+    match = re.match(r"^\s*(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds?|m|min|mins|minutes?|h|"
+                     r"hours?)?\s*$", str(span).lower())
+    if not match:
+        return None
+    value = float(match.group(1))
+    unit = (match.group(2) or "s")[0]
+    return value * {"s": 1, "m": 60, "h": 3600}[unit] if value > 0 else None
+
+
 def _is_error(value: Any) -> bool:
     return isinstance(value, dict) and "error" in value and "type" in value
 
@@ -273,11 +288,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         limit: int = 50,
         snapshot: str | None = None,
         changed_since: str | None = None,
+        touched: bool | float | str | None = None,
+        clear: bool = False,
     ) -> Any:
         """List a hosted plug-in's parameters (all of them, not just 128) with their values
         and display text; search by name. The per-MIDI-CC stand-in parameters VST3 plug-ins
-        add are left out. Also finds what the user moves in the plug-in's window: take a
-        `snapshot`, let them tweak, then ask `changed_since` it. Read-only.
+        add are left out. Also finds what the user moves in the plug-in's window: `touched`
+        lists the parameters they changed there (the host logs what vst~ reports, in order,
+        without LiveBridge's own changes); or take a `snapshot`, let them tweak, then ask
+        `changed_since` it. Read-only.
 
         Args:
             track: the track whose LiveBridge Host to read (optional when there is one).
@@ -285,20 +304,36 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             offset, limit: paging (limit 1..500).
             snapshot: remember every value now under this name ("before") instead of listing.
             changed_since: list only what changed since that snapshot, most moved first.
+            touched: what the user moved in the plug-in's window: true = since the host
+                started (or the last clear), or a time span ("2 min", "30 s", 90 = seconds).
+            clear: with touched: empty the log after reading it (start a fresh round).
 
         Returns:
             `{plugin, total, offset, count, parameters:[{id ("h12"), name, value (0..1),
             display}], next_offset?}`; with snapshot `{snapshot, parameters (count)}`; with
             changed_since `{since, changed, parameters:[{id, name, before, after, value,
-            moved}]}`.
+            moved}]}`; with touched `{touched, parameters:[{id, name, before, after, value,
+            times, first, last}]}` in the order they were first touched.
 
-        Gotchas: a snapshot reads every parameter (a few seconds on ~500).
+        Gotchas: a snapshot reads every parameter (a few seconds on ~500). The touch log
+        depends on the plug-in reporting its window edits to vst~ (most do); if `touched`
+        stays empty while the user turns knobs, use snapshot / changed_since. `before` is
+        unknown for a parameter LiveBridge never read.
         """
         cmd = "plugin_host.params"
         if not 1 <= limit <= 500 or offset < 0:
             return tool_error("limit must be 1..500 and offset >= 0", cmd=cmd)
-        if snapshot is not None and changed_since is not None:
-            return tool_error("pass snapshot or changed_since, not both", cmd=cmd)
+        if sum(x is not None for x in (snapshot, changed_since, touched)) > 1:
+            return tool_error("pass one of snapshot, changed_since, touched", cmd=cmd)
+        seconds = None
+        if touched is not None and touched is not True:
+            if touched is False:
+                touched = None
+            else:
+                seconds = _seconds(touched)
+                if seconds is None:
+                    return tool_error("touched must be true or a time span (\"2 min\", "
+                                      "\"30 s\", 90)", cmd=cmd)
         try:
             host = _host_on(track)
             if snapshot is not None:
@@ -307,6 +342,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if changed_since is not None:
                 return engine.request(host, "changes", {"since": changed_since},
                                       timeout=_SET_TIMEOUT)
+            if touched is not None:
+                return engine.request(host, "touched", {"seconds": seconds, "clear": clear})
             return engine.request(host, "params", {"search": search, "offset": offset,
                                                    "limit": limit}, timeout=_SET_TIMEOUT)
         except engine.EngineError as exc:

@@ -5,6 +5,10 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **What you touch in a hosted plug-in's window** (`live_plugin_host_parameters(touched=...)`,
+  Host 0.3.1): the host logs the changes `vst~` reports from the plug-in's own window, in
+  order with before/after values, leaving out LiveBridge's own writes and preset loads — no
+  snapshot needed. Bank dials now follow window edits.
 - **Fix: `live_plugin_host_expose(remove_host=false)` keeps the host** — an instrument's
   native rack goes on a new "<plug-in> (native)" track (one instrument per MIDI track), an
   effect's next to the host; `host_removed` is checked afterwards, and parameters a plug-in

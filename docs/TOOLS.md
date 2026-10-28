@@ -1958,7 +1958,7 @@ Bridge: `browser.load`
 
 #### `live_plugin_host_parameters`
 
-List a hosted plug-in's parameters (all of them, not just 128) with their values and display text; search by name. The per-MIDI-CC stand-in parameters VST3 plug-ins add are left out. Also finds what the user moves in the plug-in's window: take a `snapshot`, let them tweak, then ask `changed_since` it. Read-only.
+List a hosted plug-in's parameters (all of them, not just 128) with their values and display text; search by name. The per-MIDI-CC stand-in parameters VST3 plug-ins add are left out. Also finds what the user moves in the plug-in's window: `touched` lists the parameters they changed there (the host logs what vst~ reports, in order, without LiveBridge's own changes); or take a `snapshot`, let them tweak, then ask `changed_since` it. Read-only.
 
 | Argument | Type | Default |
 |---|---|---|
@@ -1968,6 +1968,8 @@ List a hosted plug-in's parameters (all of them, not just 128) with their values
 | `limit` | int | `50` |
 | `snapshot` | str \| null | `null` |
 | `changed_since` | str \| null | `null` |
+| `touched` | bool \| float \| str \| null | `null` |
+| `clear` | bool | `false` |
 
 Bridge: none (runs in the MCP server)
 
