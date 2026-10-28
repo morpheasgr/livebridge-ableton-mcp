@@ -255,3 +255,18 @@ def test_preset_into_the_host(engines, monkeypatch, tmp_path):  # noqa: F811
         bridge.stop()
     sent = [json.loads(line) for line in outlets.read_text().splitlines()]
     assert not any(m[0] == "bank" for m in sent)        # no bank on this host
+
+
+def test_load_asks_the_browser_for_a_new_midi_track(tmp_path, monkeypatch):
+    from fake_bridge import FakeBridge
+    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path / "none"))
+    bridge = FakeBridge().start()
+    bridge.set_error("browser.load", "not_found", "stop here")
+    app = create_app(BridgeClient(host=bridge.host, port=bridge.port, timeout=5.0))
+    try:
+        call_tool(app, "live_plugin_host_load", {"plugin": "Diva", "file": "Diva"})
+    finally:
+        bridge.stop()
+    load = [r for r in bridge.requests if r["cmd"] == "browser.load"][-1]["args"]
+    assert load == {"query": "LiveBridge Host Instrument", "category": "instrument",
+                    "new_track": "midi", "track_name": "Diva"}
