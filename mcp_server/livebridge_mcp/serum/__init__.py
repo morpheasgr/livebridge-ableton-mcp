@@ -168,3 +168,33 @@ def publish(folder: Path, name: str, payload: bytes, forbidden: Iterable[Path]) 
 
 
 from . import codec, pack, tree, vst3  # noqa: E402  (the ported modules, as serum.<module>)
+
+
+def vstpreset_for(source: str, user_libraries: list[Path], template: str | None = None
+                  ) -> tuple[Path, str, dict[str, Any]]:
+    """Pack a ``.SerumPreset`` (or design JSON) into a new ``.vstpreset`` in the User Library
+    (``PUBLISHED`` folder) with a same-build template: ``(path, preset name, report)``.
+
+    Raises ValueError with a readable message (no template, wrong build ...).
+    """
+    path, document, _sha, _kind = codec.load(str(resolve(source)))
+    if not user_libraries:
+        raise ValueError("Live's User Library was not found (is Live connected and on this "
+                         "machine?)")
+    wanted = (document["metadata"].get("productVersion"), document["metadata"].get("version"))
+    if template:
+        chosen = resolve(template)
+        if template_info(chosen) is None:
+            raise ValueError(f"{chosen} is not a Serum 2 .vstpreset")
+    else:
+        matching = [t for t in find_templates(user_libraries)
+                    if (t["product_version"], t["version"]) == wanted]
+        if not matching:
+            raise ValueError(f"no Serum 2 template of build {wanted[0]} in the User Library: "
+                             "save any preset from your Serum 2 in Live (the device's title "
+                             "bar > Save Preset) once, then retry")
+        chosen = Path(matching[0]["path"])
+    payload, report = pack.pack_serum2(path, chosen)
+    name = report.get("preset_name") or path.stem
+    output = publish(user_libraries[0].joinpath(*PUBLISHED), name, payload, [path, chosen])
+    return output, name, dict(report, template=str(chosen))

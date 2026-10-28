@@ -57,7 +57,9 @@ the MCP server package and the installer have their own version numbers. `live_s
   (LiveBridge Host Effect / Instrument, built by `max_for_live/build.py`, installed with the
   others) load a VST3 inside Max's `vst~`, past Live's 128-parameter Configure limit; values by
   number or display text. No automation lanes for hosted parameters. Idea from Producer Pal's
-  plug-in-host spike (GPL-3, no code taken). `live_plugin_host_bank` makes chosen hosted
+  plug-in-host spike (GPL-3, no code taken). `live_plugin_host_preset` loads a `.vstpreset` or a Serum 2
+  design (packed first) into the hosted plug-in, so a file-designed patch is fine-tuned on the
+  same instance. `live_plugin_host_bank` makes chosen hosted
   parameters automatable: a per-plug-in host with Live dials named after them (written to the
   User Library, swapped in with every value copied) — the approach of xxnoodl's
   ableton_device_vst_wrapper (MIT).

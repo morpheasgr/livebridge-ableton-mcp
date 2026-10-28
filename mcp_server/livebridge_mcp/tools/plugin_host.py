@@ -5,6 +5,7 @@ LiveBridge Host Max for Live devices (``max_for_live/LiveBridge Host``: an effec
 instrument) load the plug-in inside Max's ``vst~`` instead, which lists and sets all of them:
 `live_plugin_host_load` puts one on a track and loads the plug-in, `live_plugin_host_parameters`
 lists and searches its parameters, `live_plugin_host_set` sets them by number or display text,
+`live_plugin_host_preset` loads a preset file into it (a Serum 2 design is packed first),
 and `live_plugin_host_bank` swaps in a per-plug-in host whose chosen parameters are Live dials
 (automatable).
 
@@ -25,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from . import bridge_call, tool_error
-from .. import engine, host_device
+from .. import engine, host_device, serum
 from ..client import BridgeClient
 
 _DEVICES = {"effect": ("LiveBridge Host Effect", "audio_effect"),
@@ -455,4 +456,66 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         result["removed_old"] = removed
         result["notes"].append("Dials run 0..1; the plug-in's window shows real values. "
                                "Record them like any knob (live_automation_record).")
+        return result
+
+    @mcp.tool()
+    def live_plugin_host_preset(
+        source_path: str,
+        track: str | None = None,
+        template: str | None = None,
+    ) -> Any:
+        """Load a preset file into a hosted plug-in, so a patch designed as a file can then be
+        fine-tuned parameter by parameter on the same instance: a `.vstpreset` (any VST3),
+        or a Serum 2 `.SerumPreset` / design JSON from `live_preset_edit`, which is first packed
+        into a `.vstpreset` the way `live_preset_load` does (User Library > LiveBridge Presets >
+        Serum 2, with your same-build template). Bank dials follow the new values.
+
+        Args:
+            source_path: the preset: absolute path, or a bare name in the Serum designs folder.
+            track: the track whose LiveBridge Host gets it (optional when there is one).
+            template: Serum 2 only — the `.vstpreset` template to pack with (default: found
+                in the User Library by build).
+
+        Returns:
+            `{path, preset_name?, sampled, changed, notes}` — `changed`: how many of the first
+            parameters moved (0 = the preset did not take).
+
+        Gotchas: the preset must be for the hosted plug-in. vst~ reports nothing back, so the
+        check is a before/after comparison. `.fxp`/`.fxb` files load too (VST2 formats).
+        """
+        cmd = "plugin_host.preset"
+        path = Path(os.path.expanduser(source_path))
+        suffix = path.suffix.lower()
+        result: dict[str, Any] = {"notes": []}
+        try:
+            host = _host_on(track)
+        except engine.EngineError as exc:
+            return _failure(exc, cmd)
+        if suffix in (".vstpreset", ".fxp", ".fxb"):
+            if not path.is_file():
+                return tool_error(f"{path} does not exist", type="not_found", cmd=cmd)
+        else:
+            places = bridge_call(bridge, "samples.locations")
+            libraries = [Path(p["path"]) for p in (places.get("user_library") or [])
+                         if isinstance(p, dict) and p.get("exists") and p.get("path")] \
+                if isinstance(places, dict) and not _is_error(places) else []
+            try:
+                path, name, _report = serum.vstpreset_for(source_path, libraries, template)
+            except FileNotFoundError as exc:
+                return tool_error(str(exc), type="not_found", cmd=cmd)
+            except ImportError as exc:
+                return tool_error(f"Serum preset files need the serum extra ({exc})",
+                                  type="unsupported", cmd=cmd)
+            except (ValueError, OSError) as exc:
+                return tool_error(str(exc), type="invalid_state", cmd=cmd)
+            result["preset_name"] = name
+        try:
+            answer = engine.request(host, "preset", {"path": str(path)}, timeout=_SET_TIMEOUT)
+        except engine.EngineError as exc:
+            return _failure(exc, cmd)
+        result.update(answer or {})
+        if not result.get("changed"):
+            result["notes"].append("No sampled parameter changed: the preset may be for another "
+                                   "plug-in, or already match — open the plug-in's window "
+                                   "(live_plugin_host_set(editor=true)) to check.")
         return result
