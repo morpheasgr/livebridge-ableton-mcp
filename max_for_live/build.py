@@ -411,7 +411,7 @@ def host_patcher(instrument: bool) -> dict:
     """
     vst_out = 2 + HOST_VST_OUTLETS
     boxes = [
-        _box("obj-vst", "vst~ 2 2 @autosave 1", [20.0, 140.0, 160.0, 22.0], 2, vst_out,
+        _box("obj-vst", "vst~ 2 2 @autosave 1 @valuemode 2", [20.0, 140.0, 160.0, 22.0], 2, vst_out,
              ["signal", "signal"] + [""] * HOST_VST_OUTLETS, varname="plug",
              parameter_enable=1, saved_attribute_attributes={"valueof": {
                  "parameter_longname": "LiveBridge Host state", "parameter_shortname": "state",

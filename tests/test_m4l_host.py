@@ -68,11 +68,11 @@ def test_host_device_end_to_end(engines, monkeypatch):  # noqa: F811
     listed = call_tool(app, "live_plugin_host_parameters", {"track": "Lead"})
     assert [p["name"] for p in listed["parameters"]] == ["Cutoff", "Resonance", "Mode",
                                                          "Volume"]
-    assert listed["parameters"][3]["id"] == "h133"
+    assert listed["parameters"][3]["id"] == "h134"
     assert call_tool(app, "live_plugin_host_parameters", {"search": "res"})["total"] == 1
 
     changed = call_tool(app, "live_plugin_host_set", {"values": {
-        "Cutoff": "1000 Hz", "Mode": "HP", "resonance": 0.25, "h133": "-6 dB",
+        "Cutoff": "1000 Hz", "Mode": "HP", "resonance": 0.25, "h134": "-6 dB",
         "Nope": 1, "Volume ": "999 dB"}})
     results = {r["name"]: r for r in changed["results"]}
     assert results["Cutoff"]["ok"] and abs(int(results["Cutoff"]["display"].split()[0])
@@ -81,7 +81,7 @@ def test_host_device_end_to_end(engines, monkeypatch):  # noqa: F811
     assert results["Resonance"]["display"] == "25 %"
     assert results["Nope"]["ok"] is False
     assert changed["applied"] >= 4
-    volume = [r for r in changed["results"] if r.get("id") == "h133"]
+    volume = [r for r in changed["results"] if r.get("id") == "h134"]
     assert volume[0]["display"] == "-6.0 dB"
     assert volume[-1]["ok"] is False and "-6.0 dB" in volume[-1]["error"]   # put back
 

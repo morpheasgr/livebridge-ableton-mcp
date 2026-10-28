@@ -184,7 +184,12 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 
 - **Patch**: `lbhost.js` (Node for Max) sends `vst~` messages (`plug_vst3`, `subname`,
   `params`, `get`, `<index> <value>`, `open`/`wclose`) and hears every message outlet as
-  `vstout <outlet> ...`; replies are matched by timing, one request at a time. Registry kind
+  `vstout <outlet> ...`; replies are matched by timing, one request at a time. With
+  `valuemode 2`, `params` streams one name per message out of outlet 2, `get <n>` answers
+  `<n> <value> <text>` out of outlet 3, `get -4` is the parameter count and `get -7` 1 for an
+  instrument; indices are 1-based (ids `h<n>` use them). These facts come from two other
+  vst~ wrappers that were tried in Live (Producer Pal's spike and xxnoodl's
+  ableton_device_vst_wrapper, both reading the same vst~ reference). Registry kind
   `"host"` (`host_kind`: effect / instrument), same protocol as the Engine.
 - **By display text**: 33 values are tried and read back; an exact text wins, else the leading
   number is bisected between the two samples that bracket it. No match puts the old value back.
@@ -193,6 +198,7 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 - **Limits**: hosted parameters are not Live parameters — no automation lanes (load the plug-in
   natively with `live_plugin_expose` for that, or `live_engine_modulate`); a user's existing
   plug-in can't be moved in with its settings (the API can't read plug-in state); VST3 only;
-  latency changes of the plug-in are not reported to Live; untested in real Max so far — the
-  exact form of `vst~`'s replies is parsed tolerantly. Idea from Producer Pal's plug-in-host
+  latency changes of the plug-in are not reported to Live; not yet run in real Max by us — if
+  a plug-in sends several names in one message, the count from `get -4` switches to one
+  name per atom. Idea from Producer Pal's plug-in-host
   spike (GPL-3; re-implemented from its notes, no code taken).
