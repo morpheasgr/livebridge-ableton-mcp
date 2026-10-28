@@ -5,6 +5,12 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Scout in the host, play natively** (`live_plugin_host_save`, `live_plugin_host_expose`,
+  `live_plugin_host_parameters(snapshot=..., changed_since=...)`; Host 0.3.0): see what the user
+  moves in a plug-in's window across all its parameters, save the hosted patch as a
+  `.vstpreset` (`vst~ write`), and hand over to a native rack exposing the chosen ≤128
+  parameters with that preset. Host replies now resolve as soon as `vst~` answers (reading
+  ~500 parameters takes seconds).
 - **Presets know their plug-in** (`live_plugin_host_preset`, Host 0.2.5): a `.vstpreset`'s VST3
   class ID is looked up in the installed plug-ins' `moduleinfo.json` and in a table learned
   from loads that worked. A preset for a different plug-in than the host holds is refused

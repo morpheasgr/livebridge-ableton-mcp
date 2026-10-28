@@ -53,7 +53,8 @@ def _engine_failure(exc: engine.EngineError, cmd: str) -> dict[str, Any]:
         kind = {"bad_args": "bad_args", "unsupported": "unsupported"}.get(exc.type,
                                                                           "invalid_state")
         return tool_error(message, type=kind, cmd=cmd)
-    return tool_error(message, type="connection", cmd=cmd)
+    return tool_error(message, type="timeout" if exc.type == "timeout" else "connection",
+                      cmd=cmd)
 
 
 def _where(device: dict[str, Any]) -> dict[str, Any]:

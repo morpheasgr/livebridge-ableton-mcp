@@ -187,6 +187,8 @@ Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
 
 By hand: the device's **Open plug-in** button opens the hosted plug-in's own window.
 | `live_plugin_host_preset` | Load a `.vstpreset` (or a Serum 2 design, packed first with your template) into the hosted plug-in (`vst~` `read`); a before/after sample of values says whether it took; bank dials follow. The preset's VST3 class ID says which plug-in it is for (`plugin_ids.py`: the plug-ins' `moduleinfo.json`, plus a table learned from loads that worked, `plugin_ids.json`): a preset for another plug-in is refused, an unnamed host takes its name |
+| `live_plugin_host_save` | The hosted plug-in's complete state (`vst~` `write`) as a `.vstpreset` in User Library > LiveBridge Presets > Plug-in Presets > <plug-in>; class ID checked and learned |
+| `live_plugin_host_expose` | Hand over to a native instance: save, build the ParameterId map once (`live_plugin_param_map`), `live_plugin_expose(preset_file=…)` with the chosen ≤128 parameters, remove the host |
 | `live_plugin_host_bank` | Make chosen parameters automatable: a per-plug-in host whose Live dials carry their names, swapped in on the same track with every parameter value copied |
 
 - **Patch**: `lbhost.js` (Node for Max) sends `vst~` messages (`plug_vst3`, `subname`,
