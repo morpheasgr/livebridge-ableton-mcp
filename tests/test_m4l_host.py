@@ -342,3 +342,84 @@ def test_requests_adopt_before_the_startup_check(engines, monkeypatch):  # noqa:
     _process, send, _outlets = engines(script=HOST_JS)
     (host,) = engine.devices(kind="host")
     assert engine.request(host, "params", {})["total"] == 4               # no "no plug-in"
+
+
+# ----------------------------------------------------------------------------- scout, save, hand over
+
+def _fake_host(engines, monkeypatch, name="Fake"):  # noqa: F811
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    _process, send, outlets = engines(script=HOST_JS)
+    send("context", "track", "Keys")
+    assert engine.wait_for(lambda: any(d.get("track") == "Keys"
+                                       for d in engine.devices(kind="host")), 5)
+    (host,) = engine.devices(kind="host")
+    engine.request(host, "load", {"file": "FakeSynth", "sub": name, "name": name})
+    return host
+
+
+def test_snapshot_shows_what_the_user_moved(engines, monkeypatch):  # noqa: F811
+    host = _fake_host(engines, monkeypatch)
+    app = create_app(BridgeClient(host="127.0.0.1", port=1, timeout=1.0))
+    taken = call_tool(app, "live_plugin_host_parameters", {"snapshot": "before"})
+    assert taken == {"snapshot": "before", "parameters": 4}
+    engine.request(host, "set", {"values": {"Cutoff": 0.9, "Mode": "HP"}})   # "the user"
+    moved = call_tool(app, "live_plugin_host_parameters", {"changed_since": "before"})
+    assert moved["changed"] == 2
+    assert [p["name"] for p in moved["parameters"]] == ["Mode", "Cutoff"] or \
+        [p["name"] for p in moved["parameters"]] == ["Cutoff", "Mode"]
+    cutoff = next(p for p in moved["parameters"] if p["name"] == "Cutoff")
+    assert cutoff["before"] != cutoff["after"] and cutoff["id"] == "h1"
+    assert call_tool(app, "live_plugin_host_parameters", {"changed_since": "nope"})[
+        "type"] == "not_found"
+    assert call_tool(app, "live_plugin_host_parameters", {"snapshot": "a",
+                                                          "changed_since": "a"})["type"] == \
+        "bad_args"
+
+
+def test_save_and_hand_over_to_a_native_rack(engines, monkeypatch, tmp_path):  # noqa: F811
+    from fake_bridge import FakeBridge
+    from livebridge_mcp import plugin_ids
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "home"))
+    host = _fake_host(engines, monkeypatch)
+    library = tmp_path / "User Library"
+    library.mkdir()
+    bridge = FakeBridge().start()
+    bridge.set_result("samples.locations", {"user_library": [{"path": str(library),
+                                                               "exists": True}]})
+    app = create_app(BridgeClient(host=bridge.host, port=bridge.port, timeout=5.0))
+    try:
+        saved = call_tool(app, "live_plugin_host_save", {"name": "Warm Keys"})
+        path = Path(saved["path"])
+        assert path == library / "LiveBridge Presets" / "Plug-in Presets" / "Fake" / \
+            "Warm Keys.vstpreset" and path.is_file()
+        assert saved["class_id"] == "FA" * 16 and plugin_ids.lookup("FA" * 16)["name"] == "Fake"
+        again = call_tool(app, "live_plugin_host_save", {"name": "Warm Keys"})
+        assert Path(again["path"]).name == "Warm Keys 2.vstpreset"     # nothing overwritten
+
+        bridge.set_result("plugin_racks.map", {"status": "done", "count": 3,
+                                               "source": "probed"})
+        bridge.set_result("plugin_racks.expose", {"status": "done", "track": "Keys",
+                                                  "device": "song.tracks[0].devices[1]"})
+        bridge.set_result("devices.list", {"devices": [
+            {"name": "Fake", "path": "song.tracks[0].devices[0]",
+             "class_name": "MxDeviceInstrument"},
+            {"name": "Fake Rack", "path": "song.tracks[0].devices[1]",
+             "class_name": "InstrumentGroupDevice"}]})
+        bridge.set_result("devices.delete", {"deleted": True})
+        handed = call_tool(app, "live_plugin_host_expose", {"parameters": ["Cutoff", "Mode"],
+                                                            "name": "Handover"})
+        assert handed["host_removed"] is True and handed["map"]["count"] == 3
+        expose = [r for r in bridge.requests if r["cmd"] == "plugin_racks.expose"][-1]["args"]
+        assert expose["parameters"] == ["Cutoff", "Mode"] and expose["plugin"] == "Fake"
+        assert expose["preset_file"].endswith("Handover.vstpreset") and expose["track"] == "Keys"
+        delete = [r for r in bridge.requests if r["cmd"] == "devices.delete"][-1]["args"]
+        assert delete["device"] == "song.tracks[0].devices[0]"            # the host, not the rack
+
+        bridge.set_result("plugin_racks.map", {"status": "done", "count": 0, "source": "probed"})
+        unmapped = call_tool(app, "live_plugin_host_expose", {"parameters": ["Cutoff"]})
+        assert "could not be mapped" in unmapped["notes"][0] and "exposed" not in unmapped
+        assert call_tool(app, "live_plugin_host_expose", {"parameters": []})["type"] == \
+            "bad_args"
+    finally:
+        bridge.stop()
+    assert host

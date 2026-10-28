@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.2.5";
+const VERSION = "0.3.0";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -71,6 +71,7 @@ const state = {
   hidden: null,           // [from, to) run of MIDI stand-in parameters
   port: null,
   busy: Promise.resolve(),
+  snapshots: new Map(),   // name -> {index: {value, text}}
 };
 
 function registryDir() {
@@ -115,17 +116,27 @@ function removeRegistry() {
 // ---------------------------------------------------------------------------- talking to vst~
 
 // The real driver: send a message to vst~, collect what comes back for `waitMs`.
+// With `until`, the answer resolves as soon as a matching message arrives (vst~ answers "get"
+// at once), so reading hundreds of parameters takes seconds, not hundreds of timeouts.
 let pending = null;
 function vstReply(...atoms) {
-  if (pending) pending.push(atoms);                    // [outlet, ...message]
+  if (pending) {
+    pending.collected.push(atoms);                     // [outlet, ...message]
+    if (pending.until && pending.until(atoms)) pending.finish();
+  }
 }
 
-function realAsk(message, waitMs) {
+function realAsk(message, waitMs, until) {
   return new Promise((resolve) => {
-    const collected = [];
-    pending = collected;
+    const entry = { collected: [], until: until, timer: null, finish: null };
+    entry.finish = () => {
+      clearTimeout(entry.timer);
+      if (pending === entry) pending = null;
+      resolve(entry.collected);
+    };
+    pending = entry;
+    entry.timer = setTimeout(entry.finish, waitMs);
     maxApi.outlet("vst", ...message);
-    setTimeout(() => { pending = null; resolve(collected); }, waitMs);
   });
 }
 
@@ -155,6 +166,12 @@ function fakeAsk(message) {
   const [head, ...rest] = message;
   const out = (...atoms) => [VALUES_OUTLET, ...atoms];
   if (head === "plug_vst3") { fake.load(String(rest[0])); return Promise.resolve([]); }
+  if (head === "write") {                      // a .vstpreset with a class ID (tests)
+    const cid = process.env.LIVEBRIDGE_HOST_FAKE_CID || "FA".repeat(16);
+    fs.writeFileSync(String(rest[0]), Buffer.concat([Buffer.from("VST3"),
+      Buffer.from([1, 0, 0, 0]), Buffer.from(cid), Buffer.from(JSON.stringify(fake.values))]));
+    return Promise.resolve([]);
+  }
   if (head === "read") {                       // a preset: every value moves (tests)
     if (/\.vstpreset$/i.test(String(rest[0]))) fake.values = fake.values.map(() => 0.25);
     return Promise.resolve([]);
@@ -176,10 +193,15 @@ if (process.env.LIVEBRIDGE_HOST_FAKE === "1" && process.env.LIVEBRIDGE_HOST_FAKE
   fake.load(process.env.LIVEBRIDGE_HOST_FAKE_PRELOAD);
 }
 
-function ask(message, waitMs = REPLY_MS) {
+function ask(message, waitMs = REPLY_MS, until = null) {
   if (process.env.LIVEBRIDGE_HOST_FAKE === "1") return fakeAsk(message);
   if (!maxApi) return Promise.resolve([]);
-  return realAsk(message, waitMs);
+  return realAsk(message, waitMs, until);
+}
+
+// "<n> ..." out of the values outlet
+function answers(n) {
+  return (atoms) => Number(atoms[0]) === VALUES_OUTLET && Number(atoms[1]) === n;
 }
 
 // One request at a time: replies are matched by timing.
@@ -212,7 +234,8 @@ function fromOutlet(replies, outlet) {
 }
 
 async function infoValue(code) {
-  for (const atoms of fromOutlet(await ask(["get", code]), VALUES_OUTLET)) {
+  for (const atoms of fromOutlet(await ask(["get", code], REPLY_MS, answers(code)),
+                                 VALUES_OUTLET)) {
     if (Number(atoms[0]) === code && atoms.length > 1) return Number(atoms[1]);
   }
   return null;
@@ -235,7 +258,7 @@ async function listNames() {
 // Parameter `index` (0-based in names[]) is vst~'s index + 1.
 async function read(index) {
   const n = index + 1;
-  for (const atoms of fromOutlet(await ask(["get", n]), VALUES_OUTLET)) {
+  for (const atoms of fromOutlet(await ask(["get", n], REPLY_MS, answers(n)), VALUES_OUTLET)) {
     if (atoms.length >= 2 && Number(atoms[0]) === n && typeof atoms[1] === "number") {
       return { value: atoms[1], text: atoms.slice(2).map(String).join(" ").trim() };
     }
@@ -451,6 +474,63 @@ async function preset(args) {
   return { path: file, sampled: sample.length, changed: changed };
 }
 
+// The hosted plug-in's complete state as a preset file (vst~ "write": .vstpreset for VST3),
+// so a native instance can load the same patch.
+async function save(args) {
+  await needPlugin();
+  const file = String(args.path || "");
+  if (!file) throw { type: "bad_args", message: "save needs path" };
+  try { fs.unlinkSync(file); } catch (error) { /* not there yet */ }
+  await ask(["write", file.replace(/\\/g, "/")], 3000,
+            () => fs.existsSync(file) && fs.statSync(file).size > 0);
+  for (let i = 0; i < 20 && !(fs.existsSync(file) && fs.statSync(file).size > 0); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
+    throw { type: "invalid_state", message: "vst~ did not write " + file };
+  }
+  return { path: file, bytes: fs.statSync(file).size, plugin: state.plugin };
+}
+
+// What the user moved in the plug-in's window: a snapshot of every value, then the difference.
+async function readAll() {
+  if (!state.names.length) await listNames();
+  const values = {};
+  for (let i = 0; i < state.names.length; i++) {
+    if (!visible(i)) continue;
+    const got = await read(i);
+    if (got) values[i] = got;
+  }
+  return values;
+}
+
+async function snapshot(args) {
+  await needPlugin();
+  const name = String(args.name || "default");
+  state.snapshots.set(name, await readAll());
+  return { snapshot: name, parameters: state.snapshots.get(name) ?
+    Object.keys(state.snapshots.get(name)).length : 0 };
+}
+
+async function changes(args) {
+  await needPlugin();
+  const name = String(args.since || "default");
+  const before = state.snapshots.get(name);
+  if (!before) throw { type: "not_found", message: `no snapshot "${name}" — take one first` };
+  const now = await readAll();
+  const moved = [];
+  for (const [key, was] of Object.entries(before)) {
+    const is = now[key];
+    if (is && (Math.abs(is.value - was.value) > 1e-6 || is.text !== was.text)) {
+      const i = Number(key);
+      moved.push({ id: "h" + (i + 1), name: state.names[i], before: was.text,
+                   after: is.text, value: is.value, moved: Math.abs(is.value - was.value) });
+    }
+  }
+  moved.sort((a, b) => b.moved - a.moved);
+  return { since: name, plugin: state.plugin.name, changed: moved.length, parameters: moved };
+}
+
 // Names -> vst~ indices (for a bank), and every value at once / back (moving a sound).
 async function resolve(args) {
   if (!state.names.length) await listNames();
@@ -564,6 +644,12 @@ function handle(request, reply) {
     done(serial(() => set(args)));
   } else if (request.cmd === "preset") {
     done(serial(() => preset(args)));
+  } else if (request.cmd === "save") {
+    done(serial(() => save(args)));
+  } else if (request.cmd === "snapshot") {
+    done(serial(() => snapshot(args)));
+  } else if (request.cmd === "changes") {
+    done(serial(() => changes(args)));
   } else if (request.cmd === "resolve") {
     done(serial(() => resolve(args)));
   } else if (request.cmd === "values") {

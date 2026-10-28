@@ -5,7 +5,7 @@ description: Control Ableton Live 12 through the LiveBridge MCP tools (live_*). 
 
 # Working in Ableton Live with LiveBridge
 
-LiveBridge gives you ~216 `live_*` tools that drive a running Ableton Live 12 through its Live
+LiveBridge gives you ~218 `live_*` tools that drive a running Ableton Live 12 through its Live
 Object Model. Every mutating call is **one undo step** in Live. You cannot hear the result
 directly - you work from notes, parameters, names, level meters (`live_mixer_meters`), the two
 analysis tools (`live_theory_analyze` for MIDI, `live_audio_analyze` for audio - section 4b) and
@@ -77,6 +77,7 @@ added or removed. Prefer the `path` fields from the latest summary, or names.
 | Drum kit | `live_browser_load("909 Core Kit", category="drum_kit", new_track=true, track_name="Drums")` |
 | Serum 2 / a big VST3 synth | `live_plugin_expose(plugin="Serum 2", parameters=["sound_design"], new_track=true, track_name=...)` (loads it already controllable) |
 | Every parameter of any VST3 (past 128), no automation needed | `live_plugin_host_load(plugin="Diva")` then `live_plugin_host_parameters(search="cutoff")` / `live_plugin_host_set(values={"VCF1: Cutoff": "800 Hz"})` — experimental, Max for Live; to automate some of them, `live_plugin_host_bank(parameters=["VCF1: Cutoff", ...])` turns them into Live dials; `live_plugin_host_preset(source_path=...)` loads a `.vstpreset` or a Serum 2 design into the hosted plug-in, so a file-designed patch can be fine-tuned knob by knob |
+| Tune any VST3 (not Serum: that has preset files) with the ≤128 controls that matter | scout in a host: `live_plugin_host_load` (or `live_plugin_host_preset` with the user's saved `.vstpreset`), `live_plugin_host_parameters(snapshot="before")`, the user tweaks the window, `live_plugin_host_parameters(changed_since="before")` shows what moved; pick ≤128 (moved first, then what the patch uses, then the role's defaults); `live_plugin_host_expose(parameters=[...])` saves the patch, loads the plug-in natively in a rack with those parameters exposed and removes the host. `live_plugin_host_save` alone writes the patch as a `.vstpreset` |
 | A whole Serum 2 patch (wavetables, matrix, FX order) | design the preset file: `live_preset_find(query=...)` for a starting preset, `live_preset_edit(...)`, then `live_preset_load(source_path=...)` — `SERUM_PRESETS.md` |
 | Drum/arp/bass step pattern | `live_clip_write_pattern` (creates the clip) |
 | Chord progression | `live_clip_write_chords("Am7 Fmaj7 C G", voice_leading=true)` - Roman numerals in the song key work too ("i VI III VII") |

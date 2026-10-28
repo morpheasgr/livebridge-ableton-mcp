@@ -76,6 +76,9 @@ def request(device: dict[str, Any], cmd: str, args: dict[str, Any] | None = None
                 buffer += chunk
     except ConnectionRefusedError as exc:
         raise EngineError("connection", f"the device is not running ({exc})") from exc
+    except socket.timeout as exc:
+        # running but busy (Live loading, a heavy patch): not a reason to forget it
+        raise EngineError("timeout", f"the device did not answer within {timeout:g} s") from exc
     except (OSError, ValueError) as exc:
         raise EngineError("connection", f"could not reach the device: {exc}") from exc
     if b"\n" not in buffer:

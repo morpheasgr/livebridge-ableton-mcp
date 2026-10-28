@@ -396,6 +396,25 @@ def test_engine_tools_without_a_device(tmp_path, monkeypatch):
     assert call_tool(app, "live_engine_listen", {"kind": "loud"})["type"] == "bad_args"
 
 
+def test_a_busy_device_is_not_forgotten(tmp_path, monkeypatch):
+    # it accepts the connection but answers too late: keep its registry file
+    import socket as socketlib
+    monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path))
+    server = socketlib.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    try:
+        entry = {"port": server.getsockname()[1], "token": "t", "instance": "busy"}
+        (tmp_path / "busy.json").write_text(json.dumps(entry))
+        assert engine.devices(timeout=0.3) == []
+        assert (tmp_path / "busy.json").exists()
+        with pytest.raises(engine.EngineError) as late:
+            engine.request(entry, "hello", timeout=0.3)
+        assert late.value.type == "timeout"
+    finally:
+        server.close()
+
+
 def test_stale_registry_files_are_removed(tmp_path, monkeypatch):
     monkeypatch.setenv("LIVEBRIDGE_ENGINE_DIR", str(tmp_path))
     import socket

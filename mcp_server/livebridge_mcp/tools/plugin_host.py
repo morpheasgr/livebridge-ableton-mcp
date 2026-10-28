@@ -35,6 +35,8 @@ _WAIT_S = 12.0
 _LOAD_TIMEOUT = 30.0
 _SET_TIMEOUT = 60.0
 _BANK_FOLDER = ("LiveBridge Presets", "Plug-in Hosts")
+_SAVED_FOLDER = ("LiveBridge Presets", "Plug-in Presets")
+_EXPOSE_WAIT = 240.0
 _HOST_JS = ("lbhost.js", "lbhost_context.js")
 _GENERIC = ("LiveBridge Host Instrument", "LiveBridge Host Effect")
 _BROWSER_TRIES = 4
@@ -149,7 +151,8 @@ def _is_error(value: Any) -> bool:
 
 
 def _failure(exc: engine.EngineError, cmd: str) -> dict[str, Any]:
-    kind = exc.type if exc.type in ("bad_args", "not_found", "invalid_state") else "connection"
+    kind = exc.type if exc.type in ("bad_args", "not_found", "invalid_state", "timeout") \
+        else "connection"
     return tool_error(str(exc), type=kind, cmd=cmd)
 
 
@@ -268,25 +271,42 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         search: str | None = None,
         offset: int = 0,
         limit: int = 50,
+        snapshot: str | None = None,
+        changed_since: str | None = None,
     ) -> Any:
         """List a hosted plug-in's parameters (all of them, not just 128) with their values
         and display text; search by name. The per-MIDI-CC stand-in parameters VST3 plug-ins
-        add are left out. Read-only.
+        add are left out. Also finds what the user moves in the plug-in's window: take a
+        `snapshot`, let them tweak, then ask `changed_since` it. Read-only.
 
         Args:
             track: the track whose LiveBridge Host to read (optional when there is one).
             search: case-insensitive part of the name ("filter", "env 2", "osc a").
             offset, limit: paging (limit 1..500).
+            snapshot: remember every value now under this name ("before") instead of listing.
+            changed_since: list only what changed since that snapshot, most moved first.
 
         Returns:
             `{plugin, total, offset, count, parameters:[{id ("h12"), name, value (0..1),
-            display}], next_offset?}`.
+            display}], next_offset?}`; with snapshot `{snapshot, parameters (count)}`; with
+            changed_since `{since, changed, parameters:[{id, name, before, after, value,
+            moved}]}`.
+
+        Gotchas: a snapshot reads every parameter (a few seconds on ~500).
         """
         cmd = "plugin_host.params"
         if not 1 <= limit <= 500 or offset < 0:
             return tool_error("limit must be 1..500 and offset >= 0", cmd=cmd)
+        if snapshot is not None and changed_since is not None:
+            return tool_error("pass snapshot or changed_since, not both", cmd=cmd)
         try:
             host = _host_on(track)
+            if snapshot is not None:
+                return engine.request(host, "snapshot", {"name": snapshot},
+                                      timeout=_SET_TIMEOUT)
+            if changed_since is not None:
+                return engine.request(host, "changes", {"since": changed_since},
+                                      timeout=_SET_TIMEOUT)
             return engine.request(host, "params", {"search": search, "offset": offset,
                                                    "limit": limit}, timeout=_SET_TIMEOUT)
         except engine.EngineError as exc:
@@ -574,4 +594,173 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             result["notes"].append("No sampled parameter changed: the preset may be for another "
                                    "plug-in, or already match — open the plug-in's window "
                                    "(live_plugin_host_set(editor=true)) to check.")
+        return result
+
+    def libraries() -> list[Path]:
+        places = bridge_call(bridge, "samples.locations")
+        return [Path(p["path"]) for p in (places.get("user_library") or [])
+                if isinstance(p, dict) and p.get("exists") and p.get("path")] \
+            if isinstance(places, dict) and not _is_error(places) else []
+
+    def save_host(host: dict[str, Any], name: str | None, cmd: str) -> Any:
+        """Write the host's plug-in state to a new .vstpreset in the User Library."""
+        hello = engine.request(host, "hello") or {}
+        plugin = hello.get("plugin") or {}
+        if not plugin:
+            return tool_error("that host has no plug-in loaded", type="invalid_state",
+                              cmd=cmd)
+        places = libraries()
+        if not places:
+            return tool_error("Live's User Library was not found (is Live connected and on "
+                              "this machine?)", type="not_found", cmd=cmd)
+        folder = places[0].joinpath(*_SAVED_FOLDER, _stem(str(plugin.get("name"))))
+        folder.mkdir(parents=True, exist_ok=True)
+        stem = _stem(name or f"{plugin.get('name')} {time.strftime('%Y-%m-%d %H%M%S')}")
+        path = folder / f"{stem}.vstpreset"
+        number = 2
+        while path.exists():
+            path = folder / f"{stem} {number}.vstpreset"
+            number += 1
+        saved = engine.request(host, "save", {"path": str(path)}, timeout=_SET_TIMEOUT)
+        cid = plugin_ids.class_id_of(path)
+        result = {"path": str(path), "bytes": (saved or {}).get("bytes"),
+                  "plugin": plugin.get("name"), "kind": hello.get("host_kind"),
+                  "browser_path": "user_library/" + "/".join(
+                      _SAVED_FOLDER + (folder.name, path.name))}
+        if cid:
+            result["class_id"] = cid
+            plugin_ids.learn(cid, plugin.get("name"), plugin.get("file"))
+        else:
+            result["note"] = ("vst~ wrote a file that is not a .vstpreset (a VST2 .fxp?): it "
+                              "may not load natively")
+        return result
+
+    @mcp.tool()
+    def live_plugin_host_save(track: str | None = None, name: str | None = None) -> Any:
+        """Save a hosted plug-in's complete state — every setting, also samples, wavetables
+        and routings, not only parameters — as a `.vstpreset` in User Library > LiveBridge
+        Presets > Plug-in Presets > <plug-in>, which Live's browser and
+        `live_plugin_expose(preset_file=...)` load natively.
+
+        Args:
+            track: the track whose LiveBridge Host to save (optional when there is one).
+            name: the preset's file name (default: plug-in name + date and time).
+
+        Returns:
+            `{path, browser_path, bytes, plugin, kind, class_id?}`.
+
+        Gotchas: vst~'s "write" makes the file; nothing is overwritten (a taken name gets a
+        number). Experimental — check the file loads.
+        """
+        cmd = "plugin_host.save"
+        try:
+            return save_host(_host_on(track), name, cmd)
+        except engine.EngineError as exc:
+            return _failure(exc, cmd)
+        except OSError as exc:
+            return tool_error(f"could not create the preset folder: {exc}",
+                              type="invalid_state", cmd=cmd)
+
+    @mcp.tool()
+    def live_plugin_host_expose(
+        parameters: list[str],
+        track: str | None = None,
+        name: str | None = None,
+        remove_host: bool = True,
+        wait_seconds: float = _EXPOSE_WAIT,
+    ) -> Any:
+        """Hand a hosted plug-in over to a NATIVE instance with the chosen parameters exposed
+        (≤128, as Live parameters: automation, macros, undo): saves the host's patch as a
+        `.vstpreset`, builds the plug-in's ParameterId map once if needed
+        (`live_plugin_param_map`), loads the plug-in natively in a rack with that preset and
+        those parameters (`live_plugin_expose`), then removes the host. The scout-then-play
+        workflow: explore every parameter in the host (and `changed_since` what the user moved),
+        pick the ones that matter, hand over.
+
+        Args:
+            parameters: 1..128 parameter names (as `live_plugin_host_parameters` lists them).
+            track: the track whose LiveBridge Host to hand over (optional when there is one).
+            name: the saved preset's name (default: plug-in name + date and time).
+            remove_host: delete the host afterwards (it stays when false or when the native
+                load failed).
+            wait_seconds: how long the map probe and rack indexing may take (0..600).
+
+        Returns:
+            `{saved, map:{source, count}, exposed: <live_plugin_expose result>, host_removed,
+            notes}`.
+
+        Gotchas: plug-ins whose ParameterIds cannot be probed (some JUCE builds) cannot be
+        exposed — the preset is still saved; load it from the browser and Configure by hand.
+        Names Live gives differently from the host's are reported by live_plugin_expose.
+        """
+        cmd = "plugin_host.expose"
+        if not isinstance(parameters, list) or not 1 <= len(parameters) <= 128 or not all(
+                isinstance(p, str) and p.strip() for p in parameters):
+            return tool_error("parameters must list 1..128 names", cmd=cmd)
+        if not 0 <= wait_seconds <= 600:
+            return tool_error("wait_seconds must be 0..600", cmd=cmd)
+        try:
+            host = _host_on(track)
+            saved = save_host(host, name, cmd)
+        except engine.EngineError as exc:
+            return _failure(exc, cmd)
+        except OSError as exc:
+            return tool_error(f"could not create the preset folder: {exc}",
+                              type="invalid_state", cmd=cmd)
+        if _is_error(saved):
+            return saved
+        plugin = str(saved["plugin"])
+        where = host.get("track")
+        result: dict[str, Any] = {"saved": saved, "notes": []}
+        deadline = time.monotonic() + wait_seconds
+        args: dict[str, Any] = {"plugin": plugin, "refresh": False, "limit": 1,
+                                "max_seconds": 4.0}
+        while True:
+            mapped = bridge_call(bridge, "plugin_racks.map", args, 45.0)
+            if _is_error(mapped) or not isinstance(mapped, dict) or \
+                    mapped.get("status") not in ("running", "indexing"):
+                break
+            if time.monotonic() >= deadline:
+                mapped = dict(mapped, timed_out=True)
+                break
+            time.sleep(1.0)
+        if _is_error(mapped):
+            mapped["error"] += f" — the preset is saved at {saved['path']}"
+            return mapped
+        result["map"] = {k: mapped.get(k) for k in ("source", "count", "status", "timed_out")
+                         if k in mapped}
+        if not mapped.get("count"):
+            result["notes"].append(f"{plugin}'s parameters could not be mapped, so they "
+                                   "cannot be exposed: load the saved preset from the browser "
+                                   f"({saved['browser_path']}) and use Configure.")
+            return result
+        expose = {"parameters": parameters, "plugin": plugin, "preset_file": saved["path"],
+                  "track": where, "replace": True, "new_track": False}
+        while True:
+            exposed = bridge_call(bridge, "plugin_racks.expose", expose, 45.0)
+            if _is_error(exposed) or not isinstance(exposed, dict) or \
+                    exposed.get("status") != "indexing" or time.monotonic() >= deadline:
+                break
+            time.sleep(1.0)
+        result["exposed"] = exposed
+        removed = False
+        if not _is_error(exposed) and remove_host and \
+                any(d.get("instance") == host.get("instance") for d in _hosts()):
+            listing = bridge_call(bridge, "devices.list", {"track": where})
+            devices = listing.get("devices") if isinstance(listing, dict) else None
+            candidates = [d for d in devices or [] if str(d.get("name")) in _GENERIC
+                          or str(d.get("name")) == plugin]
+            candidates = [d for d in candidates if "Rack" not in str(d.get("class_name"))]
+            if len(candidates) == 1:
+                removed = not _is_error(bridge_call(bridge, "devices.delete", {
+                    "track": where, "device": candidates[0]["path"]}))
+            if not removed:
+                result["notes"].append("The host is still on the track: delete it once the "
+                                       "native plug-in sounds right.")
+        elif not _is_error(exposed) and remove_host:
+            removed = True                # the rack replaced it
+        result["host_removed"] = removed
+        if _is_error(exposed):
+            result["notes"].append(f"The native load failed; the host is untouched and the "
+                                   f"preset is saved at {saved['path']}.")
         return result
