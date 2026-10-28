@@ -167,3 +167,32 @@ Installed to `<User Library>/Presets/MIDI Effects/Max MIDI Effect/LiveBridge MID
 - **Timing**: played notes carry the song position (extrapolated from `context.js` reports);
   notes played by the device are scheduled by Node's clock at the current tempo — good for
   auditioning, a clip is tighter.
+
+# LiveBridge Host (Max for Live, experimental)
+
+Live's API reaches only the plug-in parameters added with **Configure** (at most 128). LiveBridge
+Host loads a VST3 plug-in inside Max's own `vst~` object instead, which can list and set every
+parameter (Serum 2 about 540, Diva about 280). Two devices, installed next to the others:
+`LiveBridge Host Effect` (audio effect: `plugin~` -> `vst~ 2 2` -> `plugout~`) and `LiveBridge
+Host Instrument` (instrument: `midiin` -> `midiparse` -> `vst~` -> `plugout~`).
+
+| Tool | What it does |
+|---|---|
+| `live_plugin_host_load` | Find the plug-in's `.vst3` (system VST3 folders, `LIVEBRIDGE_VST3_PATH`), load the host on a new MIDI track or at the end of a track, load the plug-in into it |
+| `live_plugin_host_parameters` | Every parameter (the per-MIDI-CC stand-ins VST3 adds are hidden), searchable and paged, with value and display text |
+| `live_plugin_host_set` | Set many parameters by name or id (`h12`), to 0..1 or display text ("800 Hz"); open/close the plug-in window |
+
+- **Patch**: `lbhost.js` (Node for Max) sends `vst~` messages (`plug_vst3`, `subname`,
+  `params`, `get`, `<index> <value>`, `open`/`wclose`) and hears every message outlet as
+  `vstout <outlet> ...`; replies are matched by timing, one request at a time. Registry kind
+  `"host"` (`host_kind`: effect / instrument), same protocol as the Engine.
+- **By display text**: 33 values are tried and read back; an exact text wins, else the leading
+  number is bisected between the two samples that bracket it. No match puts the old value back.
+- **State**: `vst~` saves the plug-in's state with the Set (`parameter_enable`, `autosave`);
+  one undo restores the whole state. Opening the Set needs Max for Live.
+- **Limits**: hosted parameters are not Live parameters — no automation lanes (load the plug-in
+  natively with `live_plugin_expose` for that, or `live_engine_modulate`); a user's existing
+  plug-in can't be moved in with its settings (the API can't read plug-in state); VST3 only;
+  latency changes of the plug-in are not reported to Live; untested in real Max so far — the
+  exact form of `vst~`'s replies is parsed tolerantly. Idea from Producer Pal's plug-in-host
+  spike (GPL-3; re-implemented from its notes, no code taken).

@@ -52,6 +52,12 @@ the MCP server package and the installer have their own version numbers. `live_s
   (`livebridge://omnisphere`). The codec, preset tree, VST3 container, packing and both guides
   are ported from kasperikaivola's fork of ableton-mcp-pro (MIT, commit 6ac32c8); new `serum`
   extra (cbor2, zstandard), installed by default.
+- **Plug-in host, every VST3 parameter** (`live_plugin_host_load`, `live_plugin_host_parameters`,
+  `live_plugin_host_set`; experimental, needs Max for Live): two new Max for Live devices
+  (LiveBridge Host Effect / Instrument, built by `max_for_live/build.py`, installed with the
+  others) load a VST3 inside Max's `vst~`, past Live's 128-parameter Configure limit; values by
+  number or display text. No automation lanes for hosted parameters. Idea from Producer Pal's
+  plug-in-host spike (GPL-3, no code taken).
 - **Mixing and mastering by measurement** (`live_sound_check`, `live_mix_balance`,
   `live_master_auto`; Engines on the tracks and the master): a sound check for silent parts,
   filter-strangled patches and cutoffs below a role's working floor; faders set to role levels

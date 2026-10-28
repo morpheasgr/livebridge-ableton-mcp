@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
-  211 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
+  214 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
   macOS and Windows · every Live 12 edition · Max for Live optional · MIT licensed
 </p>
@@ -82,7 +82,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 
 ## Why LiveBridge
 
-- **All of Live that its API allows**, not just transport and notes: 211 tools backed by 200
+- **All of Live that its API allows**, not just transport and notes: 214 tools backed by 200
   commands, plus direct access to the Live Object Model for anything else.
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
@@ -108,7 +108,8 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
   workflows, a sound library, generative rhythms and note chance, and project notes Claude
   remembers.
 - **Big plug-ins, fully controllable:** Serum 2 and other VST3 synths without clicking
-  *Configure* for every knob — and complete Serum 2 preset files (wavetables, mod matrix, FX
+  *Configure* for every knob, every parameter of any VST3 through the experimental LiveBridge
+  Host device (past Live's 128) — and complete Serum 2 preset files (wavetables, mod matrix, FX
   order) designed, edited and loaded onto a track.
 - **Splice in the same conversation**, through Splice's official MCP server.
 - **Two computers:** Claude on your laptop, Live on the studio PC (or the other way round),
@@ -127,7 +128,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
  ┌───────────────────────────┐   TCP JSON lines :9880    ┌──────────────────────────────────┐
  │ livebridge-mcp            │ ────────────────────────▶ │ Ableton Live 12                  │
  │ MCP server (Python ≥3.10) │ ◀──────────────────────── │  └ LiveBridge Remote Script      │
- │ 211 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
+ │ 214 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
  │ client, LAN discovery     │ ◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │     runs every command on Live's │
  └───────────────────────────┘                           │     main thread, 1 undo step each)│
                                                          └──────────────────────────────────┘
@@ -256,7 +257,7 @@ Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and 
 
 ## Tools
 
-211 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
+214 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
 full reference (every tool with its arguments and defaults, and every bridge command with the tool
 that runs it) is [docs/TOOLS.md](docs/TOOLS.md), generated from the code by
 `installers/gen_tools_doc.py`; Claude reads the full docstrings at runtime.
