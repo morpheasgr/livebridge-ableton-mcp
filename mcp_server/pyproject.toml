@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "livebridge-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Ableton Live MCP server: let Claude control Ableton Live 12 (tracks, clips, MIDI, devices, Serum 2, automation, arrangement, Splice) through the LiveBridge Remote Script"
 readme = "README.md"
 requires-python = ">=3.10"

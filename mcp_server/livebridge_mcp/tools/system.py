@@ -7,9 +7,11 @@ These are the tools Claude reaches for first (`live_status`) and when something 
 from __future__ import annotations
 
 import json
+import os
 import platform
 import re
 import sys
+import time
 from typing import Any
 
 from . import bridge_call, drop_none, tool_error
@@ -20,6 +22,8 @@ from ..discovery import BEACON_PORT, discover as udp_discover
 from ..errors import BridgeError, error_payload, friendly_error
 
 _COMMAND_RE = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
+#: When this MCP server process started (a restart of Claude starts a new one).
+_STARTED = time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _command_entries(result: Any) -> list[dict[str, Any]] | None:
@@ -99,6 +103,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             - `mcp_host.version` is this MCP server's version and `bridge_version` the Remote
               Script's (two separate numbers). When Claude and Live run on two machines, both
               machines should report the same pair (same LiveBridge checkout/bundle on both).
+              `mcp_host.pid` / `started` identify the server process: a new one after Claude
+              restarts (an unchanged `started` means the old server is still running).
             - `hidden_tool_modules` appears when the server runs with a reduced toolset
               (`--toolsets` / `LIVEBRIDGE_TOOLSETS`): those modules have no tools in this session,
               but their bridge commands still run through `live_command_call`.
@@ -117,6 +123,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 "version": __version__,
                 "python": sys.version.split()[0],
                 "platform": platform.system(),
+                "pid": os.getpid(),
+                "started": _STARTED,
             },
         }
         hidden = getattr(mcp, "hidden_tool_modules", None)
