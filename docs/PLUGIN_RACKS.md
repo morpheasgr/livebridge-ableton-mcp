@@ -150,6 +150,14 @@ End-to-end proof, run through the MCP tools in-process against the real bridge:
   `LB_SERUM_TEMPLATE` / `LB_PROBE_A` / `LB_PROBE_B` tracks and its
   `User Library/LiveBridge/LB_probe_*` files.
 
+## From a LiveBridge Host
+
+`live_plugin_host_expose` (see [ENGINE.md](ENGINE.md)) ends here: it saves a hosted plug-in's
+patch as a `.vstpreset`, runs `plugin_racks.map` if the plug-in has no map yet and calls
+`plugin_racks.expose(preset_file=..., parameters=[...])`, so the native rack starts from the
+hosted sound with the parameters the user actually touched. Parameters a plug-in adds to the
+rack's list on its own (Massive: UNISONO) are reported as `extra`.
+
 ## Limits
 
 - **VST3 only.** AU racks load, but Live exposes nothing through them. VST2 is not generated.
