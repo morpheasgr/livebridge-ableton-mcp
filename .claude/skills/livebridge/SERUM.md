@@ -46,6 +46,16 @@ what you changed in synth terms ("opened the filter to 1.2 kHz, more unison detu
 
 ## 2. What the API can and cannot change
 
+**Not a parameter is not the same as manual.** Serum 2 publishes ~540 parameters (all of them
+reachable through a LiveBridge Host), but no oscillator routing (Filter / Main / Direct / None
+per source), wavetable choice, mod-matrix route or FX slot type — checked: searching the hosted
+parameters for route, output, dest, osc, A Filter finds nothing. All of those are in the preset
+**file**: find the field with `live_preset_search`, set it with `live_preset_edit`, then load
+the result (`live_preset_load`, or `live_plugin_host_preset` into a hosted Serum). Do the
+structure in the file first and tune the knobs after — loading a preset replaces the instance's
+whole state. Ask the user to click in Serum's window only for a quick one-off on a sound that
+must not be reloaded, and say that the file route exists.
+
 Serum 2 has 541 mapped parameters (any 128 at a time). Everything with a knob is a parameter.
 These are **not** parameters, so they come from the preset or from the user in Serum's window:
 
