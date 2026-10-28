@@ -528,7 +528,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     f"{report.get('version')} template: settings newer than the preset keep "
                     "the template's defaults.")
         try:
-            answer = engine.request(host, "preset", {"path": str(path)}, timeout=_SET_TIMEOUT)
+            args = {"path": str(path)}
+            if result.get("preset_name"):            # packed for Serum 2 by us
+                args["plugin_name"] = "Serum 2"
+            answer = engine.request(host, "preset", args, timeout=_SET_TIMEOUT)
         except engine.EngineError as exc:
             return _failure(exc, cmd)
         result.update(answer or {})
