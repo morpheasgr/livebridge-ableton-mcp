@@ -5,6 +5,10 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Fix: the touch log no longer counts restores** (Host 0.3.2): Live's undo or a reopened set
+  makes a plug-in re-announce all its values at once; such bursts (8+ parameters in 50 ms)
+  are listed as `restores`, not touches. The host reads a baseline after every load and
+  restore so touches have a `before`; `touched="reset"` starts a clean round.
 - **What you touch in a hosted plug-in's window** (`live_plugin_host_parameters(touched=...)`,
   Host 0.3.1): the host logs the changes `vst~` reports from the plug-in's own window, in
   order with before/after values, leaving out LiveBridge's own writes and preset loads — no

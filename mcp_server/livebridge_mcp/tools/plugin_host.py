@@ -305,7 +305,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             snapshot: remember every value now under this name ("before") instead of listing.
             changed_since: list only what changed since that snapshot, most moved first.
             touched: what the user moved in the plug-in's window: true = since the host
-                started (or the last clear), or a time span ("2 min", "30 s", 90 = seconds).
+                started (or the last clear), a time span ("2 min", "30 s", 90 = seconds), or
+                "reset" to empty the log and start a clean round.
             clear: with touched: empty the log after reading it (start a fresh round).
 
         Returns:
@@ -313,7 +314,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             display}], next_offset?}`; with snapshot `{snapshot, parameters (count)}`; with
             changed_since `{since, changed, parameters:[{id, name, before, after, value,
             moved}]}`; with touched `{touched, parameters:[{id, name, before, after, value,
-            times, first, last}]}` in the order they were first touched.
+            times, first, last}], restores?:[{at, parameters}]}` in the order they were first
+            touched; `restores` are bursts of many values at once (undo, a reopened set,
+            a preset restore) — not counted as touches.
 
         Gotchas: a snapshot reads every parameter (a few seconds on ~500). The touch log
         depends on the plug-in reporting its window edits to vst~ (most do); if `touched`
@@ -326,7 +329,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if sum(x is not None for x in (snapshot, changed_since, touched)) > 1:
             return tool_error("pass one of snapshot, changed_since, touched", cmd=cmd)
         seconds = None
-        if touched is not None and touched is not True:
+        reset = isinstance(touched, str) and touched.strip().lower() == "reset"
+        if touched is not None and touched is not True and not reset:
             if touched is False:
                 touched = None
             else:
@@ -343,7 +347,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 return engine.request(host, "changes", {"since": changed_since},
                                       timeout=_SET_TIMEOUT)
             if touched is not None:
-                return engine.request(host, "touched", {"seconds": seconds, "clear": clear})
+                return engine.request(host, "touched", {"seconds": seconds, "clear": clear,
+                                                        "reset": reset})
             return engine.request(host, "params", {"search": search, "offset": offset,
                                                    "limit": limit}, timeout=_SET_TIMEOUT)
         except engine.EngineError as exc:

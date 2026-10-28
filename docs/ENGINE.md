@@ -203,6 +203,10 @@ By hand: the device's **Open plug-in** button opens the hosted plug-in's own win
 - **Touch log**: `vst~` reports a change made in the plug-in's window, unasked, as
   `<n> <value> <text>`; `lbhost.js` logs those (first/last time, before/after, how often)
   and skips echoes of its own writes (400 ms) and everything during a plug-in or preset load.
+  A burst — 8+ parameters within 50 ms — is a state restore (Live's undo, a reopened or
+  duplicated set), listed under `restores`, not as touches. After each load or restore the
+  host reads every value once, so a touch knows its `before`. Only plug-ins inside a host
+  are watched; a native plug-in (after `live_plugin_host_expose`) is not.
   `live_plugin_host_parameters(touched=...)` reads it; bank dials follow window edits too.
 - **By display text**: 33 values are tried and read back; an exact text wins, else the leading
   number is bisected between the two samples that bracket it. No match puts the old value back.

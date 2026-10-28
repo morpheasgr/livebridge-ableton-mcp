@@ -466,3 +466,26 @@ def test_touch_log_lists_what_the_user_moved_in_the_window(engines, monkeypatch)
     assert call_tool(app, "live_plugin_host_parameters", {"touched": True})["touched"] == 0
     for bad in ({"touched": "soon"}, {"touched": True, "snapshot": "a"}):
         assert call_tool(app, "live_plugin_host_parameters", bad)["type"] == "bad_args", bad
+
+
+
+def test_a_restore_burst_is_not_a_touch(engines, monkeypatch):  # noqa: F811
+    host, send = _fake_host(engines, monkeypatch, with_send=True)
+    app = create_app(BridgeClient(host="127.0.0.1", port=1, timeout=1.0))
+    assert engine.wait_for(lambda: engine.request(host, "touched", {})["touched"] == 0, 2)
+    import time as _time
+    _time.sleep(0.5)                                  # past the load's quiet moment + baseline
+    # Live's undo restores the plug-in: it re-announces many values at once
+    for n, value in enumerate([0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19], start=1):
+        send("vstout", 3, n, value, f"{n}")
+    _time.sleep(0.3)
+    after = call_tool(app, "live_plugin_host_parameters", {"touched": True})
+    assert after["touched"] == 0 and after["restores"][0]["parameters"] >= 8
+    # then the user really moves one knob: it is a touch, with its before value
+    send("vstout", 3, 3, 0.95, "HP")
+    assert engine.wait_for(lambda: engine.request(host, "touched", {})["touched"] == 1, 2)
+    one = call_tool(app, "live_plugin_host_parameters", {"touched": True})["parameters"][0]
+    assert one["name"] == "Mode" and one["after"] == "HP" and one["before"] is not None
+    cleared = call_tool(app, "live_plugin_host_parameters", {"touched": "reset"})
+    assert cleared["reset"] is True
+    assert call_tool(app, "live_plugin_host_parameters", {"touched": True})["touched"] == 0
