@@ -767,10 +767,20 @@ def _windows_documents_dirs(environ, home, shell_folders=None):
     return _unique(dirs)
 
 
+def _path_key(path):
+    """Compare paths the way the file system does: a Windows path ignores case and slash
+    direction (Library.cfg may spell the User Library differently from Documents)."""
+    text = str(path).rstrip("\\/")
+    if _looks_windows_absolute(text) or "\\" in text:
+        return ntpath.normcase(ntpath.normpath(text))
+    return posixpath.normpath(text)
+
+
 def _unique(paths):
-    unique = []
+    unique, seen = [], set()
     for path in paths:
-        if path and path not in unique:
+        if path and _path_key(path) not in seen:
+            seen.add(_path_key(path))
             unique.append(path)
     return unique
 

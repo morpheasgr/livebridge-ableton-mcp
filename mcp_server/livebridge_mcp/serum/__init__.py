@@ -124,8 +124,19 @@ def template_info(path: Path) -> dict[str, Any] | None:
 def find_templates(user_libraries: list[Path]) -> list[dict[str, Any]]:
     """Serum 2 ``.vstpreset`` templates in the User Library, newest first (LiveBridge's own
     published presets last: they work, but a preset the user saved is the safer schema)."""
-    found = []
-    for path in _walk([p for p in user_libraries if p.is_dir()], ".vstpreset"):
+    found, seen = [], set()
+    roots: list[Path] = []
+    for root in user_libraries:              # one folder may be listed under two spellings
+        try:
+            if root.is_dir() and not any(root.samefile(r) for r in roots):
+                roots.append(root)
+        except OSError:
+            continue
+    for path in _walk(roots, ".vstpreset"):
+        key = os.path.normcase(os.path.realpath(path))
+        if key in seen:
+            continue
+        seen.add(key)
         info = template_info(path)
         if info:
             info["generated"] = all(part in path.parts for part in PUBLISHED)

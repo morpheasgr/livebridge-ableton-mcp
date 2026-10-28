@@ -177,6 +177,12 @@ def test_splice_and_library_candidates():
     assert samples_handlers.user_library_candidates(environ={}, windows=False,
                                                     home="/Users/v") == \
         ["/Users/v/Music/Ableton/User Library"]
+    # Library.cfg spelling the same folder differently: listed once
+    same = samples_handlers.user_library_candidates(
+        library={"user_library": "c:/users/v/documents/Ableton/User Library/"},
+        environ={}, windows=True, home="C:\\Users\\v", shell_folders={})
+    assert same == ["c:/users/v/documents/Ableton/User Library/",
+                    "C:\\Users\\v\\OneDrive\\Documents\\Ableton\\User Library"]
 
 
 def test_core_library_and_factory_packs_candidates():
