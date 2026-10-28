@@ -77,7 +77,7 @@ added or removed. Prefer the `path` fields from the latest summary, or names.
 | Drum kit | `live_browser_load("909 Core Kit", category="drum_kit", new_track=true, track_name="Drums")` |
 | Serum 2 / a big VST3 synth | `live_plugin_expose(plugin="Serum 2", parameters=["sound_design"], new_track=true, track_name=...)` (loads it already controllable) |
 | Every parameter of any VST3 (past 128), no automation needed | `live_plugin_host_load(plugin="Diva")` then `live_plugin_host_parameters(search="cutoff")` / `live_plugin_host_set(values={"VCF1: Cutoff": "800 Hz"})` — experimental, Max for Live; to automate some of them, `live_plugin_host_bank(parameters=["VCF1: Cutoff", ...])` turns them into Live dials; `live_plugin_host_preset(source_path=...)` loads a `.vstpreset` or a Serum 2 design into the hosted plug-in, so a file-designed patch can be fine-tuned knob by knob |
-| Tune any VST3 (not Serum: that has preset files) with the ≤128 controls that matter | scout in a host: `live_plugin_host_load` (or `live_plugin_host_preset` with the user's saved `.vstpreset`), the user tweaks the plug-in's window, `live_plugin_host_parameters(touched=true)` lists what they moved (in order; `clear=true` starts a fresh round) — if it stays empty, `snapshot="before"` then `changed_since="before"`; pick ≤128 (moved first, then what the patch uses, then the role's defaults); `live_plugin_host_expose(parameters=[...])` saves the patch, loads the plug-in natively in a rack with those parameters exposed and removes the host. `live_plugin_host_save` alone writes the patch as a `.vstpreset` |
+| Tune any VST3 (not Serum: that has preset files) with the ≤128 controls that matter | scout in a host: `live_plugin_host_load` (or `live_plugin_host_preset` with the user's saved `.vstpreset`), **first** `live_plugin_host_parameters(touched="reset")` (the log keeps everything since the host started, including restore bursts), then the user tweaks the plug-in's window, then `live_plugin_host_parameters(touched=true)` lists only what they moved (in order, before → after) — see §4b; if it stays empty, `snapshot="before"` then `changed_since="before"`; pick ≤128 (moved first, then what the patch uses, then the role's defaults); `live_plugin_host_expose(parameters=[...])` saves the patch, loads the plug-in natively in a rack with those parameters exposed and removes the host. `live_plugin_host_save` alone writes the patch as a `.vstpreset` |
 | A whole Serum 2 patch (wavetables, matrix, FX order) | design the preset file: `live_preset_find(query=...)` for a starting preset, `live_preset_edit(...)`, then `live_preset_load(source_path=...)` — `SERUM_PRESETS.md` |
 | Drum/arp/bass step pattern | `live_clip_write_pattern` (creates the clip) |
 | Chord progression | `live_clip_write_chords("Am7 Fmaj7 C G", voice_leading=true)` - Roman numerals in the song key work too ("i VI III VII") |
@@ -214,6 +214,14 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     smooth_random, steps=[...]); nothing is written and `live_engine_unmodulate` puts the
     value back. Use it to audition movement; when the user likes it, write it as automation
     (`live_automation_*`) — modulations are not saved with the set.
+  - *What the user turns in a hosted plug-in* (LiveBridge Host): every round is
+    reset → user tweaks → read. 1) `live_plugin_host_parameters(touched="reset")` **before**
+    asking them to tweak — the log otherwise still holds earlier rounds and restore bursts
+    (undo, a reopened set, a preset load); 2) they say "done"; 3) `touched=true` (or
+    `touched="2 min"`). Report only `parameters`; `restores` are not the user's hands (Live
+    re-announcing a whole state) — mention one only if it explains a changed sound. A
+    `before` of null means LiveBridge never read that value. Native plug-ins (after a
+    handover) are not watched: use `live_device_parameters` on the rack instead.
   - *Sound check, balance, master* (Engines on the tracks and the master, song playing):
     `live_sound_check()` -> silent or strangled parts and filters shut below their role's
     floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role
