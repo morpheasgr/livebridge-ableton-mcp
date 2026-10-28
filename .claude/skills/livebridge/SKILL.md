@@ -250,9 +250,12 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
 
 - **Session memory**: after the user keeps or rejects something meaningful, write one short
   `live_memory_note(text=..., kind="decision")`; open threads ("the drop needs a counter-line")
-  as `kind="idea"`, things about the user ("prefers dry drums") as `kind="preference"`. The first
-  note in a new project needs `project="<name>"` (ask the user for the track's name). Mark ideas
-  done with `live_memory_update(id=..., done=true)`. Don't note every small tweak.
+  as `kind="idea"`, things about the user ("prefers dry drums") as `kind="preference"`. Notes
+  file themselves under the open Live Set's name (`song.set_name` in `live_set_snapshot`). A set never
+  saved (`unsaved_set: true`) has no name yet: suggest saving it, and once it is saved move the
+  early notes with `live_memory_update(id=<one of them>, project="<set name>",
+  whole_project=true)`. Mark ideas done with `live_memory_update(id=..., done=true)`. Don't note
+  every small tweak.
 - **Sound library**: Live's API cannot save presets, so keep sounds the user likes with
   `live_sound_save(name=..., track=..., device=<path>, tags=[...])` and recall them with
   `live_sound_load` (same device type). For Serum 2 this also survives a re-expose: save,

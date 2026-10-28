@@ -3699,6 +3699,8 @@ class Song(LomObject):
 
     def __init__(self):
         LomObject.__init__(self, None)
+        self._file_path = ""          # "" = never saved (a new set from the template)
+        self._name = ""
         self._tempo = 120.0
         self._signature_numerator = 4
         self._signature_denominator = 4
@@ -3758,6 +3760,8 @@ class Song(LomObject):
         self._redo_stack = []
 
     # -- properties -----------------------------------------------------------------
+    file_path = _ro("file_path")
+    name = _ro("name")
     tempo = _rw("tempo", _as_float, _range_check(20.0, 999.0, "tempo"))
     signature_numerator = _rw("signature_numerator", _as_int,
                               _range_check(1, 99, "signature_numerator"))

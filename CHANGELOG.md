@@ -5,6 +5,8 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
+- The open set's name: `live_set_snapshot` reports `set_name`/`set_path` (`Song.name`/`Song.file_path`), or `unsaved: true` for a set never saved.
+- Session memory files notes under the open set's name and finds the project by the set's file on recall (`matched_by: "set"`); notes written before the set was saved say `unsaved_set` and move over with `live_memory_update(project=..., whole_project=true)`.
 - Version bump so `live_status` shows whether the new code runs; `live_status` also reports the MCP server's `pid` and `started` time.
 
 ## Unreleased

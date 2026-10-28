@@ -3,9 +3,11 @@ sessions. `live_memory_note` stores an entry, `live_memory_recall` reads the pro
 (and the user's general preferences) at the start of a session, `live_memory_update` marks an
 idea done or rewrites it, `live_memory_forget` deletes one.
 
-Live's API does not tell which file is open, so each project is identified by its name plus a
-fingerprint of the set (tempo and track names) taken when a note is written; recall without a
-project name matches the open set against those fingerprints.
+A project is named after the open Live Set (``Song.name``; its file ``Song.file_path`` is kept
+too), and also carries a fingerprint of the set (tempo and track names) taken when a note is
+written. Recall without a project name finds the open set by its file, then its name, then the
+fingerprints. A set that was never saved has no name: notes go to the last project used (or
+"default") until it is saved; `live_memory_update(project=..., whole_project=true)` moves them.
 
 Stored in ``~/.livebridge/memory.json`` on the machine of the MCP server
 (:mod:`livebridge_mcp.library`).
@@ -57,6 +59,20 @@ def _similarity(a: dict[str, Any], b: dict[str, Any]) -> float:
     return round(score, 2)
 
 
+def _known(data: dict[str, Any], name: str | None) -> str | None:
+    """The stored project called ``name`` (any case), else None."""
+    if not name:
+        return None
+    wanted = name.strip().lower()
+    return next((n for n in data["projects"] if n.lower() == wanted), None)
+
+
+def _same_path(a: Any, b: Any) -> bool:
+    """Two set files are the same (case and separator differences ignored)."""
+    norm = (lambda p: str(p).replace("\\", "/").rstrip("/").lower())
+    return bool(a and b) and norm(a) == norm(b)
+
+
 def _entry_view(entry: dict[str, Any]) -> dict[str, Any]:
     view = {k: entry[k] for k in ("id", "kind", "text", "created") if k in entry}
     if entry.get("tags"):
@@ -84,6 +100,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         tempo = state.get("tempo") if isinstance(state, dict) and not _is_error(state) else None
         return {"tempo": tempo, "tracks": names[:64]}
 
+    def open_set() -> dict[str, Any] | None:
+        """``{set_name, set_path}`` of the open set, ``{unsaved: true}``, or None (no Live)."""
+        song = bridge_call(bridge, "song.summary", {"detail": "minimal"})
+        if _is_error(song) or not isinstance(song, dict):
+            return None
+        if song.get("set_name"):
+            return {"set_name": song["set_name"], "set_path": song.get("set_path")}
+        return {"unsaved": True} if song.get("unsaved") else None
+
     def save(data: dict[str, Any], cmd: str) -> dict[str, Any] | None:
         try:
             library.write_json(_path(), data)
@@ -108,12 +133,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             text: The note (one or two sentences).
             kind: "decision", "idea" (open creative thread), "todo", "preference" (about the
                 user, applies to every project) or "note".
-            project: Project name ("Night Drive"). Omitted = the current project (the last one
-                used); the first note of a new project needs a name.
+            project: Project name ("Night Drive"). Omitted = the open Live Set's name; for a
+                set never saved, the last project used (save the set first, or pass a name).
             tags: Optional words to find it again (["bass", "drop"]).
 
         Returns:
-            `{id, project, kind, text, created, fingerprint?}`.
+            `{id, project, kind, text, created, fingerprint?, unsaved_set?}` (`unsaved_set`:
+            the set has no name yet, so the note went to the last project used).
         """
         cmd = "memory.note"
         if not isinstance(text, str) or not text.strip():
@@ -134,10 +160,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             entry["tags"] = sorted({str(t).strip().lower() for t in tags if str(t).strip()})
         result_project = None
         stamped = None
+        live_set = open_set() if kind != "preference" else None
         if kind != "preference":
-            result_project = (project or data["current"] or _DEFAULT_PROJECT).strip()
+            named = (live_set or {}).get("set_name")
+            result_project = (project or _known(data, named) or named or data["current"]
+                              or _DEFAULT_PROJECT).strip()
             entry["project"] = result_project
             info = data["projects"].setdefault(result_project, {})
+            if named and (project is None or _known(data, project) == _known(data, named)):
+                info["set_path"] = live_set.get("set_path")
             current = fingerprint()
             if current and current["tracks"]:
                 info["fingerprint"] = current
@@ -151,6 +182,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if error:
             return error
         result = dict(_entry_view(entry), project=result_project)
+        if live_set and live_set.get("unsaved") and project is None:
+            result["unsaved_set"] = True
         if stamped:
             result["fingerprint"] = {"tempo": stamped["tempo"],
                                      "tracks": len(stamped["tracks"])}
@@ -170,15 +203,16 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Read-only.
 
         Args:
-            project: Project name. Omitted = the open set is matched against the stored
-                projects by its track names and tempo; without a match, the last project used.
+            project: Project name. Omitted = the open Live Set: by its file, then its name,
+                then its track names and tempo; without a match, the last project used.
             kind: Only "decision", "idea", "todo", "preference" or "note".
             query: Only entries containing this text.
             include_done: Also ideas/todos marked done.
             limit: Newest N entries of the project (1..200).
 
         Returns:
-            `{project, matched_by ("name"|"fingerprint"|"last_used"|"none"), similarity?,
+            `{project, matched_by ("name"|"set"|"fingerprint"|"last_used"|"none"), set?,
+            unsaved_set?, similarity?,
             entries:[{id, kind, text, created, tags?, done?}], preferences:[...], projects:
             [{name, updated, entries}]}`.
         """
@@ -194,7 +228,16 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                            if name.lower() == project.strip().lower()), project.strip())
             matched_by = "name"
         else:
-            current = fingerprint()
+            live_set = open_set() or {}
+            path = live_set.get("set_path")
+            if path:
+                chosen = next((name for name, info in data["projects"].items()
+                               if _same_path(info.get("set_path"), path)), None)
+            if chosen is None and live_set.get("set_name"):
+                chosen = _known(data, live_set["set_name"])
+            if chosen is not None:
+                matched_by = "set"
+            current = fingerprint() if chosen is None else None
             if current:
                 scored = sorted(((_similarity(current, info.get("fingerprint") or {}), name)
                                  for name, info in data["projects"].items()), reverse=True)
@@ -225,6 +268,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                   "projects": projects[:20]}
         if similarity is not None:
             result["similarity"] = similarity
+        if not project:
+            if live_set.get("set_name"):
+                result["set"] = live_set["set_name"]
+            elif live_set.get("unsaved"):
+                result["unsaved_set"] = True
         if chosen is not None and matched_by != "name" and data["current"] != chosen:
             data["current"] = chosen
             save(data, cmd)
@@ -236,22 +284,34 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         done: bool | None = None,
         text: str | None = None,
         kind: str | None = None,
+        project: str | None = None,
+        whole_project: bool = False,
     ) -> Any:
         """Change a remembered entry: mark an idea or todo done (it stops showing in recall),
-        reopen it, rewrite its text or change its kind (an idea that became a decision).
+        reopen it, rewrite its text, change its kind (an idea that became a decision) or move
+        it to another project — with `whole_project` every entry of its project moves (notes
+        written before the set was saved, under "default", to the set's name).
 
         Args:
             id: The entry id from `live_memory_recall` / `live_memory_note`.
             done: true = done, false = open again.
             text: New text.
             kind: New kind ("decision", "idea", "todo", "preference", "note").
+            project: Move the entry to this project (created when new; a project of the same
+                name, any case, is reused).
+            whole_project: With `project`: move every entry of the entry's project and drop
+                the old project name (a rename, or a merge into an existing one).
 
         Returns:
-            The updated entry.
+            The updated entry (`moved: n` with `whole_project`).
         """
         cmd = "memory.update"
-        if done is None and text is None and kind is None:
-            return tool_error("pass done, text or kind", cmd=cmd)
+        if done is None and text is None and kind is None and project is None:
+            return tool_error("pass done, text, kind or project", cmd=cmd)
+        if project is not None and (not isinstance(project, str) or not project.strip()):
+            return tool_error("project must be a non-empty name", cmd=cmd)
+        if whole_project and project is None:
+            return tool_error("whole_project needs project (the new name)", cmd=cmd)
         if kind is not None and kind not in KINDS:
             return tool_error(f"kind must be one of {', '.join(KINDS)}", cmd=cmd)
         if text is not None and (not text.strip() or len(text) > _MAX_TEXT):
@@ -271,8 +331,32 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 entry["project"] = data["current"] or _DEFAULT_PROJECT
             entry["kind"] = kind
         entry["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        moved = None
+        if project is not None:
+            if entry.get("project") is None:
+                return tool_error("a preference belongs to no project; change its kind first",
+                                  cmd=cmd)
+            old, new = entry["project"], _known(data, project) or project.strip()
+            targets = [e for e in data["entries"] if e.get("project") == old] \
+                if whole_project else [entry]
+            for item in targets:
+                item["project"] = new
+            info = data["projects"].setdefault(new, {})
+            if whole_project and old != new:
+                previous = data["projects"].pop(old, {})
+                for key, value in previous.items():
+                    info.setdefault(key, value)
+                if data["current"] == old:
+                    data["current"] = new
+            info["updated"] = entry["updated"]
+            moved = len(targets)
         error = save(data, cmd)
-        return error or _entry_view(entry)
+        if error:
+            return error
+        view = _entry_view(entry)
+        if whole_project:
+            view["moved"] = moved
+        return view
 
     @mcp.tool()
     def live_memory_forget(id: int | None = None, project: str | None = None) -> Any:

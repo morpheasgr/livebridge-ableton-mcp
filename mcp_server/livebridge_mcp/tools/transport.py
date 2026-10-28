@@ -72,8 +72,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 the list is paged).
 
         Returns:
-            `{song:{tempo, signature, is_playing, position:{beats,bbs}, loop:{...}, scale:{...},
-            track_count, scene_count, clip_trigger_quantization, ...}, tracks:[{path, index, name,
+            `{song:{set_name, set_path, project_path?, tempo, signature, is_playing,
+            position:{beats,bbs}, loop:{...}, scale:{...}, track_count, scene_count,
+            clip_trigger_quantization, ...}, tracks:[{path, index, name,
             type, color_index, volume, panning, sends, devices, clips, ...}], returns:[...],
             master:{...}, scenes:[...], cue_points:[...], selection:{track, scene, clip_slot,
             detail_clip, device, ...}, paging?}`
@@ -85,6 +86,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
               is `<track.path>.clip_slots[s].clip`, scene i is `song.scenes[i]`.
             - volume/panning/sends are raw parameter values (volume 0.85 = 0 dB, pan -1..1).
             - Indices shift when tracks/scenes are added or deleted — re-snapshot afterwards.
+            - `set_name`/`set_path` name the open set file; a set never saved has
+              `unsaved: true` instead.
         """
         cmd = "song.snapshot" if include_tracks else "song.summary"
         if detail not in _DETAILS:
