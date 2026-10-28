@@ -453,8 +453,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if replace and any(d.get("instance") == old.get("instance") for d in _hosts()):
             listing = bridge_call(bridge, "devices.list", {"track": where})
             devices = listing.get("devices") if isinstance(listing, dict) else None
+            # the old host: still generically named, or named after its plug-in by load()
             candidates = [d for d in devices or [] if str(d.get("name")) in _GENERIC
-                          or (str(d.get("name")) == str(hello.get("device_name") or ""))]
+                          or str(d.get("name")) == str(plugin.get("name") or "")]
             if len(candidates) == 1:
                 gone = bridge_call(bridge, "devices.delete", {"track": where,
                                                              "device": candidates[0]["path"]})

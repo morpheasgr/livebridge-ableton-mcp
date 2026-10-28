@@ -5,6 +5,8 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **LiveBridge Host names itself after its plug-in** (Host 0.2.3): the device's title becomes
+  "Serum 2", and a reopened set shows that name instead of "plug-in".
 - **LiveBridge Host: an "Open plug-in" button** on the device (and on bank devices) opens the
   hosted plug-in's own window.
 - **Fix: a reopened set's LiveBridge Host knows its plug-in again** (Host 0.2.2): `vst~`
