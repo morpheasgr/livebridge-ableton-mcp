@@ -132,6 +132,9 @@ def test_templates_are_found_in_the_user_library(tmp_path):
     found = serum.find_templates([library])
     assert [Path(t["path"]).name for t in found] == ["Init.vstpreset", "Generated.vstpreset"]
     assert found[0]["product_version"] == "2.0.16"
+    # the same User Library listed twice (two spellings of one folder): each template once
+    twice = serum.find_templates([library, tmp_path / "." / "User Library"])
+    assert len(twice) == 2
 
 
 # ----------------------------------------------------------------------------- the tools
