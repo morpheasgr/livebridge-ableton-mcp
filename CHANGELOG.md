@@ -5,6 +5,9 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **Fix: `live_engine_unmodulate` restores the parameter's value** (Engine 1.5.1). It let go of
+  the parameter in the same instant it sent the saved value, so the knob kept the LFO's last
+  position; it now lets go a few audio vectors later and writes the saved value once more.
 - **LiveBridge Engine, a Max for Live device for real-time listening** (`live_engine_status`,
   `live_engine_listen`; needs Max for Live): drop it on the master and Claude reads what is
   playing right now — momentary/short-term LUFS (BS.1770 K-weighting in gen~), peaks, crest
