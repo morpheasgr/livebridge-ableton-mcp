@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.3.1";
+const VERSION = "0.3.2";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -150,6 +150,14 @@ function quietEnds() {                 // the load is done: stragglers for a mom
   quietUntil = Date.now() + 300;
 }
 
+// A plug-in whose state is restored (Live's undo, a reopened or duplicated set) re-announces
+// its values all at once: BURST_COUNT or more parameters within BURST_MS is a restore, not a
+// hand — logged under restores, not touches.
+const BURST_MS = 50;
+const BURST_COUNT = 8;
+let burst = null;              // {changes: [{index, value, text, was, at}], timer}
+const restores = [];           // [{at, parameters}]
+
 function noticeChange(atoms) {
   if (Number(atoms[0]) !== VALUES_OUTLET || atoms.length < 3) return;
   const n = Number(atoms[1]);
@@ -162,17 +170,52 @@ function noticeChange(atoms) {
     (ownWrites.has(index) && now - ownWrites.get(index) < ECHO_MS);
   const was = known.get(index);
   known.set(index, { value: value, text: text });
-  if (echo || (was && Math.abs(was.value - value) < 1e-7 && was.text === text)) return;
-  const entry = touches.get(index) || { first: now, count: 0, before: was ? was.text : null,
-                                        before_value: was ? was.value : null };
-  touches.delete(index);                               // keep the map in order of last touch
-  touches.set(index, Object.assign(entry, { last: now, count: entry.count + 1,
-                                            value: value, text: text }));
-  while (touches.size > TOUCH_LIMIT) touches.delete(touches.keys().next().value);
   follow(index, value);                                // a bank dial follows the window
+  if (echo || (was && Math.abs(was.value - value) < 1e-7 && was.text === text)) return;
+  if (!burst) {
+    burst = { changes: [], timer: setTimeout(settleBurst, BURST_MS) };
+  }
+  burst.changes.push({ index: index, value: value, text: text, was: was, at: now });
+}
+
+function settleBurst() {
+  const changes = burst ? burst.changes : [];
+  burst = null;
+  const distinct = new Set(changes.map((c) => c.index));
+  if (distinct.size >= BURST_COUNT) {
+    restores.push({ at: new Date(changes[0].at).toISOString(), parameters: distinct.size });
+    while (restores.length > 20) restores.shift();
+    return;
+  }
+  for (const change of changes) {
+    const entry = touches.get(change.index) ||
+      { first: change.at, count: 0, before: change.was ? change.was.text : null,
+        before_value: change.was ? change.was.value : null };
+    touches.delete(change.index);                    // keep the map in order of last touch
+    touches.set(change.index, Object.assign(entry, { last: change.at, count: entry.count + 1,
+                                                     value: change.value, text: change.text }));
+  }
+  while (touches.size > TOUCH_LIMIT) touches.delete(touches.keys().next().value);
+}
+
+// After a load or an adopted restore: read every value once, so a touch knows its "before".
+function baseline() {
+  serial(async () => {
+    try {
+      quiet(0);
+      await readAll();
+    } catch (error) {
+      log("baseline failed: " + (error.message || error));
+    }
+  });
 }
 
 function touched(args) {
+  if (args.reset) {
+    touches.clear();
+    restores.length = 0;
+    return { reset: true, touched: 0, parameters: [] };
+  }
   const since = Number(args.seconds) > 0 ? Date.now() - Number(args.seconds) * 1000 : 0;
   const list = [];
   for (const [index, entry] of touches) {
@@ -186,6 +229,8 @@ function touched(args) {
   if (args.clear) touches.clear();
   return { plugin: state.plugin ? state.plugin.name : null, touched: list.length,
            parameters: list,
+           ...(restores.length ? { restores: restores.filter((r) => Date.parse(r.at) >= since) }
+             : {}),
            ...(args.clear ? { cleared: true } : {}) };
 }
 
@@ -434,6 +479,7 @@ async function load(args) {
   const isSynth = (await infoValue(-7)) === 1;
   const names = await listNames();
   quietEnds();
+  setTimeout(baseline, 400);
   if (!names.length) throw { type: "not_found", message: `vst~ could not load "${file}"` };
   state.plugin = { file: file, name: String(args.name || args.sub || file), synth: isSynth };
   if (args.class_id) state.plugin.class_id = String(args.class_id);
@@ -661,6 +707,7 @@ async function adopt() {
   }
   state.plugin = { file: config.autoload ? config.autoload.file : null, name: name || "plug-in",
                    synth: (await infoValue(-7)) === 1, restored: true };
+  setTimeout(baseline, 0);
   writeRegistry();
   status(state.plugin.name);
   return true;
