@@ -40,7 +40,12 @@ def test_host_amxd_files_are_built_and_wired():
         assert (("obj-vst", 0), ("obj-plugout", 0)) in lines
         assert (("obj-route", 3), ("obj-vst", 0)) in lines           # lbhost.js -> vst~
         assert (("obj-vst", 2), ("obj-vstout0", 0)) in lines         # vst~ -> lbhost.js
-        assert any(b["text"] == first for b in boxes.values())
+        assert any(b.get("text") == first for b in boxes.values())
+        # a button on the device opens the plug-in's window
+        assert boxes["obj-open"]["maxclass"] == "textbutton" and boxes["obj-open"]["presentation"]
+        assert (("obj-open", 0), ("obj-openbang", 0)) in lines
+        assert (("obj-openmsg", 0), ("obj-vst", 0)) in lines and \
+            boxes["obj-openmsg"]["text"] == "open"
         assert patcher["patcher"]["project"]["searchpath"] == {}
     assert m4l_build.HOST_CONTEXT.read_bytes() == m4l_build.ENGINE_CONTEXT.read_bytes()
 

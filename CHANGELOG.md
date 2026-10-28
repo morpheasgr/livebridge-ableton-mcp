@@ -5,6 +5,8 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## Unreleased
 
+- **LiveBridge Host: an "Open plug-in" button** on the device (and on bank devices) opens the
+  hosted plug-in's own window.
 - **Fix: a reopened set's LiveBridge Host knows its plug-in again** (Host 0.2.2): `vst~`
   restored the plug-in and its sound, but the host script started blank ("ready — no
   plug-in", tools refused). It now adopts the restored plug-in at startup and before any
