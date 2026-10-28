@@ -1120,7 +1120,10 @@ class Installer(Ops):
                 self.warn("%s is missing -- %s is not installed" % (source, name))
                 continue
             dest = user_library.joinpath(*presets) / name
-            source_files = tree_files(source)
+            # a source folder may hold several devices (the plug-in hosts): only this one's
+            # .amxd goes with the shared scripts
+            source_files = {rel: data for rel, data in tree_files(source).items()
+                            if not rel.lower().endswith(".amxd") or rel == name + ".amxd"}
             if is_link_or_junction(dest):
                 self.info("%s is a symlink/junction (developer setup) -- left as it is" % dest)
             elif dest.exists() and not is_m4l_device(dest, name, marker):
@@ -1136,7 +1139,10 @@ class Installer(Ops):
                         if dest.exists():
                             remove_tree(dest)
                         self.ensure_dir(dest.parent)
-                        shutil.copytree(str(source), str(dest), ignore=COPY_IGNORE)
+                        for rel, data in source_files.items():
+                            target = dest / rel
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            target.write_bytes(data)
                     except OSError as error:
                         self.warn("could not copy %s to %s (%s) -- if Live has it loaded, "
                                   "remove it from the set or quit Live and run again"

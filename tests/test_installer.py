@@ -1179,6 +1179,30 @@ def test_engine_device_is_copied_into_the_user_library(tmp_path):
     assert not dest.exists() and not midi.exists() and midi.parent.is_dir()
 
 
+def test_host_devices_get_only_their_own_amxd(tmp_path):
+    host = mac_host(tmp_path)
+    presets = remote_dir_mac(host).parent.parent / "Presets"
+    instrument = presets / "Instruments" / "Max Instrument" / "LiveBridge Host Instrument"
+    effect = presets / "Audio Effects" / "Max Audio Effect" / "LiveBridge Host Effect"
+    # an earlier install copied both devices into each folder
+    source = REPO / "max_for_live" / "LiveBridge Host"
+    for folder in (instrument, effect):
+        folder.mkdir(parents=True)
+        for item in source.iterdir():
+            if item.is_file():
+                (folder / item.name).write_bytes(item.read_bytes())
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert code == 0, out
+    assert sorted(p.name for p in instrument.iterdir()) == [
+        "LiveBridge Host Instrument.amxd", "lbhost.js", "lbhost_context.js"]
+    assert sorted(p.name for p in effect.iterdir()) == [
+        "LiveBridge Host Effect.amxd", "lbhost.js", "lbhost_context.js"]
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert "unchanged: " + str(instrument) in out and "unchanged: " + str(effect) in out
+    run_uninstall(host)
+    assert not instrument.exists() and not effect.exists()
+
+
 def test_no_engine_and_foreign_folders(tmp_path):
     host = mac_host(tmp_path)
     code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code", "--no-engine"])
