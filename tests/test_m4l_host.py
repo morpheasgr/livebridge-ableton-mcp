@@ -346,7 +346,7 @@ def test_requests_adopt_before_the_startup_check(engines, monkeypatch):  # noqa:
 
 # ----------------------------------------------------------------------------- scout, save, hand over
 
-def _fake_host(engines, monkeypatch, name="Fake"):  # noqa: F811
+def _fake_host(engines, monkeypatch, name="Fake", with_send=False):  # noqa: F811
     monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
     monkeypatch.setenv("LIVEBRIDGE_HOST_KIND", "instrument")
     _process, send, outlets = engines(script=HOST_JS)
@@ -355,7 +355,7 @@ def _fake_host(engines, monkeypatch, name="Fake"):  # noqa: F811
                                        for d in engine.devices(kind="host")), 5)
     (host,) = engine.devices(kind="host")
     engine.request(host, "load", {"file": "FakeSynth", "sub": name, "name": name})
-    return host
+    return (host, send) if with_send else host
 
 
 def test_snapshot_shows_what_the_user_moved(engines, monkeypatch):  # noqa: F811
@@ -436,3 +436,33 @@ def test_save_and_hand_over_to_a_native_rack(engines, monkeypatch, tmp_path):  #
     finally:
         bridge.stop()
     assert host
+
+
+def test_touch_log_lists_what_the_user_moved_in_the_window(engines, monkeypatch):  # noqa: F811
+    host, send = _fake_host(engines, monkeypatch, with_send=True)
+    from livebridge_mcp.tools import plugin_host
+    assert plugin_host._seconds("2 min") == 120 and plugin_host._seconds(90) == 90
+    assert plugin_host._seconds("30 s") == 30 and plugin_host._seconds("soon") is None
+    app = create_app(BridgeClient(host="127.0.0.1", port=1, timeout=1.0))
+    engine.request(host, "params", {})                         # LiveBridge knows the values
+    # the user turns Cutoff twice and Mode once in the plug-in's window (vst~ reports it)
+    send("vstout", 3, 1, 0.7, "2512", "Hz")
+    send("vstout", 3, 1, 0.8, "5024", "Hz")
+    send("vstout", 3, 3, 0.9, "HP")
+    # an echo of LiveBridge's own write is not a touch
+    engine.request(host, "set", {"values": {"Resonance": 0.3}})
+    send("vstout", 3, 2, 0.3, "30", "%")
+    assert engine.wait_for(lambda: engine.request(host, "touched", {})["touched"] == 2, 3)
+    log = call_tool(app, "live_plugin_host_parameters", {"touched": True})
+    assert [p["name"] for p in log["parameters"]] == ["Cutoff", "Mode"]
+    cutoff = log["parameters"][0]
+    assert cutoff["before"] == "632 Hz" and cutoff["after"] == "5024 Hz" and cutoff["times"] == 2
+    assert call_tool(app, "live_plugin_host_parameters", {"touched": "2 min",
+                                                          "clear": True})["touched"] == 2
+    assert call_tool(app, "live_plugin_host_parameters", {"touched": True})["touched"] == 0
+    # a preset load reports every value: none of it counts
+    engine.request(host, "preset", {"path": "x.vstpreset"})
+    send("vstout", 3, 1, 0.25, "112", "Hz")
+    assert call_tool(app, "live_plugin_host_parameters", {"touched": True})["touched"] == 0
+    for bad in ({"touched": "soon"}, {"touched": True, "snapshot": "a"}):
+        assert call_tool(app, "live_plugin_host_parameters", bad)["type"] == "bad_args", bad

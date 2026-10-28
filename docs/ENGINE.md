@@ -200,6 +200,10 @@ By hand: the device's **Open plug-in** button opens the hosted plug-in's own win
   vst~ wrappers that were tried in Live (Producer Pal's spike and xxnoodl's
   ableton_device_vst_wrapper, both reading the same vst~ reference). Registry kind
   `"host"` (`host_kind`: effect / instrument), same protocol as the Engine.
+- **Touch log**: `vst~` reports a change made in the plug-in's window, unasked, as
+  `<n> <value> <text>`; `lbhost.js` logs those (first/last time, before/after, how often)
+  and skips echoes of its own writes (400 ms) and everything during a plug-in or preset load.
+  `live_plugin_host_parameters(touched=...)` reads it; bank dials follow window edits too.
 - **By display text**: 33 values are tried and read back; an exact text wins, else the leading
   number is bisected between the two samples that bracket it. No match puts the old value back.
 - **State**: `vst~` saves the plug-in's state with the Set (`parameter_enable`, `autosave`);

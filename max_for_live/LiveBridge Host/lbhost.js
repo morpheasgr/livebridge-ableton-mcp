@@ -32,7 +32,7 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
@@ -122,8 +122,71 @@ let pending = null;
 function vstReply(...atoms) {
   if (pending) {
     pending.collected.push(atoms);                     // [outlet, ...message]
-    if (pending.until && pending.until(atoms)) pending.finish();
+    if (pending.until && pending.until(atoms)) {
+      pending.finish();
+      return;
+    }
   }
+  noticeChange(atoms);
+}
+
+// ---------------------------------------------------------------------------- touch log
+// vst~ reports a parameter change made in the plug-in's own window as "<n> <value> <text>" out
+// of the values outlet, unasked. Those are the user's touches: logged with their time, their
+// value before (the last one LiveBridge saw) and after. Echoes of LiveBridge's own writes are
+// left out.
+const TOUCH_LIMIT = 2000;
+const ECHO_MS = 400;
+const touches = new Map();     // index -> {first, last, count, before, value, text}
+const known = new Map();       // index -> {value, text}: the last value LiveBridge read or set
+const ownWrites = new Map();   // index -> ms of LiveBridge's last write
+let quietUntil = 0;            // a preset or plug-in load is reporting every value: not touches
+
+function quiet(ms) {
+  quietUntil = Math.max(quietUntil, Date.now() + ms);
+}
+
+function quietEnds() {                 // the load is done: stragglers for a moment, then listen
+  quietUntil = Date.now() + 300;
+}
+
+function noticeChange(atoms) {
+  if (Number(atoms[0]) !== VALUES_OUTLET || atoms.length < 3) return;
+  const n = Number(atoms[1]);
+  if (!Number.isInteger(n) || n < 1 || typeof atoms[2] !== "number") return;
+  const index = n - 1;
+  const now = Date.now();
+  const value = atoms[2];
+  const text = atoms.slice(3).map(String).join(" ").trim();
+  const echo = now < quietUntil ||
+    (ownWrites.has(index) && now - ownWrites.get(index) < ECHO_MS);
+  const was = known.get(index);
+  known.set(index, { value: value, text: text });
+  if (echo || (was && Math.abs(was.value - value) < 1e-7 && was.text === text)) return;
+  const entry = touches.get(index) || { first: now, count: 0, before: was ? was.text : null,
+                                        before_value: was ? was.value : null };
+  touches.delete(index);                               // keep the map in order of last touch
+  touches.set(index, Object.assign(entry, { last: now, count: entry.count + 1,
+                                            value: value, text: text }));
+  while (touches.size > TOUCH_LIMIT) touches.delete(touches.keys().next().value);
+  follow(index, value);                                // a bank dial follows the window
+}
+
+function touched(args) {
+  const since = Number(args.seconds) > 0 ? Date.now() - Number(args.seconds) * 1000 : 0;
+  const list = [];
+  for (const [index, entry] of touches) {
+    if (entry.last < since) continue;
+    list.push({ id: "h" + (index + 1), name: state.names[index] || null,
+                before: entry.before, after: entry.text, value: entry.value,
+                times: entry.count, first: new Date(entry.first).toISOString(),
+                last: new Date(entry.last).toISOString() });
+  }
+  list.sort((a, b) => a.first.localeCompare(b.first));
+  if (args.clear) touches.clear();
+  return { plugin: state.plugin ? state.plugin.name : null, touched: list.length,
+           parameters: list,
+           ...(args.clear ? { cleared: true } : {}) };
 }
 
 function realAsk(message, waitMs, until) {
@@ -260,7 +323,9 @@ async function read(index) {
   const n = index + 1;
   for (const atoms of fromOutlet(await ask(["get", n], REPLY_MS, answers(n)), VALUES_OUTLET)) {
     if (atoms.length >= 2 && Number(atoms[0]) === n && typeof atoms[1] === "number") {
-      return { value: atoms[1], text: atoms.slice(2).map(String).join(" ").trim() };
+      const got = { value: atoms[1], text: atoms.slice(2).map(String).join(" ").trim() };
+      known.set(index, got);
+      return got;
     }
   }
   return null;
@@ -303,6 +368,7 @@ function follow(index, value) {
 }
 
 async function setValue(index, value) {
+  ownWrites.set(index, Date.now());
   await ask([index + 1, value], 5);
   follow(index, value);
   return read(index);
@@ -362,10 +428,12 @@ async function load(args) {
   const file = String(args.file || "").trim();
   if (!file) throw { type: "bad_args", message: "load needs file (the VST3 file name)" };
   await ask(["valuemode", 2], 5);
+  quiet(3000);
   await ask(["plug_vst3", file], 1500);
   if (args.sub) await ask(["subname", String(args.sub)], 500);
   const isSynth = (await infoValue(-7)) === 1;
   const names = await listNames();
+  quietEnds();
   if (!names.length) throw { type: "not_found", message: `vst~ could not load "${file}"` };
   state.plugin = { file: file, name: String(args.name || args.sub || file), synth: isSynth };
   if (args.class_id) state.plugin.class_id = String(args.class_id);
@@ -456,6 +524,7 @@ async function preset(args) {
   const sample = state.names.map((n, i) => i).filter(visible).slice(0, 64);
   const before = [];
   for (const i of sample) before.push(await read(i));
+  quiet(2500);
   await ask(["read", file], 1500);
   let changed = 0;
   for (let k = 0; k < sample.length; k++) {
@@ -465,6 +534,7 @@ async function preset(args) {
       follow(sample[k], got.value);
     }
   }
+  quietEnds();
   for (const n of state.bank.keys()) {          // bank dials outside the sample follow too
     if (!sample.includes(n - 1)) {
       const got = await read(n - 1);
@@ -566,6 +636,7 @@ async function restore(args) {
     const n = Number(pair[0]);
     const value = Number(pair[1]);
     if (!Number.isInteger(n) || n < 1 || !Number.isFinite(value)) continue;
+    ownWrites.set(n - 1, Date.now());
     await ask([n, Math.max(0, Math.min(1, value))], 0);
     follow(n - 1, value);
     count++;
@@ -644,6 +715,8 @@ function handle(request, reply) {
     done(serial(() => set(args)));
   } else if (request.cmd === "preset") {
     done(serial(() => preset(args)));
+  } else if (request.cmd === "touched") {
+    reply(null, touched(args));
   } else if (request.cmd === "save") {
     done(serial(() => save(args)));
   } else if (request.cmd === "snapshot") {
