@@ -229,7 +229,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if track:
             load_args["track"] = track
         else:
-            load_args.update({"new_track": True, "track_name": track_name or plugin})
+            load_args.update({"new_track": "midi", "track_name": track_name or plugin})
         loaded = bridge_call(bridge, "browser.load", load_args)
         if _is_error(loaded):
             if loaded.get("type") == "not_found":
