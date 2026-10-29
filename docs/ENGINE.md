@@ -113,6 +113,28 @@ together.
 The Remote Script is not involved, so a busy Live main thread never delays the device and the
 device never touches the set.
 
+## Max facts the devices rely on
+
+From Cycling '74's references (Live Object Model https://docs.cycling74.com/apiref/lom/, the
+Live API overview, the JS API https://docs.cycling74.com/apiref/js/, Node for Max
+https://docs.cycling74.com/apiref/nodeformax/) and the 12.4.15 LOM dump:
+
+- `LiveAPI` lives in the classic `[js]` object (`context.js`), never in Node: it cannot run in
+  global code (wait for `live.thisdevice`) or on the high-priority scheduler thread. `[js]`
+  queues incoming messages to the low-priority thread by default, which is what makes the
+  `node.script` -> `route` -> `context.js` chain safe (`node.script` sends on the scheduler).
+- No set changes from inside a notification (defer them). Ids belong to one device and are not
+  saved: devices navigate again after loading, and modulation is deliberately not persistent.
+- `live.remote~` bypasses undo, disables the parameter's automation while it controls it (clip
+  envelopes keep working) and leaves the stored value unchanged, so `unmodulate` writes the
+  original value back through `context.js`.
+- Max's `DeviceParameter` has no `begin_gesture` / `end_gesture` (the Remote Script's has):
+  the Engine's automation passes write plain values.
+- Big answers travel as files, not Max messages (captures, `lom_dump`); `File.writestring`
+  documents no size limit, `context.js` writes in 8000-character chunks anyway.
+- Max 9 also has a `[v8]` JavaScript object (modern JS, `fetch`, sockets, `setTimeout`) that
+  can use `LiveAPI` too; the devices stay on `[js]` + `node.script`, which work in Max 8 as well.
+
 ## Building
 
 The `.amxd` and `.gendsp` are generated, not hand-edited:
