@@ -794,3 +794,146 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         manual.append("Export is yours: File > Export Audio/Video, 24-bit WAV (dither only for "
                       "16-bit).")
         return result
+
+    # ------------------------------------------------------------------ channel strips
+    @mcp.tool()
+    def live_mix_auto(
+        genre: str | None = None,
+        tracks: list[str] | None = None,
+        roles: dict[str, str] | None = None,
+        seconds: float = 6.0,
+        apply: bool = True,
+        balance: bool = True,
+        master: str | None = None,
+        master_chain: str = "native",
+    ) -> Any:
+        """Mix every part by measurement: on each track with a LiveBridge Channel (a channel
+        strip from Ableton's DSP in front of the Engine's meters: high-pass, EQ, compressor,
+        saturation, width/bass mono, trim — all Live parameters), it sets the strip to rest,
+        listens to the raw part, guesses its role, then sets the strip for that role: high-pass,
+        mud / harshness cuts and air from the measured bands, compression to the role's crest
+        factor, bass mono on the low end, a little saturation on a dull bass or lead. Then it
+        listens again and reports before/after with the reason for every move. With `balance`
+        it then sets the faders (`live_mix_balance`), with `master` it masters
+        (`live_master_auto`).
+
+        Args:
+            genre: for the balance and master steps (techno, house, pop ... see
+                live_mix_balance).
+            tracks: only these tracks (default: every track with a Channel).
+            roles: correct a guessed role: `{"Audio 3": "hats"}` (kick, snare, hats, perc,
+                drums, sub, bass, pad, lead, keys, vocal, guitar, fx).
+            seconds: listening window (3..20) — loop the fullest section (the drop).
+            apply: false = listen to the strips as they are and report the plan only.
+            balance: then balance the faders by role (needs 2+ Engines/Channels).
+            master: then master to this destination ("streaming", "club", "apple", "genre"
+                ... see live_master_auto; needs an Engine on the master). None = skip.
+            master_chain: "native" or "livebridge" (the LiveBridge Master device).
+
+        Returns:
+            `{applied, tracks:[{name, role, role_from, before:{lufs, peak_db, crest_db},
+            after?, values:{parameter: value}, reasons:[...]}], balance?, master?, notes}`.
+
+        Gotchas: the song must play (loop the fullest section). The Channel replaces the
+        Engine on a track (it has the meters) — not both. Rules of thumb, not taste: report
+        the reasons, let the user listen, and undo or set a single parameter
+        (`live_device_set_parameter(device="LiveBridge Channel", ...)`) where they disagree.
+        Needs Max 9 (Ableton DSP objects).
+        """
+        cmd = "mix.auto"
+        if not 3 <= seconds <= 20:
+            return tool_error("seconds must be 3..20", cmd=cmd)
+        if master_chain not in ("native", "livebridge"):
+            return tool_error("master_chain must be 'native' or 'livebridge'", cmd=cmd)
+        bad = [r for r in (roles or {}).values() if r not in mix.ROLES]
+        if bad:
+            return tool_error(f"unknown role(s) {bad}; use one of {', '.join(mix.ROLES)}",
+                              cmd=cmd)
+        try:
+            found = engine.devices()
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        channels = [d for d in found if d.get("strip") and d.get("role") == "track"]
+        if tracks:
+            wanted = {t.lower() for t in tracks}
+            channels = [d for d in channels if str(d.get("track") or "").lower() in wanted]
+        if not channels:
+            return tool_error(
+                "no LiveBridge Channel on " + ("these tracks" if tracks else "any track")
+                + ": live_browser_load(query=\"LiveBridge Channel\", category=\"audio_effect\", "
+                "track=<name>) on each part (it ends the chain; remove a LiveBridge Engine "
+                "there — the Channel has the meters). Needs Max 9.", type="not_found", cmd=cmd)
+        if playing() is False:
+            return tool_error("the transport is stopped: loop the fullest section and start "
+                              "playback (live_transport_play), then mix", type="invalid_state",
+                              cmd=cmd)
+        notes: list[str] = []
+        names = [str(d.get("track") or "") for d in channels]
+
+        def strip_index(name: str) -> int | None:
+            listing = bridge_call(bridge, "devices.list", {"track": name})
+            for device in (listing.get("devices") or []) if isinstance(listing, dict) else []:
+                if "livebridge channel" in str(device.get("name", "")).lower():
+                    return device.get("index")
+            return None
+
+        def set_strip(name: str, index: int, values: dict[str, float]) -> Any:
+            return bridge_call(bridge, "devices.set_parameters",
+                               {"track": name, "device": index, "values": values})
+
+        indexes = {name: strip_index(name) for name in names}
+        missing = [n for n, i in indexes.items() if i is None]
+        if missing:
+            notes.append("Channel not found in the device list of " + ", ".join(missing)
+                         + " (renamed?): left out.")
+        pairs = [(d, n) for d, n in zip(channels, names) if indexes[n] is not None]
+        if apply:
+            for _device, name in pairs:          # at rest: measure the raw part
+                answer = set_strip(name, indexes[name], dict(mix.CHANNEL_NEUTRAL))
+                if _is_error(answer):
+                    return answer
+            time.sleep(_SETTLE_S)
+        else:
+            notes.append("apply=false: the plan is based on the strips as they are now — if "
+                         "they already process, it is not a plan for the raw parts.")
+        before = listen_all([d for d, _n in pairs], seconds)
+        results: list[dict[str, Any]] = []
+        for (device, name), reading in zip(pairs, before):
+            if isinstance(reading, engine.EngineError):
+                results.append({"name": name, "error": str(reading)})
+                continue
+            role_info = mix.guess_role(name, reading)
+            role = (roles or {}).get(name) or role_info["role"]
+            entry: dict[str, Any] = {"name": name, "role": role,
+                                     "role_from": "you" if (roles or {}).get(name)
+                                     else role_info["from"], "before": _reading(reading)}
+            if reading.get("silent"):
+                entry.update(values={}, reasons=["silent in this window: left at rest"])
+            else:
+                plan = mix.channel_plan(role, reading)
+                entry.update(values=plan["values"], reasons=plan["reasons"])
+                if apply and plan["values"]:
+                    answer = set_strip(name, indexes[name], plan["values"])
+                    if _is_error(answer):
+                        entry["error"] = answer.get("error")
+            results.append(entry)
+        result: dict[str, Any] = {"applied": bool(apply), "tracks": results, "notes": notes}
+        if apply:
+            time.sleep(_SETTLE_S)
+            live = [(d, n) for d, n in pairs
+                    if any(r.get("name") == n and "error" not in r for r in results)]
+            for (_device, name), reading in zip(live, listen_all([d for d, _n in live],
+                                                                   seconds)):
+                if not isinstance(reading, engine.EngineError):
+                    next(r for r in results if r.get("name") == name)["after"] = \
+                        _reading(reading)
+            if balance and len(pairs) >= 2:
+                result["balance"] = live_mix_balance(
+                    genre=genre, tracks=None if not tracks else names,
+                    roles={r["name"]: r["role"] for r in results if r.get("role")},
+                    seconds=max(3.0, seconds))
+            if master:
+                result["master"] = live_master_auto(destination=master, genre=genre,
+                                                    seconds=max(3.0, seconds),
+                                                    chain=master_chain)
+        return result

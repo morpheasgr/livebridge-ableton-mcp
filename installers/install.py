@@ -80,6 +80,10 @@ M4L_DEVICES = (
     ("LiveBridge Host Instrument", REPO_ROOT / "max_for_live" / "LiveBridge Host",
      ("Presets", "Instruments", "Max Instrument"), "lbhost.js", "host_instrument_dir",
      "-- Claude loads it with live_plugin_host_load: a VST3 synth with all its parameters"),
+    ("LiveBridge Channel", REPO_ROOT / "max_for_live" / "LiveBridge Channel",
+     ("Presets", "Audio Effects", "Max Audio Effect"), "lbchannel.js", "channel_dir",
+     "at the end of each track (instead of the Engine there) -- a channel strip from "
+     "Ableton's DSP plus the Engine's meters (Max 9); live_mix_auto sets it per part"),
     ("LiveBridge Master", REPO_ROOT / "max_for_live" / "LiveBridge Master",
      ("Presets", "Audio Effects", "Max Audio Effect"), "LiveBridge Master.amxd", "master_dir",
      "onto the master, before the Engine -- EQ, glue compressor, limiter and width from "

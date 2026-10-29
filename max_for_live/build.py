@@ -45,6 +45,11 @@ HOST_DIR = HERE / "LiveBridge Host"
 HOST_EFFECT_AMXD = HOST_DIR / "LiveBridge Host Effect.amxd"
 HOST_INSTRUMENT_AMXD = HOST_DIR / "LiveBridge Host Instrument.amxd"
 HOST_CONTEXT = HOST_DIR / "lbhost_context.js"
+CHANNEL_DIR = HERE / "LiveBridge Channel"
+CHANNEL_AMXD = CHANNEL_DIR / "LiveBridge Channel.amxd"
+CHANNEL_NODE = CHANNEL_DIR / "lbchannel.js"
+CHANNEL_CONTEXT = CHANNEL_DIR / "lbchannel_context.js"
+CHANNEL_GENDSP = CHANNEL_DIR / "lb_engine.gendsp"
 MASTER_DIR = HERE / "LiveBridge Master"
 MASTER_AMXD = MASTER_DIR / "LiveBridge Master.amxd"
 
@@ -462,10 +467,10 @@ _MASTER_DSP = (
 )
 
 
-def _master_param_box(i: int, spec: tuple) -> dict:
+def _master_param_box(i: int, spec: tuple, prefix: str = "p", left: float = 10.0) -> dict:
     name, kind, low, high, initial, unit = spec[:6]
     col, row = divmod(i, 4)
-    rect = [10.0 + 56.0 * col, 4.0 + 40.0 * row, 52.0, 36.0]
+    rect = [left + 56.0 * col, 4.0 + 40.0 * row, 52.0, 36.0]
     valueof: dict = {"parameter_longname": name, "parameter_shortname": name[:12],
                      "parameter_initial_enable": 1, "parameter_initial": [initial]}
     if kind == "toggle":
@@ -484,12 +489,34 @@ def _master_param_box(i: int, spec: tuple) -> dict:
         if unit == "hz":
             valueof["parameter_exponent"] = 3.0
         extra = {}
-    return {"box": {"id": f"obj-p{i}", "maxclass": maxclass, "varname": name,
+    return {"box": {"id": f"obj-{prefix}{i}", "maxclass": maxclass, "varname": name,
                     "numinlets": 1, "numoutlets": len(outlets), "outlettype": outlets,
                     "parameter_enable": 1, "presentation": 1, "presentation_rect": rect,
                     "patching_rect": [20.0 + 120.0 * (i % 8), 40.0 + 120.0 * (i // 8),
                                       52.0, 36.0],
                     "saved_attribute_attributes": {"valueof": valueof}, **extra}}
+
+
+def _wire_params(params: tuple, boxes: list, lines: list, prefix: str = "p",
+                 left: float = 10.0, top: float = 40.0) -> None:
+    """A Live parameter per entry of ``params``, each driving its DSP object(s) through
+    ``prepend <message>`` (scaled first when the dial shows % but the DSP takes 0..1)."""
+    for i, spec in enumerate(params):
+        _name, _kind, _low, _high, _initial, _unit, targets, message, scale = spec
+        boxes.append(_master_param_box(i, spec, prefix, left))
+        source = f"obj-{prefix}{i}"
+        x, y = 20.0 + 120.0 * (i % 8), top + 120.0 * (i // 8)
+        if scale != 1.0:
+            boxes.append(_box(f"obj-{prefix}s{i}", f"* {scale}", [x, y + 40.0, 50.0, 22.0], 2,
+                              1))
+            lines.append(_line(source, 0, f"obj-{prefix}s{i}", 0))
+            source = f"obj-{prefix}s{i}"
+        # the utility's width is its side level (mid stays at 1)
+        text = "prepend midside 1." if message == "width" else f"prepend {message}"
+        boxes.append(_box(f"obj-{prefix}m{i}", text, [x, y + 70.0, 110.0, 22.0], 1, 1))
+        lines.append(_line(source, 0, f"obj-{prefix}m{i}", 0))
+        for target in targets:
+            lines.append(_line(f"obj-{prefix}m{i}", 0, f"obj-{target}", 0))
 
 
 def master_patcher() -> dict:
@@ -513,23 +540,7 @@ def master_patcher() -> dict:
     for a, b in (("comp", "lim"), ("lim", "util")):
         lines += [_line(f"obj-{a}", 0, f"obj-{b}", 0), _line(f"obj-{a}", 1, f"obj-{b}", 1)]
     lines += [_line("obj-util", 0, "obj-plugout", 0), _line("obj-util", 1, "obj-plugout", 1)]
-    for i, spec in enumerate(MASTER_PARAMS):
-        name, kind, _low, _high, _initial, _unit, targets, message, scale = spec
-        boxes.append(_master_param_box(i, spec))
-        source = f"obj-p{i}"
-        if scale != 1.0:
-            boxes.append(_box(f"obj-s{i}", f"* {scale}", [20.0 + 120.0 * (i % 8),
-                                                         80.0 + 120.0 * (i // 8), 50.0, 22.0],
-                              2, 1))
-            lines.append(_line(source, 0, f"obj-s{i}", 0))
-            source = f"obj-s{i}"
-        # the utility's width is its side level (mid stays at 1)
-        text = "prepend midside 1." if message == "width" else f"prepend {message}"
-        boxes.append(_box(f"obj-m{i}", text, [20.0 + 120.0 * (i % 8),
-                                              110.0 + 120.0 * (i // 8), 110.0, 22.0], 1, 1))
-        lines.append(_line(source, 0, f"obj-m{i}", 0))
-        for target in targets:
-            lines.append(_line(f"obj-m{i}", 0, f"obj-{target}", 0))
+    _wire_params(MASTER_PARAMS, boxes, lines)
     return {"patcher": {
         "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
         "rect": [80.0, 80.0, 1100.0, 700.0], "openinpresentation": 1,
@@ -543,6 +554,88 @@ def master_patcher() -> dict:
                     "contents": {"patchers": {}, "code": {}}, "layout": {},
                     "searchpath": {}, "detailsvisible": 0},
     }}
+
+
+# ----------------------------------------------------------------------------- LiveBridge Channel
+
+#: The channel strip in front of the Engine's meters (same columns as MASTER_PARAMS). Every
+#: initial value is neutral: a fresh Channel does not change the sound (Comp Ratio 1 = no
+#: compression, Saturation 0 % = dry, HP at 20 Hz). live_mix_auto sets them per role.
+CHANNEL_PARAMS = (
+    ("HP Freq", "dial", 20.0, 1000.0, 20.0, "hz", ("hp",), "frequency", 1.0),
+    ("Low", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "lowgain", 1.0),
+    ("Mid", "dial", -12.0, 12.0, 0.0, "db", ("eql", "eqr"), "midgain", 1.0),
+    ("Mid Freq", "dial", 120.0, 7500.0, 1000.0, "hz", ("eql", "eqr"), "midfreq", 1.0),
+    ("High", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "highgain", 1.0),
+    ("Comp Threshold", "dial", -40.0, 0.0, 0.0, "db", ("comp",), "threshold", 1.0),
+    ("Comp Ratio", "dial", 1.0, 10.0, 1.0, "float", ("comp",), "compression", 1.0),
+    ("Comp Attack", "dial", 0.1, 100.0, 10.0, "ms", ("comp",), "attack", 1.0),
+    ("Comp Release", "dial", 10.0, 1000.0, 150.0, "ms", ("comp",), "release", 1.0),
+    ("Comp Makeup", "dial", -12.0, 24.0, 0.0, "db", ("comp",), "gain", 1.0),
+    ("Saturation", "dial", 0.0, 100.0, 0.0, "pct", ("satl", "satr"), "mix", 0.01),
+    ("Drive", "dial", 0.0, 24.0, 6.0, "db", ("satl", "satr"), "drive", 1.0),
+    ("Width", "dial", 0.0, 100.0, 100.0, "pct", ("util",), "width", 0.01),
+    ("Bass Mono", "toggle", 0, 1, 0, None, ("util",), "bass_mono", 1.0),
+    ("Bass Mono Freq", "dial", 50.0, 500.0, 120.0, "hz", ("util",), "bass_mono_frequency",
+     1.0),
+    ("Trim", "dial", -24.0, 12.0, 0.0, "db", ("util",), "gain", 1.0),
+)
+_CHANNEL_DSP = (
+    # id, object, inlets, outlets: a clean 24 dB high-pass, Channel EQ and Saturator once per
+    # side (mono or stereo, either way one channel each), the rest stereo
+    ("hp", "abl.device.autofilter~ @filtertype 1 @filterslope 1 @circuit 0 @resonance 0. "
+           "@drive 0. @lfoamount 0. @envamount 0. @mix 1.", 2, 2),
+    ("eql", "abl.device.channeleq~", 1, 1),
+    ("eqr", "abl.device.channeleq~", 1, 1),
+    ("comp", "abl.device.stereocompressor~ @model 1 @autorelease 0 @knee 6. @makeup 0", 2, 2),
+    ("satl", "abl.dsp.saturator~ @curve 1 @mix 0.", 1, 1),
+    ("satr", "abl.dsp.saturator~ @curve 1 @mix 0.", 1, 1),
+    ("util", "abl.device.utility~", 2, 2),
+)
+
+
+def channel_patcher() -> dict:
+    """LiveBridge Channel: the Engine (meters, listening, capture, modulation) with a channel
+    strip in front of its meters — high-pass, EQ, compressor, saturation, width/bass mono,
+    trim from Ableton's DSP (Max 9). Its Node script says ``strip: true`` in hello."""
+    patcher = engine_patcher()
+    body = patcher["patcher"]
+    for item in body["boxes"]:
+        box = item["box"]
+        if box["id"] == "obj-node":
+            box["text"] = "node.script lbchannel.js @autostart 1 @watch 0 @args channel"
+        elif box["id"] == "obj-context":
+            box["text"] = "js lbchannel_context.js"
+        elif box["id"] == "obj-title":
+            box["text"] = "LiveBridge Channel"
+    # what plugin~ fed (meters, recorder, output) now hears the strip's output instead
+    for line in body["lines"]:
+        source = line["patchline"]["source"]
+        if source[0] == "obj-plugin":
+            source[0] = "obj-util"
+    for n, (box_id, text, inlets, outlets) in enumerate(_CHANNEL_DSP):
+        body["boxes"].append(_box(f"obj-{box_id}", text, [20.0 + 200.0 * (n % 4),
+                                                          700.0 + 40.0 * (n // 4), 190.0,
+                                                          22.0],
+                                  inlets, outlets, ["signal"] * outlets))
+    body["lines"] += [
+        _line("obj-plugin", 0, "obj-hp", 0), _line("obj-plugin", 1, "obj-hp", 1),
+        _line("obj-hp", 0, "obj-eql", 0), _line("obj-hp", 1, "obj-eqr", 0),
+        _line("obj-eql", 0, "obj-comp", 0), _line("obj-eqr", 0, "obj-comp", 1),
+        _line("obj-comp", 0, "obj-satl", 0), _line("obj-comp", 1, "obj-satr", 0),
+        _line("obj-satl", 0, "obj-util", 0), _line("obj-satr", 0, "obj-util", 1),
+    ]
+    _wire_params(CHANNEL_PARAMS, body["boxes"], body["lines"], prefix="c", left=200.0,
+                 top=800.0)
+    body["devicewidth"] = 200.0 + 56.0 * math.ceil(len(CHANNEL_PARAMS) / 4) + 8.0
+    body["description"] = ("LiveBridge Channel: a channel strip from Ableton's DSP plus the "
+                           "Engine's meters, set by live_mix_auto")
+    body["dependency_cache"] = [
+        {"name": "lbchannel.js", "bootpath": ".", "type": "TEXT", "implicit": 1},
+        {"name": "lbchannel_context.js", "bootpath": ".", "type": "TEXT", "implicit": 1},
+        {"name": "lb_engine.gendsp", "bootpath": ".", "type": "gDSP", "implicit": 1},
+    ]
+    return patcher
 
 
 def host_patcher(instrument: bool) -> dict:
@@ -578,6 +671,10 @@ def outputs() -> dict[Path, bytes]:
         HOST_INSTRUMENT_AMXD: amxd(host_patcher(True), INSTRUMENT),
         HOST_CONTEXT: ENGINE_CONTEXT.read_bytes(),
         MASTER_AMXD: amxd(master_patcher(), AUDIO_EFFECT),
+        CHANNEL_AMXD: amxd(host_device.gate_until_ready(channel_patcher()), AUDIO_EFFECT),
+        CHANNEL_NODE: (HERE / "LiveBridge Engine" / "engine.js").read_bytes(),
+        CHANNEL_CONTEXT: ENGINE_CONTEXT.read_bytes(),
+        CHANNEL_GENDSP: (json.dumps(gendsp(), indent="\t", ensure_ascii=False) + "\n").encode(),
     }
 
 

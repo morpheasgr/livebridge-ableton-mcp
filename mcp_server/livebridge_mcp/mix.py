@@ -13,6 +13,11 @@ spectrum:{bands_db (8 bands, dB of the total)}, stereo:{width}}``.
 - **Track or master** (:func:`band_decisions`): a band that is off on the master is a master
   EQ move when the excess is spread over 3+ tracks, a track EQ move when 1-2 tracks own it —
   the planner idea of the same project.
+- **Channel strips** (:func:`channel_plan`): what the LiveBridge Channel device (a channel
+  strip from Ableton's DSP in front of the Engine's meters) should do for a part — high-pass
+  by role, mud / harshness cuts and air from the measured bands, compression to the role's
+  crest factor, bass mono, a little saturation on a dull bass or lead. Rules of thumb on a
+  reading of the raw part, not a trained model.
 - **Patch health** (:func:`patch_health`, :func:`filter_cutoffs`): a sound strangled by its
   filter (one band holds nearly all the energy, no harmonics above 2 kHz, a low-pass far below
   the working floor of its role) — adapted from hellyee's preset audit (MIT, Copyright (c)
@@ -25,7 +30,8 @@ import math
 import re
 from typing import Any, Iterable
 
-__all__ = ["DESTINATIONS", "GENRES", "ROLE_OFFSETS", "band_decisions", "balance_plan",
+__all__ = ["CHANNEL_NEUTRAL", "DESTINATIONS", "GENRES", "ROLE_OFFSETS", "STRIP_ROLES",
+           "band_decisions", "balance_plan", "channel_plan",
            "filter_cutoffs", "genre_balance", "genre_key", "guess_role", "parse_hz",
            "patch_health", "role_from_name", "role_from_sound"]
 
@@ -492,3 +498,95 @@ def filter_cutoffs(device: str, parameters: Iterable[dict[str, Any]],
             entry["below_floor"] = caps and hz < floor
         found.append(entry)
     return found
+
+
+# ----------------------------------------------------------------------------- channel strips
+
+#: The LiveBridge Channel's parameters at rest (max_for_live/build.py CHANNEL_PARAMS): a
+#: fresh or reset Channel leaves the sound alone.
+CHANNEL_NEUTRAL: dict[str, float] = {
+    "HP Freq": 20.0, "Low": 0.0, "Mid": 0.0, "Mid Freq": 1000.0, "High": 0.0,
+    "Comp Threshold": 0.0, "Comp Ratio": 1.0, "Comp Attack": 10.0, "Comp Release": 150.0,
+    "Comp Makeup": 0.0, "Saturation": 0.0, "Drive": 6.0, "Width": 100.0, "Bass Mono": 0.0,
+    "Bass Mono Freq": 120.0, "Trim": 0.0}
+
+#: role -> (high-pass Hz, crest target dB or None = leave the dynamics, ratio, attack ms,
+#: release ms, bass mono). Attack lets the role's transient through (kick 20 ms), release
+#: follows its decay.
+STRIP_ROLES: dict[str | None, tuple[float, float | None, float, float, float, bool]] = {
+    "kick": (30.0, 11.0, 4.0, 20.0, 80.0, True),
+    "snare": (100.0, 10.0, 4.0, 5.0, 120.0, False),
+    "hats": (300.0, None, 2.0, 1.0, 60.0, False),
+    "perc": (150.0, 11.0, 3.0, 5.0, 80.0, False),
+    "drums": (30.0, 10.0, 3.0, 10.0, 100.0, True),
+    "sub": (20.0, 6.0, 4.0, 10.0, 150.0, True),
+    "bass": (30.0, 7.0, 4.0, 10.0, 120.0, True),
+    "pad": (150.0, None, 2.0, 30.0, 300.0, False),
+    "lead": (150.0, 9.0, 3.0, 10.0, 150.0, False),
+    "keys": (120.0, 10.0, 2.5, 10.0, 150.0, False),
+    "vocal": (90.0, 8.0, 4.0, 5.0, 100.0, False),
+    "guitar": (90.0, 9.0, 3.0, 10.0, 120.0, False),
+    "fx": (200.0, None, 2.0, 10.0, 200.0, False),
+    None: (40.0, None, 2.0, 10.0, 150.0, False),
+}
+_MUDDY_ROLES = ("pad", "lead", "keys", "vocal", "guitar", "snare", "perc", "fx")
+_AIRY_ROLES = ("vocal", "hats", "lead")
+
+
+def channel_plan(role: str | None, reading: dict[str, Any] | None) -> dict[str, Any]:
+    """``{values: {parameter: value}, reasons: [...]}`` for a LiveBridge Channel on a part.
+
+    ``reading`` is the raw part (the Channel at rest): its bands, peak and crest decide the EQ
+    and the compression; ``role`` decides the high-pass, timing and bass mono. Only parameters
+    that move from :data:`CHANNEL_NEUTRAL` are in ``values``.
+    """
+    hp, crest_target, ratio, attack, release, mono = STRIP_ROLES.get(role, STRIP_ROLES[None])
+    values: dict[str, float] = {}
+    reasons: list[str] = []
+    label = role or "part"
+    if hp > 20.0:
+        values["HP Freq"] = hp
+        reasons.append(f"high-pass at {hp:g} Hz: nothing a {label} needs lives below it")
+    bands = ((reading or {}).get("spectrum") or {}).get("bands_db") or {}
+    loud = (reading or {}).get("loudness") or {}
+    if bands:
+        mud = float(bands.get("mud", -90.0))
+        presence = float(bands.get("presence", -90.0))
+        boxy = max(float(bands.get("low_mid", -90.0)), mud)
+        if role in _MUDDY_ROLES and mud > -6.0:
+            cut = round(min(4.0, 1.5 + (mud + 6.0) * 0.6), 1)
+            values.update({"Mid Freq": 350.0, "Mid": -cut})
+            reasons.append(f"{-mud:.0f} dB below total in 250-500 Hz is a lot for a {label}: "
+                           f"-{cut:g} dB at 350 Hz (mud)")
+        elif role == "kick" and boxy > -8.0:
+            values.update({"Mid Freq": 300.0, "Mid": -3.0})
+            reasons.append("boxy kick (strong 120-500 Hz): -3 dB at 300 Hz")
+        elif role not in ("hats", "fx") and presence > -4.0:
+            values.update({"Mid Freq": 3500.0, "Mid": -2.0})
+            reasons.append("harsh 2-5 kHz: -2 dB at 3.5 kHz")
+        if role in _AIRY_ROLES and float(bands.get("air", -90.0)) < -25.0 and \
+                float(bands.get("high", -90.0)) < -18.0:
+            values["High"] = 2.0
+            reasons.append(f"dull top for a {label}: +2 dB high shelf (air)")
+        if role in ("bass", "lead") and _share(bands, "presence", "high", "air") < 0.02:
+            values["Saturation"] = 20.0
+            reasons.append(f"almost nothing above 2 kHz: 20 % saturation so the {label} "
+                           "speaks on small speakers")
+    crest, peak = loud.get("crest_db"), loud.get("peak_db")
+    if crest_target is not None and crest is not None and peak is not None and \
+            crest > crest_target + 1.5:
+        reduce = min(crest - crest_target, 8.0)
+        threshold = max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio)))
+        values.update({"Comp Threshold": round(threshold, 1), "Comp Ratio": ratio,
+                       "Comp Attack": attack, "Comp Release": release,
+                       "Comp Makeup": round(reduce / 2.0, 1)})
+        reasons.append(f"crest {crest:g} dB vs ~{crest_target:g} for a {label}: {ratio:g}:1 "
+                       f"from {threshold:.1f} dB (about {reduce:.1f} dB off the peaks), "
+                       f"attack {attack:g} ms, release {release:g} ms")
+    if mono:
+        values["Bass Mono"] = 1.0
+        reasons.append("bass mono below 120 Hz: the low end stays centred")
+        if role == "sub":
+            values["Width"] = 0.0
+            reasons.append("sub fully mono")
+    return {"values": values, "reasons": reasons}

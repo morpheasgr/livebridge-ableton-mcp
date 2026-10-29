@@ -49,7 +49,10 @@ try {
   maxApi = null; // run outside Max (tests): no patch to talk to
 }
 
-const NAME = "LiveBridge Engine";
+// The same script runs the LiveBridge Channel (node.script ... @args channel): the Engine
+// with a channel strip in front of its meters; hello says so (strip: true).
+const STRIP = process.argv.slice(2).indexOf("channel") >= 0;
+const NAME = STRIP ? "LiveBridge Channel" : "LiveBridge Engine";
 const VERSION = "1.7.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
@@ -138,7 +141,7 @@ function writeRegistry() {
     return;
   }
   const record = {
-    name: NAME, version: VERSION, protocol: PROTOCOL, instance: state.instance,
+    name: NAME, version: VERSION, protocol: PROTOCOL, instance: state.instance, strip: STRIP,
     pid: process.pid, host: "127.0.0.1", port: state.port, token: state.token,
     role: state.role, track: state.track, started: state.started,
   };

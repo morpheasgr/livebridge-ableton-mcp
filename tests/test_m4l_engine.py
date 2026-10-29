@@ -215,6 +215,39 @@ def test_master_device_is_built_and_wired():
     assert "obj-plugout" in reaches("obj-plugin")
 
 
+def test_channel_device_is_the_engine_plus_a_strip():
+    device_type, patcher = m4l_build.read_amxd(m4l_build.CHANNEL_AMXD.read_bytes())
+    assert device_type == m4l_build.AUDIO_EFFECT
+    body = patcher["patcher"]
+    boxes = {b["box"]["id"]: b["box"] for b in body["boxes"]}
+    for line in body["lines"]:
+        (source, outlet), (destination, inlet) = (line["patchline"]["source"],
+                                                  line["patchline"]["destination"])
+        assert source in boxes and destination in boxes, line
+        assert outlet < boxes[source]["numoutlets"] and inlet < boxes[destination]["numinlets"]
+    assert boxes["obj-node"]["text"].startswith("node.script lbchannel.js")
+    assert "@args channel" in boxes["obj-node"]["text"]
+    for dependency in body["dependency_cache"]:
+        assert (m4l_build.CHANNEL_DIR / dependency["name"]).is_file(), dependency["name"]
+    assert m4l_build.CHANNEL_NODE.read_bytes() == m4l_build.ENGINE_DIR.joinpath(
+        "engine.js").read_bytes()
+    feeds = {}
+    for line in body["lines"]:
+        feeds.setdefault(line["patchline"]["source"][0], set()).add(
+            line["patchline"]["destination"][0])
+    # plugin~ feeds only the strip; the meters, recorder and output hear the strip's end
+    assert feeds["obj-plugin"] == {"obj-hp"}
+    assert {"obj-gen", "obj-plugout", "obj-sfrecord"} <= feeds["obj-util"]
+    names = [b["saved_attribute_attributes"]["valueof"]["parameter_longname"]
+             for b in boxes.values() if b.get("parameter_enable")
+             and b["id"].startswith("obj-c")]
+    assert names == [p[0] for p in m4l_build.CHANNEL_PARAMS]
+    from livebridge_mcp import mix
+    assert set(mix.CHANNEL_NEUTRAL) == set(names)
+    initial = {p[0]: p[4] for p in m4l_build.CHANNEL_PARAMS}
+    assert initial == mix.CHANNEL_NEUTRAL                    # a fresh Channel is at rest
+
+
 def test_frame_fields_agree_everywhere():
     js = ENGINE_JS.read_text(encoding="utf-8")
     fields = re.findall(r'"(\w+)"', js[js.index("const FRAME_FIELDS"):js.index("];",
