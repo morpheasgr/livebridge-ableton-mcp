@@ -10,13 +10,14 @@ master and one at the end of each track to balance. The decisions are in
 
 from __future__ import annotations
 
+import functools
 import math
 import re
 import time
 from typing import Any
 
 from . import bridge_call, tool_error
-from .. import engine, mix
+from .. import engine, jobs, mix
 from ..client import BridgeClient
 from .engine import _HOW_TO_ADD, _engine_failure
 
@@ -72,6 +73,20 @@ def _chain_devices(kind: str) -> tuple[tuple[str, str], ...]:
     if kind == "livebridge":
         return ((_MASTER_DEVICE, _MASTER_DEVICE),)
     return (("EQ Eight", "Eq8"), ("Glue Compressor", "GlueCompressor"), ("Limiter", "Limiter"))
+
+
+def _background(tool: str):
+    """Run a long mix/master tool as a job (:mod:`livebridge_mcp.jobs`): its report as usual
+    when it ends within ~40 s, else ``{job, status: "running"}`` and ``live_mix_job`` later."""
+    def wrap(fn):
+        @functools.wraps(fn)
+        def run(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return jobs.start(tool, lambda: fn(*args, **kwargs))
+            except jobs.Busy as exc:
+                return tool_error(str(exc), type="busy", cmd="mix.job")
+        return run
+    return wrap
 
 
 def register(mcp: Any, bridge: BridgeClient) -> None:
@@ -362,6 +377,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     # ------------------------------------------------------------------ balance
     @mcp.tool()
+    @_background("live_mix_balance")
     def live_mix_balance(
         genre: str | None = None,
         tracks: list[str] | None = None,
@@ -371,6 +387,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         apply: bool = True,
         passes: int = 2,
         headroom_db: float = 6.0,
+        max_move_db: float = 6.0,
+        min_active: float = 0.35,
     ) -> Any:
         """Balance the mix by measurement: listens to every track with a LiveBridge Engine at
         its end over the same window, gives each part its role's level (kick on top, then sub
@@ -381,9 +399,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         master/bus EQ when 3+ tracks share it, on a track when 1-2 own it.
 
         Args:
-            genre: role levels and band balance of a genre (techno, house, trance, dnb,
-                dubstep, hip_hop, trap, pop, rnb, lo_fi, ambient, breaks, funk, jazz, metal,
-                country, reggaeton, classical, balanced).
+            genre: role levels and band balance of a genre (techno, house, melodic_house —
+                leads/pads/keys close to the kick, for melodic house/techno and progressive —,
+                trance, dnb, dubstep, hip_hop, trap, pop, rnb, lo_fi, ambient, breaks, funk,
+                jazz, metal, country, reggaeton, classical, balanced). An unknown genre is
+                refused; the answer names the profile used (`genre`, `genre_label`).
             tracks: only these tracks (default: every track device).
             roles: correct guessed roles: `{"Audio 3": "hats"}`.
             anchor: the track that keeps its level (default: the kick, else the loudest role).
@@ -391,6 +411,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             apply: false = only report the plan.
             passes: measure/adjust rounds (1..4).
             headroom_db: wanted master peak below 0 dBFS (0..12; needs an Engine on the master).
+            max_move_db: the most one pass moves a fader (1..24 dB; the rest is measured again
+                next pass) — keeps a wrong role or an odd reading from throwing a fader.
+            min_active: parts that play less than this share of the window (0..1; one-shots,
+                fills, a tom twice in 10 s) read too quiet on average: their faders are left
+                alone and listed in the notes.
 
         Returns:
             `{genre?, applied, passes, parts:[{name, role, role_from, lufs (pre-fader),
@@ -410,6 +435,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error(f"passes must be 1..{_MAX_PASSES}", cmd=cmd)
         if not 0 <= headroom_db <= 12:
             return tool_error("headroom_db must be 0..12", cmd=cmd)
+        if not 1 <= max_move_db <= 24:
+            return tool_error("max_move_db must be 1..24", cmd=cmd)
+        if not 0 <= min_active <= 1:
+            return tool_error("min_active must be 0..1", cmd=cmd)
         key = None
         if genre is not None:
             key = mix.genre_key(genre)
@@ -470,13 +499,22 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         notes.append(f"{name} is silent in this window — fader left alone "
                                      "(live_sound_check says why).")
                     continue
+                share = (result.get("loudness") or {}).get("active_share")
+                if share is not None and share < min_active:
+                    if f"{name} plays" not in " ".join(notes):
+                        notes.append(f"{name} plays only {round(share * 100)} % of the window "
+                                     "(a one-shot or fill reads too quiet on average): fader "
+                                     "left alone — set it by ear, or loop a section where it "
+                                     "plays throughout.")
+                    continue
                 guess = mix.guess_role(name, result)
                 role = (roles or {}).get(name) or guess["role"]
                 parts.append({"name": name, "role": role,
                               "role_from": "you" if (roles or {}).get(name) else guess["from"],
                               "lufs": float(lufs),
                               "fader_db": state.get(name, {}).get("volume") or 0.0})
-            plan = mix.balance_plan([dict(p) for p in parts], key, anchor)
+            plan = mix.balance_plan([dict(p) for p in parts], key, anchor,
+                                    max_move=max_move_db)
             if not plan["moves"] or not apply:
                 break
             answer = bridge_call(bridge, "mixer.set_many", {"settings": [
@@ -497,6 +535,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                   "parts": result_parts, "plan": plan, "notes": notes}
         if key:
             answer["genre"] = key
+            answer["genre_label"] = mix.GENRES[key]["label"]
         if master is not None:
             try:
                 reading = engine.listen(master, min(seconds, 6.0))
@@ -539,6 +578,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     # ------------------------------------------------------------------ master
     @mcp.tool()
+    @_background("live_master_auto")
     def live_master_auto(
         destination: str = "streaming",
         lufs: float | None = None,
@@ -858,6 +898,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                            "already louder than the target with the limiter at 0 dB gain: "
                            "turn the mix down")
                 break
+            jobs.note(f"limiter gain {new_gain:.1f} dB (step {len(steps) + 1}), measuring")
             answer = set_limiter({gain_name: f"{new_gain:.1f} dB"})
             if _is_error(answer):
                 return answer
@@ -913,6 +954,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     # ------------------------------------------------------------------ channel strips
     @mcp.tool()
+    @_background("live_mix_auto")
     def live_mix_auto(
         genre: str | None = None,
         tracks: list[str] | None = None,
@@ -961,8 +1003,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             before:{lufs, peak_db, crest_db}, after?, values:{parameter: value},
             reasons:[...]}], low_end?:{phase, unmask}, balance?, master?, notes}`.
 
-        Gotchas: the song must play (loop the fullest section). Placing ~20 devices takes a
-        while (each one loads and starts). The Channel replaces the Engine on a track (it has
+        Gotchas: the song must play (loop the fullest section); the transport keeps playing
+        afterwards. A big set takes minutes: past ~40 s the call answers `{job, status:
+        "running"}` and the run goes on — `live_mix_job(job=..., wait_seconds=30)` returns the full
+        report. Placing ~20 devices takes a while (each one loads and starts). The Channel replaces the Engine on a track (it has
         the meters) — not both. Rules of thumb, not taste: report
         the reasons, let the user listen, and undo or set a single parameter
         (`live_device_set_parameter(device="LiveBridge Channel", ...)`) where they disagree.
@@ -979,6 +1023,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               cmd=cmd)
         placed = None
         if place_devices and apply:
+            jobs.note("placing LiveBridge Channels and the master's Engine")
             placed = place_meters(tracks, master=bool(master))
             if placed.get("error"):
                 return placed["error"]
@@ -1029,6 +1074,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         else:
             notes.append("apply=false: the plan is based on the strips as they are now — if "
                          "they already process, it is not a plan for the raw parts.")
+        jobs.note(f"listening to {len(pairs)} parts at rest")
         before = listen_all([d for d, _n in pairs], seconds)
         results: list[dict[str, Any]] = []
         for (device, name), reading in zip(pairs, before):
@@ -1054,6 +1100,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if placed is not None and (placed["placed"] or placed["replaced"] or placed["skipped"]):
             result["placed"] = placed
         if apply:
+            jobs.note("listening again with the strips set")
             time.sleep(_SETTLE_S)
             live = [(d, n) for d, n in pairs
                     if any(r.get("name") == n and "error" not in r for r in results)]
@@ -1066,16 +1113,19 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             basses = [r["name"] for r in results if r.get("role") in ("bass", "sub")
                       and "error" not in r]
             if low_end and kicks and basses:
+                jobs.note(f"low end: {basses[0]} against {kicks[0]} (phase, then unmask)")
                 result["low_end"] = {
                     "phase": live_mix_phase(track=basses[0], seconds=2.0),
                     "unmask": live_mix_unmask(track=basses[0], against=kicks[0],
                                               seconds=max(3.0, min(seconds, 8.0)))}
             if balance and len(pairs) >= 2:
+                jobs.note("balancing the faders")
                 result["balance"] = live_mix_balance(
                     genre=genre, tracks=None if not tracks else names,
                     roles={r["name"]: r["role"] for r in results if r.get("role")},
                     seconds=max(3.0, seconds))
             if master:
+                jobs.note(f"mastering for {master}")
                 result["master"] = live_master_auto(destination=master, genre=genre,
                                                     seconds=max(3.0, seconds),
                                                     chain=master_chain)
@@ -1083,6 +1133,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     # ------------------------------------------------------------------ phase
     @mcp.tool()
+    @_background("live_mix_phase")
     def live_mix_phase(
         track: str,
         seconds: float = 2.0,
@@ -1226,6 +1277,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     # ------------------------------------------------------------------ unmask
     @mcp.tool()
+    @_background("live_mix_unmask")
     def live_mix_unmask(
         track: str,
         against: str,
@@ -1384,3 +1436,35 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                          f"{round(bands[clash['band']], 1)} dB of its total (averaged over "
                          "the window; the cut itself only happens on the hits).")
         return result
+
+
+    # ------------------------------------------------------------------ jobs
+    @mcp.tool()
+    def live_mix_job(job: int | None = None, wait_seconds: float = 0.0) -> Any:
+        """The report of a mix or master run that outlived its call. `live_mix_auto`,
+        `live_mix_balance`, `live_master_auto`, `live_mix_phase` and `live_mix_unmask` run as
+        background jobs: when one takes longer than ~40 s, its call answers `{job, status:
+        "running", phase}` while the work goes on in Live — ask here (with `wait_seconds`) until
+        `status` is "done" and read `result`, the tool's full report. Read-only.
+
+        Args:
+            job: the job id from the "running" answer (default: the newest job).
+            wait_seconds: wait up to this many seconds for it to finish (0..40).
+
+        Returns:
+            `{job, tool, status: running|done|failed, elapsed_s, phase?, result?}` — result is
+            the tool's own report (or its error).
+
+        Gotchas: only one mix/master run at a time — another one is refused as `busy` until
+        this one ends (it would fight over the same devices). The transport is left as the
+        run left it (playing, or stopped again when it was started for loud_bar/quiet_bar).
+        """
+        cmd = "mix.job"
+        if not 0 <= wait_seconds <= 40:
+            return tool_error("wait_seconds must be 0..40", cmd=cmd)
+        found = jobs.get(job, wait_seconds)
+        if found is None:
+            return tool_error("no mix/master job" + (f" {job}" if job is not None else "")
+                              + " — none ran since the server started (or it is too old)",
+                              type="not_found", cmd=cmd)
+        return found

@@ -8,7 +8,7 @@ spectrum:{bands_db (8 bands, dB of the total)}, stereo:{width}}``.
 - **Roles** (:func:`guess_role`): from the track name first, otherwise from the sound — where the
   energy sits in the 8 bands, the crest factor and the width (a fixed rule set, no model).
 - **Genre targets** (:data:`GENRES`): target loudness, a 6-band balance and level offsets per
-  role for 18 genres, adapted from HighVoltSound's ableton-auto-mix-mcp style profiles (MIT,
+  role for 20 genres (house and melodic_house are LiveBridge's), adapted from HighVoltSound's ableton-auto-mix-mcp style profiles (MIT,
   Copyright (c) 2026 HighVoltSound). They are rules of thumb, not measurements of releases.
 - **Track or master** (:func:`band_decisions`): a band that is off on the master is a master
   EQ move when the excess is spread over 3+ tracks, a track EQ move when 1-2 tracks own it —
@@ -102,6 +102,18 @@ GENRES: dict[str, dict[str, Any]] = {
                 "bands": (0.0, -3.0, -6.0, -8.0, -7.0, -11.0),
                 "roles": {"sub": 0.0, "kick": -1.0, "snare": -5.0, "perc": -7.0, "hats": -9.0,
                           "vocal": -3.0, "lead": -7.0, "fx": -12.0}},
+    "house": {"label": "House / Tech House", "lufs": -8.5,
+              "bands": (0.0, -2.0, -7.0, -9.0, -8.0, -11.0),
+              "roles": {"kick": 0.0, "sub": -1.0, "bass": -3.0, "snare": -5.0, "vocal": -2.0,
+                        "lead": -6.0, "keys": -6.0, "perc": -8.0, "hats": -9.0, "pad": -8.0,
+                        "fx": -12.0}},
+    "melodic_house": {"label": "Melodic House / Techno, Progressive", "lufs": -9.0,
+                      "bands": (-1.0, -3.0, -6.0, -7.0, -7.0, -10.0),
+                      # the melody carries the track: leads, pads and keys sit close to the
+                      # kick instead of 6-10 LU under it
+                      "roles": {"kick": 0.0, "sub": -2.0, "bass": -3.0, "lead": -3.0,
+                                "pad": -5.0, "keys": -4.0, "vocal": -2.0, "guitar": -4.0,
+                                "perc": -9.0, "hats": -10.0, "snare": -6.0, "fx": -10.0}},
     "jazz": {"label": "Jazz / Acoustic", "lufs": -16.0,
              "bands": (-10.0, -3.0, 0.0, -2.0, -3.0, -6.0),
              "roles": {"bass": 0.0, "keys": -2.0, "lead": 0.0, "drums": -4.0, "vocal": 0.0,
@@ -143,8 +155,10 @@ _GENRE_ALIASES = {"dnb": "drum_n_bass", "d&b": "drum_n_bass", "drum and bass": "
                   "drum & bass": "drum_n_bass", "jungle": "drum_n_bass", "hiphop": "hip_hop",
                   "hip-hop": "hip_hop", "hip hop": "hip_hop", "rap": "hip_hop", "lofi": "lo_fi",
                   "lo-fi": "lo_fi", "lo fi": "lo_fi", "r&b": "rnb", "soul": "rnb",
-                  "latin": "reggaeton", "house": "techno", "tech house": "techno",
-                  "melodic techno": "trance", "phonk": "trap", "rock": "metal",
+                  "latin": "reggaeton", "tech house": "house", "deep house": "house",
+                  "afro house": "house", "melodic": "melodic_house",
+                  "melodic techno": "melodic_house", "progressive house": "melodic_house",
+                  "progressive": "melodic_house", "organic house": "melodic_house", "phonk": "trap", "rock": "metal",
                   "orchestral": "classical", "cinematic": "ambient", "neutral": "balanced"}
 
 #: the 6 bands of GENRES as unions of the 8 bands of live_audio_analyze
@@ -305,8 +319,8 @@ def genre_balance(bands_db: dict[str, float], genre: str, tolerance: float = 4.0
 # ----------------------------------------------------------------------------- balance
 
 def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
-                 anchor: str | None = None, max_db: float = 6.0, min_move: float = 0.5
-                 ) -> dict[str, Any]:
+                 anchor: str | None = None, max_db: float = 6.0, min_move: float = 0.5,
+                 max_move: float | None = None) -> dict[str, Any]:
     """Fader moves that put every part at its role's level.
 
     Args:
@@ -316,6 +330,8 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         anchor: the part that keeps its level (default: the kick or the loudest role).
         max_db: highest fader value allowed (Live's +6 dB).
         min_move: smaller moves are left out.
+        max_move: cap one move to this many dB (the rest waits for the next pass, measured
+            again) — a wrong role or a sparse part cannot throw a fader 15 dB at once.
 
     Returns:
         ``{anchor, moves:[{name, role, offset_lu, now_db, target_db, fader_db, new_fader_db,
@@ -343,10 +359,16 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         target = level + part["offset"]
         new_fader = target - part["lufs"]
         move = new_fader - part["fader_db"]
+        capped = max_move is not None and abs(move) > max_move
+        if capped:
+            move = math.copysign(max_move, move)
+            new_fader = part["fader_db"] + move
         entry = {"name": part["name"], "role": part.get("role"), "offset_lu": part["offset"],
                  "now_lufs": round(part["post"], 1), "target_lufs": round(target, 1),
                  "fader_db": round(part["fader_db"], 1), "new_fader_db": round(new_fader, 1),
                  "move_db": round(move, 1)}
+        if capped:
+            entry["capped"] = True
         if abs(move) < min_move:
             unchanged.append(part["name"])
         else:

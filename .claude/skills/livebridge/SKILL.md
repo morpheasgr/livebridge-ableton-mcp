@@ -232,6 +232,11 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     LiveBridge Master device before the master's Engine. Needs Max for Live (Max 9 for the
     Channel and Master). On the user's own mix: `apply=false` first (it then places nothing and
     only plans from the Channels already there) and show the plan; report the `reasons` after.
+    A big set outlives the call: the answer is then `{job, status: "running", phase}` — the
+    run goes on in Live; call `live_mix_job(job=<id>, wait_seconds=30)` until `status` is "done" and
+    report its `result`. Never start another mix/master run meanwhile (it is refused as
+    `busy`). Melodic house/techno or progressive: `genre="melodic_house"` (leads and pads stay
+    close to the kick); one-shots and fills are left to the ear (`notes` says which).
   - *Sound check, balance, master step by step* (each tool places the meters it needs):
     `live_sound_check()` -> silent or strangled parts and filters shut below their role's
     floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role

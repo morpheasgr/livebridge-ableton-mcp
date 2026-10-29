@@ -145,6 +145,17 @@ target, bass mono on kick/sub/bass, saturation on a bass or lead with nothing ab
 listens again, then optionally runs `live_mix_balance` and `live_master_auto`. Put one Channel
 per track instead of an Engine (two Engines on a track just measure twice).
 
+## Long runs: background jobs
+
+An MCP client gives every tool call a fixed time (Claude Desktop: about a minute) that the
+server cannot extend, and mixing a 20-track set listens for longer. `live_mix_auto`,
+`live_mix_balance`, `live_master_auto`, `live_mix_phase` and `live_mix_unmask` therefore run as
+jobs in the MCP server (`livebridge_mcp/jobs.py`): finished within ~40 s, the report comes back
+as usual; otherwise the call answers `{job, status: "running", phase}` at once, the run goes
+on, and `live_mix_job(job=..., wait_seconds=30)` returns the report (kept in memory and in
+`mix_jobs.json` in the library folder). One run at a time — another is refused as `busy`; a
+run's own nested calls (mix_auto -> balance -> master) run inline.
+
 ## LiveBridge Unmask (Live 12)
 
 `max_for_live/LiveBridge Unmask/`: `plugin~ 1 2 3 4` (channels 3-4 are the device's second

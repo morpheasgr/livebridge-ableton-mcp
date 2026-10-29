@@ -337,6 +337,10 @@ def summarize(frames: list[list[float]], fields: list[str] | tuple[str, ...] = F
         "rms_left_db": _db(ms_left), "rms_right_db": _db(ms_right),
     }
     loudness["true_peak_db"] = loudness["peak_db"]      # sample peak: what the flags compare
+    # how much of the window the part plays: frames within 20 dB of its loudest moment (a
+    # one-shot heard twice in 10 s reads quiet on average, but it is not a quiet part)
+    if k and max(k) > _SILENT:
+        loudness["active_share"] = round(sum(1 for v in k if v >= max(k) * 0.01) / len(k), 2)
     if peak > 0 and ms_left + ms_right > 0:
         loudness["crest_db"] = round(loudness["peak_db"] - loudness["rms_db"], 1)
     band_power = {name: _mean(column("band_" + name)) for name, _low, _high, _target in BANDS}
