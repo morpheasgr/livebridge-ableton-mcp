@@ -1132,3 +1132,26 @@ member changed kind or read/write. The only API change:
 Not a change: `Song.name` ("the current Live Set's name") and `Song.file_path` were already in
 12.4.5. The browser lists in the runtime section stop after the first 40 children per root, so
 names that differ there (Roar, Saturator… past the cut) are not removals.
+
+## 21. What Max for Live reaches (dump `docs/LIVE_M4L_LOM_12.4.15.md`)
+
+Max devices (`LiveAPI`, `live.object`) see a narrower object model than the Remote Script.
+From a set with every object type and most device classes (members merged across all objects
+of a type; 930 objects):
+
+- **Python only**: `Application.browser` (Max cannot load devices or browse), undo grouping
+  (`Song.begin_undo_step` / `end_undo_step`), `Song`/`Track` `get_data` / `set_data`,
+  `DeviceParameter.begin_gesture` / `end_gesture` (so the Engine's fast automation pass
+  writes plain values since 1.6.2), clip automation envelopes (`automation_envelope`,
+  `create_automation_envelope`), the old note API (`get_notes`, `set_notes`...),
+  `Clip.is_session_clip` / `is_take_lane_clip`, the legacy routing lists
+  (`input_routings`, `current_output_routing`...), `duplicate_device`, `macros_mapped`,
+  Simpler's `pitch_bend_range`, Spectral Resonator's `*_list` properties.
+- **Reachable from Max** (things LiveBridge's devices could use): `Song.name` / `file_path`,
+  the clip scale (12.4.15), audio clip warp and gain properties, `Track.arm` /
+  `playing_slot_index` / `arrangement_clips` / meters / take lanes, Simpler's `sample`
+  (slices, warp), Wavetable's modulation matrix, Drift's and Meld's voice settings, Looper's
+  transport functions, Compressor's sidechain routing, Hybrid Reverb's IR selection, and the
+  view selection (`selected_parameter`, `detail_clip`, `selected_drum_pad`...).
+- Not settled by the dump: the master track's mixer (`crossfader`, `cue_volume`,
+  `song_tempo`) was not walked, so "Python only" there is unproven.

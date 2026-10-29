@@ -25,7 +25,7 @@
 // Finally it is the fast writer and reader of LiveBridge's arrangement automation passes:
 // "automate" — while the Remote Script runs a recording pass (Arrangement Record, playback,
 // often at a raised tempo) it moves each lane's parameter along its curve 50 times a second,
-// five times the Remote Script's tick, with begin/end gesture so Live records one touch;
+// five times the Remote Script's tick (Max's LiveAPI has no begin/end_gesture: plain writes);
 // "sample" — while the Remote Script plays a range without recording, it reads the
 // parameters 50 times a second (their arrangement automation playing back).
 //
@@ -50,7 +50,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.6.1";
+const VERSION = "1.6.2";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -569,12 +569,6 @@ function curveAt(points, mode, beat) {
 }
 
 function finishAutomation(pass, phase, error) {
-  for (const lane of pass.lanes) {
-    if (lane.gesture) {
-      maxApi.outlet("call", "end_gesture", ...atoms(lane.path));
-      lane.gesture = false;
-    }
-  }
   pass.phase = phase;
   pass.error = error || null;
   state.lastAutomation = pass;
@@ -603,10 +597,6 @@ function automateTick(pass, now) {
     pass.first = at;
   }
   for (const lane of pass.lanes) {
-    if (!lane.gesture) {
-      maxApi.outlet("call", "begin_gesture", ...atoms(lane.path));
-      lane.gesture = true;
-    }
     const value = curveAt(lane.points, lane.mode, at);
     if (lane.lastValue === null || Math.abs(value - lane.lastValue) > 1e-9) {
       maxApi.outlet("setvalue", value, ...atoms(lane.path));
@@ -634,7 +624,7 @@ function parseLane(spec) {
   points.sort((a, b) => a[0] - b[0]);
   return {
     path: target, points: points, mode: spec.mode === "step" ? "step" : "linear",
-    writes: 0, lastValue: null, gesture: false,
+    writes: 0, lastValue: null,
   };
 }
 

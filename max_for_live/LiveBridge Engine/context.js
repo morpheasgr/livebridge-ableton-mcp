@@ -15,8 +15,7 @@
 // slot> <has clip 0/1 per slot...>", "query <id> scenes live_set" answers "info <id> -1 -1
 // 1 1 ..." (one per scene), and "call fire|stop_all_clips <path...>" launches or stops.
 //
-// For the fast automation recording: "call begin_gesture|end_gesture <path...>" and
-// "setvalue <value> <path...>" (the parameter objects are kept between calls); for sampling
+// For the fast automation recording: "setvalue <value> <path...>" (the parameter objects are kept between calls); for sampling
 // "getvalues <id> <path|path|...>" answers "values <id> <value per path...>".
 //
 // For the API dump (tests/dump_m4l_lom.py): "lomdump <file>" walks Live's object model as Max
@@ -140,7 +139,8 @@ function query() {
                Number(api.get("fired_slot_index"))].concat(flags));
 }
 
-var CALLS = { fire: true, stop_all_clips: true, begin_gesture: true, end_gesture: true };
+// (no begin_gesture / end_gesture: Max's DeviceParameter does not have them, LOM dump 12.4.15)
+var CALLS = { fire: true, stop_all_clips: true };
 var parameters = {};
 
 function parameterAt(path) {

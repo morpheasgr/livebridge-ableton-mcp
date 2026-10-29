@@ -5,6 +5,7 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
+- Engine 1.6.2: the fast automation pass no longer calls `begin_gesture`/`end_gesture`, which Max's LiveAPI does not have (each call was an error in the Max window). `docs/LIVE_M4L_LOM_12.4.15.md` and `LIVE_API_VERIFIED.md` §21: what Max for Live reaches compared with the Remote Script.
 - Max for Live API dump: Engine 1.6.1 answers `lom_dump` (members merged across every object of a type: LiveAPI lists only what each object has) (its `context.js` walks Live's object model through LiveAPI `info`); `tests/dump_m4l_lom.py` writes `docs/LIVE_M4L_LOM_<version>.md` with, per type, what the Python API has that Max cannot reach and the reverse.
 - Per-clip scale (Live 12.4.15): `live_clip_set(scale_name=, root_note=, scale_mode=)`, `scale` in `live_clip_get` and the clip summaries, `key="clip"` in `live_theory_analyze` / `live_theory_melody`, and a `clip_scale` hint when a clip's own scale disagrees with its notes. Older Live answers `unsupported`.
 - The open set's name: `live_set_snapshot` reports `set_name`/`set_path` (`Song.name`/`Song.file_path`), or `unsaved: true` for a set never saved.
