@@ -636,6 +636,8 @@ Mixing first, mastering second; most "weak" masters are mix problems.
 **All in one**: loop the fullest section, start playback, `live_mix_auto(genre="techno",
 master="streaming")` — strips, kick/bass phase and unmasking, balance and master in one call.
 The steps below are the same work one tool at a time (to stop between steps, or to redo one).
+Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
+`live_mix_job(job=..., wait_seconds=30)` for the report; don't start a second run meanwhile.
 
 
 1. **Sound check** (§19) — nothing silent, nothing strangled.

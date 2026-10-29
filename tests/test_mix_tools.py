@@ -176,7 +176,8 @@ def test_roles_from_names_and_sound():
 def test_genres_and_balance():
     assert mix.genre_key("DnB") == "drum_n_bass" and mix.genre_key("Hip Hop") == "hip_hop"
     assert mix.genre_key("polka") is None
-    assert len(mix.GENRES) == 18
+    assert len(mix.GENRES) == 20 and mix.genre_key("house") == "house"
+    assert mix.genre_key("melodic techno") == "melodic_house"
     shares6 = mix.genre_shares("techno")
     assert abs(sum(10 ** (v / 10) for v in shares6.values()) - 1) < 1e-9
     report = mix.genre_balance(bands_db(PAD), "techno")
@@ -311,7 +312,8 @@ def test_sound_check(app, song, mix_set):
 
 
 def test_mix_balance_sets_faders_and_keeps_headroom(app, song, mix_set):
-    result = call_tool(app, "live_mix_balance", {"tracks": ["Kick", "Sub", "Pad", "Hats"],
+    result = call_tool(app, "live_mix_balance", {"max_move_db": 24,
+                                                  "tracks": ["Kick", "Sub", "Pad", "Hats"],
                                                  "seconds": 3})
     assert result["applied"] and result["plan"]["anchor"] == "Kick"
     post = {}
@@ -642,3 +644,26 @@ def test_mix_auto_places_the_devices_itself(app, song, mix_set, monkeypatch):
     again = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": False,
                                              "low_end": False})
     assert again.get("placed", {}).get("placed", []) == []           # nothing new to place
+
+
+
+def test_balance_caps_each_move_and_skips_sparse_parts(app, song, mix_set, monkeypatch):
+    plan = mix.balance_plan([{"name": "Kick", "role": "kick", "lufs": -10.0, "fader_db": 0.0},
+                             {"name": "Pad", "role": "pad", "lufs": -6.0, "fader_db": 0.0}],
+                            max_move=6.0)
+    pad = next(m for m in plan["moves"] if m["name"] == "Pad")
+    assert pad["move_db"] == -6.0 and pad["capped"] is True        # wanted -14, capped
+    # a one-shot that plays in 2 frames of 20: left alone, said in the notes
+    plain = frames_for
+
+    def sparse(lufs, crest_db, share, width=0.1, count=20):
+        frames = plain(lufs, crest_db, share, width, count)
+        if lufs is not None and abs(lufs - (-16.0)) < 1e-9:       # the Hats part
+            k = 1 + engine.FIELDS.index("ms_k")
+            for frame in frames[2:]:
+                frame[k] = frame[k] * 1e-4
+        return frames
+    monkeypatch.setattr(sys.modules[__name__], "frames_for", sparse)
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "apply": False})
+    assert "Hats" not in [p["name"] for p in result["parts"]]
+    assert any("Hats plays only" in n for n in result["notes"])

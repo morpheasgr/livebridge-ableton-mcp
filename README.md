@@ -13,7 +13,7 @@
 
 <p align="center">
   <strong>Make music in Ableton Live 12 by talking to Claude.</strong><br>
-  221 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
+  222 tools for tracks, clips, MIDI, drums, chords, devices, Serum 2, automation, arrangement,
   mixing and Splice samples.<br>
   macOS and Windows · every Live 12 edition · Max for Live optional · MIT licensed
 </p>
@@ -89,7 +89,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
 
 ## Why LiveBridge
 
-- **All of Live that its API allows**, not just transport and notes: 221 tools backed by 200
+- **All of Live that its API allows**, not just transport and notes: 222 tools backed by 200
   commands, plus direct access to the Live Object Model for anything else.
 - **Tools that think like a producer:** drum patterns written against the kit's pad names,
   chords from symbols or Roman numerals with voice leading, arps and basslines from a
@@ -141,7 +141,7 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
  ┌───────────────────────────┐   TCP JSON lines :9880    ┌──────────────────────────────────┐
  │ livebridge-mcp            │ ────────────────────────▶ │ Ableton Live 12                  │
  │ MCP server (Python ≥3.10) │ ◀──────────────────────── │  └ LiveBridge Remote Script      │
- │ 221 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
+ │ 222 tools, reconnecting   │   UDP discovery :9881     │    (stdlib Python 3.11 in Live,  │
  │ client, LAN discovery     │ ◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │     runs every command on Live's │
  └───────────────────────────┘                           │     main thread, 1 undo step each)│
                                                          └──────────────────────────────────┘
@@ -288,7 +288,7 @@ Try: *"Here's my 32-bar loop: turn it into a 6-minute track with a DJ intro and 
 
 ## Tools
 
-221 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
+222 tools, named `live_<area>_<verb>`, backed by 200 bridge commands in the Remote Script. The
 full reference (every tool with its arguments and defaults, and every bridge command with the tool
 that runs it) is [docs/TOOLS.md](docs/TOOLS.md), generated from the code by
 `installers/gen_tools_doc.py`; Claude reads the full docstrings at runtime.
@@ -317,7 +317,7 @@ colours are a palette index, `"#RRGGBB"`, `[r, g, b]` or a name.
 | Automation | `live_automation_write/shape/get/copy/clear/state`, `live_automation_record` | Envelopes and LFO shapes in session clips; arrangement automation recorded in real time |
 | Analysis | `live_theory_analyze`, `live_audio_analyze`, `live_audio_masking`, `live_audio_compare`, `live_audio_problems`, `live_audio_align` | Key, chords, clashes between MIDI parts; LUFS, spectral balance, stereo, tempo, key and energy curve of audio (optional `audio` extra), compared with a reference track; which parts mask each other in which bands; before/after checks of a change; technical problems (clipping, DC, polarity, hum, noise, resonances with an EQ suggestion); kick/bass phase and timing between layers |
 | Max for Live: listening, modulation, follow actions, MIDI | `live_engine_status`, `live_engine_listen`, `live_engine_compare`, `live_engine_capture`, `live_engine_masking`, `live_engine_modulate`, `live_engine_unmodulate`, `live_engine_follow`, `live_engine_unfollow`, `live_midi_played`, `live_midi_play`, `live_midi_stop` | Optional LiveBridge Engine Max for Live device on the master and at the end of tracks: live LUFS (momentary/short-term), peaks, crest, 8-band balance, stereo correlation and low-end width while the song plays; A/B checks of a change, WAV captures of several tracks at once and live masking between tracks — no bouncing; tempo-synced LFOs and step sequences on any parameter without writing automation; follow actions on tracks and scenes (weighted next/other/random/jump, chance, seed); with the LiveBridge MIDI device, what you just played as clip-ready notes and phrases played live into an instrument — [details](docs/ENGINE.md) |
-| Mixing by measurement (Max for Live; the tools place their own devices) | `live_sound_check`, `live_mix_auto`, `live_mix_unmask`, `live_mix_phase`, `live_mix_balance`, `live_master_auto` | Silent or filter-strangled parts; per-part channel strips (high-pass, EQ, compression, saturation, bass mono) set by role on the LiveBridge Channel; side-chained dynamic EQ between two clashing parts (the bass cut only where and while the kick plays); kick/bass phase alignment (polarity + all-pass rotation, the setting that cancels least on the master); faders to role levels in dB; the master driven to a loudness target (native chain or the LiveBridge Master device) — [details](docs/ENGINE.md) |
+| Mixing by measurement (Max for Live; the tools place their own devices) | `live_sound_check`, `live_mix_auto`, `live_mix_unmask`, `live_mix_phase`, `live_mix_balance`, `live_master_auto`, `live_mix_job` | Silent or filter-strangled parts; per-part channel strips (high-pass, EQ, compression, saturation, bass mono) set by role on the LiveBridge Channel; side-chained dynamic EQ between two clashing parts (the bass cut only where and while the kick plays); kick/bass phase alignment (polarity + all-pass rotation, the setting that cancels least on the master); faders to role levels in dB; the master driven to a loudness target (native chain or the LiveBridge Master device); long runs continue as background jobs whose report `live_mix_job` returns — [details](docs/ENGINE.md) |
 | Generative | `live_clip_write_euclid`, `live_clip_note_chance` | Euclidean rhythms and polymeters; per-note play probability and velocity variation |
 | Sound library | `live_sound_save/load/list/delete` | Keep a designed sound (Serum 2 included) and recall it later or on another instance |
 | Session memory | `live_memory_note/recall/update/forget` | Decisions, open ideas and the user's preferences, remembered across sessions |
