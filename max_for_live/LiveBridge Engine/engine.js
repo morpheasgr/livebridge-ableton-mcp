@@ -50,7 +50,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.6.0";
+const VERSION = "1.6.1";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
