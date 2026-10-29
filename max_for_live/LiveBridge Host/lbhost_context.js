@@ -270,6 +270,26 @@ function lomKey(api) {
     return type;
 }
 
+function lomMerge(into, info) {
+    into.objects++;
+    var lists = ["properties", "functions", "children"];
+    for (var l = 0; l < lists.length; l++) {
+        var have = {};
+        var list = into[lists[l]];
+        for (var i = 0; i < list.length; i++) {
+            have[list[i] instanceof Array ? list[i][0] : list[i]] = 1;
+        }
+        var more = info[lists[l]];
+        for (var j = 0; j < more.length; j++) {
+            var name = more[j] instanceof Array ? more[j][0] : more[j];
+            if (!have[name]) {
+                list.push(more[j]);
+                have[name] = 1;
+            }
+        }
+    }
+}
+
 function lomdump() {
     var file = arrayfromargs(arguments).join(" ");
     var types = {};
@@ -289,8 +309,11 @@ function lomdump() {
         var info = lomInfo(api);
         if (first) {
             info.path = path;
+            info.objects = 1;
             types[key] = info;
-        }
+        } else {
+            lomMerge(types[key], info);      // info lists what THIS object has (a return
+        }                                    // track has no arm): keep the union
         for (var c = 0; c < info.children.length; c++) {
             var name = info.children[c][0];
             if (name === "canonical_parent" || (!first && !LOM_CONTAINERS[name])) {
