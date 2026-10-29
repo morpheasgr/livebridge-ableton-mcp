@@ -440,14 +440,13 @@ MASTER_PARAMS = (
     ("EQ Mid", "dial", -12.0, 12.0, 0.0, "db", ("eql", "eqr"), "midgain", 1.0),
     ("EQ Mid Freq", "dial", 120.0, 7500.0, 1000.0, "hz", ("eql", "eqr"), "midfreq", 1.0),
     ("EQ High", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "highgain", 1.0),
-    ("Comp Threshold", "dial", -40.0, 0.0, 0.0, "db", ("comp",), "threshold", 1.0),
-    ("Comp Ratio", "dial", 1.0, 10.0, 2.0, "float", ("comp",), "compression", 1.0),
-    ("Comp Attack", "dial", 0.1, 100.0, 10.0, "ms", ("comp",), "attack", 1.0),
-    ("Comp Release", "dial", 10.0, 1000.0, 200.0, "ms", ("comp",), "release", 1.0),
-    ("Comp Auto Release", "toggle", 0, 1, 1, None, ("comp",), "autorelease", 1.0),
-    ("Comp Knee", "dial", 0.0, 18.0, 6.0, "db", ("comp",), "knee", 1.0),
-    ("Comp Makeup", "dial", -12.0, 24.0, 0.0, "db", ("comp",), "gain", 1.0),
-    ("Comp Mix", "dial", 0.0, 100.0, 100.0, "pct", ("comp",), "mix", 0.01),
+    # abl.device.compressor~ takes attack/release in seconds; one per side (the stereo
+    # compressor of the reference pages is not in every Max 9)
+    ("Comp Threshold", "dial", -40.0, 0.0, 0.0, "db", ("compl", "compr"), "threshold", 1.0),
+    ("Comp Ratio", "dial", 1.0, 10.0, 2.0, "float", ("compl", "compr"), "ratio", 1.0),
+    ("Comp Attack", "dial", 0.1, 100.0, 10.0, "ms", ("compl", "compr"), "attack", 0.001),
+    ("Comp Release", "dial", 10.0, 1000.0, 200.0, "ms", ("compl", "compr"), "release", 0.001),
+    ("Comp Makeup", "dial", -12.0, 24.0, 0.0, "db", ("compl", "compr"), "gain", 1.0),
     ("Limit Gain", "dial", -24.0, 24.0, 0.0, "db", ("lim",), "gain", 1.0),
     ("Limit Ceiling", "dial", -24.0, 0.0, -1.0, "db", ("lim",), "ceiling", 1.0),
     ("Limit Mode", "menu", 0, 2, 2, ("Standard", "Soft clip", "True peak"), ("lim",), "mode",
@@ -466,7 +465,8 @@ _MASTER_DSP = (
     # one channel each); the others are stereo.
     ("eql", "abl.device.channeleq~", 1, 1),
     ("eqr", "abl.device.channeleq~", 1, 1),
-    ("comp", "abl.device.stereocompressor~ @model 1", 2, 2),
+    ("compl", "abl.device.compressor~", 1, 1),
+    ("compr", "abl.device.compressor~", 1, 1),
     ("lim", "abl.device.limiter~", 2, 2),
     ("util", "abl.device.utility~", 2, 2),
 )
@@ -525,7 +525,7 @@ def _wire_params(params: tuple, boxes: list, lines: list, prefix: str = "p",
 
 
 def master_patcher() -> dict:
-    """LiveBridge Master: Channel EQ -> Stereo Compressor -> Limiter -> Utility, Ableton's own
+    """LiveBridge Master: Channel EQ -> Compressor -> Limiter -> Utility, Ableton's own
     DSP as Max objects (abl.device.*, Max 9 / Live 12.2+), every control a Live parameter."""
     boxes = [
         _box("obj-plugin", "plugin~", [20.0, 420.0, 60.0, 22.0], 2, 2, ["signal", "signal"]),
@@ -541,9 +541,9 @@ def master_patcher() -> dict:
                           inlets, outlets, ["signal"] * outlets))
     # audio: plugin~ -> EQ (L, R) -> compressor -> limiter -> utility -> plugout~
     lines += [_line("obj-plugin", 0, "obj-eql", 0), _line("obj-plugin", 1, "obj-eqr", 0),
-              _line("obj-eql", 0, "obj-comp", 0), _line("obj-eqr", 0, "obj-comp", 1)]
-    for a, b in (("comp", "lim"), ("lim", "util")):
-        lines += [_line(f"obj-{a}", 0, f"obj-{b}", 0), _line(f"obj-{a}", 1, f"obj-{b}", 1)]
+              _line("obj-eql", 0, "obj-compl", 0), _line("obj-eqr", 0, "obj-compr", 0),
+              _line("obj-compl", 0, "obj-lim", 0), _line("obj-compr", 0, "obj-lim", 1),
+              _line("obj-lim", 0, "obj-util", 0), _line("obj-lim", 1, "obj-util", 1)]
     lines += [_line("obj-util", 0, "obj-plugout", 0), _line("obj-util", 1, "obj-plugout", 1)]
     _wire_params(MASTER_PARAMS, boxes, lines)
     return {"patcher": {
@@ -572,11 +572,11 @@ CHANNEL_PARAMS = (
     ("Mid", "dial", -12.0, 12.0, 0.0, "db", ("eql", "eqr"), "midgain", 1.0),
     ("Mid Freq", "dial", 120.0, 7500.0, 1000.0, "hz", ("eql", "eqr"), "midfreq", 1.0),
     ("High", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "highgain", 1.0),
-    ("Comp Threshold", "dial", -40.0, 0.0, 0.0, "db", ("comp",), "threshold", 1.0),
-    ("Comp Ratio", "dial", 1.0, 10.0, 1.0, "float", ("comp",), "compression", 1.0),
-    ("Comp Attack", "dial", 0.1, 100.0, 10.0, "ms", ("comp",), "attack", 1.0),
-    ("Comp Release", "dial", 10.0, 1000.0, 150.0, "ms", ("comp",), "release", 1.0),
-    ("Comp Makeup", "dial", -12.0, 24.0, 0.0, "db", ("comp",), "gain", 1.0),
+    ("Comp Threshold", "dial", -40.0, 0.0, 0.0, "db", ("compl", "compr"), "threshold", 1.0),
+    ("Comp Ratio", "dial", 1.0, 10.0, 1.0, "float", ("compl", "compr"), "ratio", 1.0),
+    ("Comp Attack", "dial", 0.1, 100.0, 10.0, "ms", ("compl", "compr"), "attack", 0.001),
+    ("Comp Release", "dial", 10.0, 1000.0, 150.0, "ms", ("compl", "compr"), "release", 0.001),
+    ("Comp Makeup", "dial", -12.0, 24.0, 0.0, "db", ("compl", "compr"), "gain", 1.0),
     ("Saturation", "dial", 0.0, 100.0, 0.0, "pct", ("satl", "satr"), "mix", 0.01),
     ("Drive", "dial", 0.0, 24.0, 6.0, "db", ("satl", "satr"), "drive", 1.0),
     ("Width", "dial", 0.0, 100.0, 100.0, "pct", ("util",), "width", 0.01),
@@ -592,7 +592,8 @@ _CHANNEL_DSP = (
            "@drive 0. @lfoamount 0. @envamount 0. @mix 1.", 2, 2),
     ("eql", "abl.device.channeleq~", 1, 1),
     ("eqr", "abl.device.channeleq~", 1, 1),
-    ("comp", "abl.device.stereocompressor~ @model 1 @autorelease 0 @knee 6. @makeup 0", 2, 2),
+    ("compl", "abl.device.compressor~", 1, 1),
+    ("compr", "abl.device.compressor~", 1, 1),
     ("satl", "abl.dsp.saturator~ @curve 1 @mix 0.", 1, 1),
     ("satr", "abl.dsp.saturator~ @curve 1 @mix 0.", 1, 1),
     ("util", "abl.device.utility~", 2, 2),
@@ -626,8 +627,8 @@ def channel_patcher() -> dict:
     body["lines"] += [
         _line("obj-plugin", 0, "obj-hp", 0), _line("obj-plugin", 1, "obj-hp", 1),
         _line("obj-hp", 0, "obj-eql", 0), _line("obj-hp", 1, "obj-eqr", 0),
-        _line("obj-eql", 0, "obj-comp", 0), _line("obj-eqr", 0, "obj-comp", 1),
-        _line("obj-comp", 0, "obj-satl", 0), _line("obj-comp", 1, "obj-satr", 0),
+        _line("obj-eql", 0, "obj-compl", 0), _line("obj-eqr", 0, "obj-compr", 0),
+        _line("obj-compl", 0, "obj-satl", 0), _line("obj-compr", 0, "obj-satr", 0),
         _line("obj-satl", 0, "obj-util", 0), _line("obj-satr", 0, "obj-util", 1),
     ]
     _wire_params(CHANNEL_PARAMS, body["boxes"], body["lines"], prefix="c", left=200.0,
