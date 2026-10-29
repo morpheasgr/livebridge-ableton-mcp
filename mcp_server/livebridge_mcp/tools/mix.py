@@ -23,6 +23,7 @@ from .engine import _HOW_TO_ADD, _engine_failure
 _MAX_PASSES = 4
 _MAX_STEPS = 8
 _SETTLE_S = 1.0
+_PLACE_WAIT_S = 30.0
 _PLUGIN_LIMITER_RE = re.compile(r"limit|maxim|pro-l|ozone|\bl[123]\b|elevate|loudmax", re.I)
 
 
@@ -95,6 +96,95 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     def listen_all(devices: list[dict[str, Any]], seconds: float) -> list[Any]:
         return engine.each(devices, lambda d: engine.listen(d, seconds))
+
+    def load_device(device_name: str, track: str) -> Any:
+        """``browser.load`` a LiveBridge device onto ``track``; a "not found" is retried once
+        with a cleared browser cache (a device installed after the cache was built)."""
+        args = {"query": device_name, "category": "audio_effect", "track": track}
+        loaded = bridge_call(bridge, "browser.load", args, timeout=60.0)
+        if _is_error(loaded) and loaded.get("type") == "not_found":
+            bridge_call(bridge, "browser.cache", {"action": "clear"})
+            loaded = bridge_call(bridge, "browser.load", args, timeout=60.0)
+        return loaded
+
+    def place_meters(tracks: list[str] | None = None, master: bool = True,
+                     strips: bool = True, include_tracks: bool = True) -> dict[str, Any]:
+        """Put the devices the mix tools need in place, so nobody has to drag them in: a
+        LiveBridge Channel at the end of every track that makes sound (``strips``; it replaces
+        a LiveBridge Engine there — two meters on a track only measure twice) or an Engine
+        where ``strips`` is false, and an Engine on the master. Waits until they answer.
+        ``{placed:[...], replaced:[...], skipped:[...], error?}``."""
+        report: dict[str, Any] = {"placed": [], "replaced": [], "skipped": []}
+        listing = bridge_call(bridge, "tracks.list", {"include_returns": False,
+                                                      "include_master": False,
+                                                      "detail": "summary"}) \
+            if include_tracks else {"tracks": []}
+        if _is_error(listing) or not isinstance(listing, dict):
+            report["error"] = listing
+            return report
+        wanted = {t.lower() for t in tracks} if tracks else None
+        expected: list[str] = []
+        for item in listing.get("tracks") or []:
+            name = str(item.get("name") or "")
+            if item.get("type") not in ("midi", "audio") or (
+                    wanted is not None and name.lower() not in wanted):
+                continue
+            devs = item.get("devices") or []
+            names = [str(d.get("name") or "").lower() for d in devs]
+            if item.get("type") == "midi" and not any(
+                    d.get("type") == "instrument" or d.get("class_name") in (
+                        "InstrumentGroupDevice", "DrumGroupDevice") for d in devs):
+                report["skipped"].append(f"{name} (MIDI track without an instrument)")
+                continue
+            have_channel = any("livebridge channel" in n for n in names)
+            have_engine = any("livebridge engine" in n for n in names)
+            if have_channel or (have_engine and not strips):
+                expected.append(name)
+                continue
+            if have_engine and strips:
+                index = next(d.get("index") for d in devs
+                             if "livebridge engine" in str(d.get("name") or "").lower())
+                gone = bridge_call(bridge, "devices.delete", {"track": name, "device": index})
+                if _is_error(gone):
+                    report["skipped"].append(f"{name} (could not remove its Engine)")
+                    continue
+                report["replaced"].append(name)
+            device_name = "LiveBridge Channel" if strips else "LiveBridge Engine"
+            loaded = load_device(device_name, name)
+            if _is_error(loaded):
+                report["error"] = loaded
+                if loaded.get("type") == "not_found":
+                    loaded["error"] += (f" — is {device_name} installed (the LiveBridge "
+                                        "installer puts it in the User Library) and Max for "
+                                        "Live available" + (" (Max 9)" if strips else "") + "?")
+                return report
+            report["placed"].append(name)
+            expected.append(name)
+        need_master = False
+        if master:
+            found = engine.devices()
+            if not any(d.get("role") == "master" for d in found):
+                loaded = load_device("LiveBridge Engine", "master")
+                if _is_error(loaded):
+                    report["error"] = loaded
+                    return report
+                report["placed"].append("master")
+                need_master = True
+        if report["placed"]:
+            # each device's Node script starts and registers within a few seconds
+            end = time.time() + _PLACE_WAIT_S
+            while time.time() < end:
+                found = engine.devices()
+                tracks_up = {str(d.get("track") or "").lower() for d in found
+                             if d.get("role") == "track"}
+                master_up = any(d.get("role") == "master" for d in found)
+                if all(n.lower() in tracks_up for n in expected) and \
+                        (master_up or not need_master):
+                    break
+                time.sleep(0.5)
+            else:
+                report["slow"] = "some devices did not answer yet — run again in a moment"
+        return report
 
     # ------------------------------------------------------------------ sound check
     @mcp.tool()
@@ -460,6 +550,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         quiet_bar: float | None = None,
         max_gain_db: float = 18.0,
         chain: str = "native",
+        place_devices: bool = True,
     ) -> Any:
         """Master the song to a loudness target by measurement: uses (or builds) EQ Eight ->
         Glue Compressor -> Limiter (or the LiveBridge Master device, `chain="livebridge"`) on
@@ -487,6 +578,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 LiveBridge Master device (Ableton's Channel EQ, Compressor, Limiter and Utility
                 DSP in a single Max device, Max 9 / Live 12.2+: EQ Low Cut, Comp Ratio/Attack,
                 Limit Gain/Ceiling/Mode, Width, Bass Mono... all Live parameters).
+            place_devices: put a LiveBridge Engine on the master first when there is none (default).
 
         Returns:
             `{destination, target_lufs, ceiling_db, applied, chain, inserted, before:{lufs,
@@ -533,6 +625,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         for bar in (loud_bar, quiet_bar):
             if bar is not None and bar < 1:
                 return tool_error("bars are 1-based (>= 1)", cmd=cmd)
+        if place_devices and apply:
+            placed = place_meters(master=True, include_tracks=False)
+            if placed.get("error"):
+                return placed["error"]
         try:
             device = engine.choose(engine.devices(), "master")
         except engine.EngineError as exc:
@@ -825,9 +921,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         apply: bool = True,
         balance: bool = True,
         master: str | None = None,
-        master_chain: str = "native",
+        master_chain: str = "livebridge",
+        place_devices: bool = True,
+        low_end: bool = True,
     ) -> Any:
-        """Mix every part by measurement: on each track with a LiveBridge Channel (a channel
+        """Mix (and master) the song by measurement in one call — the devices it needs are put
+        in place by the tool itself. On each track with a LiveBridge Channel (a channel
         strip from Ableton's DSP in front of the Engine's meters: high-pass, EQ, compressor,
         saturation, width/bass mono, trim — all Live parameters), it sets the strip to rest,
         listens to the raw part, guesses its role, then sets the strip for that role: high-pass,
@@ -848,14 +947,23 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             balance: then balance the faders by role (needs 2+ Engines/Channels).
             master: then master to this destination ("streaming", "club", "apple", "genre"
                 ... see live_master_auto; needs an Engine on the master). None = skip.
-            master_chain: "native" or "livebridge" (the LiveBridge Master device).
+            master_chain: "livebridge" (default: the LiveBridge Master device before the
+                master's Engine) or "native" (EQ Eight -> Glue Compressor -> Limiter).
+            place_devices: put the devices in place first (default): a LiveBridge Channel at the end of
+                every track that makes sound (it replaces a LiveBridge Engine there) and an
+                Engine on the master. false = only the Channels already there.
+            low_end: when there is a kick and a bass/sub, align the bass's phase against it
+                (`live_mix_phase`) and cut the bass's clashing band while the kick plays
+                (`live_mix_unmask`).
 
         Returns:
-            `{applied, tracks:[{name, role, role_from, before:{lufs, peak_db, crest_db},
-            after?, values:{parameter: value}, reasons:[...]}], balance?, master?, notes}`.
+            `{applied, placed?:{placed, replaced, skipped}, tracks:[{name, role, role_from,
+            before:{lufs, peak_db, crest_db}, after?, values:{parameter: value},
+            reasons:[...]}], low_end?:{phase, unmask}, balance?, master?, notes}`.
 
-        Gotchas: the song must play (loop the fullest section). The Channel replaces the
-        Engine on a track (it has the meters) — not both. Rules of thumb, not taste: report
+        Gotchas: the song must play (loop the fullest section). Placing ~20 devices takes a
+        while (each one loads and starts). The Channel replaces the Engine on a track (it has
+        the meters) — not both. Rules of thumb, not taste: report
         the reasons, let the user listen, and undo or set a single parameter
         (`live_device_set_parameter(device="LiveBridge Channel", ...)`) where they disagree.
         Needs Max 9 (Ableton DSP objects).
@@ -869,6 +977,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if bad:
             return tool_error(f"unknown role(s) {bad}; use one of {', '.join(mix.ROLES)}",
                               cmd=cmd)
+        placed = None
+        if place_devices and apply:
+            placed = place_meters(tracks, master=bool(master))
+            if placed.get("error"):
+                return placed["error"]
         try:
             found = engine.devices()
         except engine.EngineError as exc:
@@ -938,6 +1051,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         entry["error"] = answer.get("error")
             results.append(entry)
         result: dict[str, Any] = {"applied": bool(apply), "tracks": results, "notes": notes}
+        if placed is not None and (placed["placed"] or placed["replaced"] or placed["skipped"]):
+            result["placed"] = placed
         if apply:
             time.sleep(_SETTLE_S)
             live = [(d, n) for d, n in pairs
@@ -947,6 +1062,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 if not isinstance(reading, engine.EngineError):
                     next(r for r in results if r.get("name") == name)["after"] = \
                         _reading(reading)
+            kicks = [r["name"] for r in results if r.get("role") == "kick" and "error" not in r]
+            basses = [r["name"] for r in results if r.get("role") in ("bass", "sub")
+                      and "error" not in r]
+            if low_end and kicks and basses:
+                result["low_end"] = {
+                    "phase": live_mix_phase(track=basses[0], seconds=2.0),
+                    "unmask": live_mix_unmask(track=basses[0], against=kicks[0],
+                                              seconds=max(3.0, min(seconds, 8.0)))}
             if balance and len(pairs) >= 2:
                 result["balance"] = live_mix_balance(
                     genre=genre, tracks=None if not tracks else names,
@@ -965,6 +1088,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         seconds: float = 2.0,
         frequencies: list[float] | None = None,
         apply: bool = True,
+        place_devices: bool = True,
     ) -> Any:
         """Phase-align a part against the rest of the low end (bass against kick, a layered
         kick against its partner) by measurement, like a phase-rotation plug-in's "analyze":
@@ -980,6 +1104,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             frequencies: all-pass frequencies to try in Hz (default 40, 55, 70, 90, 120, 160,
                 220; each with normal and flipped polarity).
             apply: false = measure every setting, then put the device back to neutral.
+            place_devices: put a LiveBridge Engine on the master first when there is none (default).
 
         Returns:
             `{track, best:{invert, frequency?, low_db}, baseline_low_db, gain_db, noise_db,
@@ -995,6 +1120,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         freqs = list(frequencies or (40.0, 55.0, 70.0, 90.0, 120.0, 160.0, 220.0))
         if not 1 <= len(freqs) <= 12 or any(not 20 <= f <= 2000 for f in freqs):
             return tool_error("frequencies: 1..12 values of 20..2000 Hz", cmd=cmd)
+        if place_devices:
+            placed = place_meters(master=True, include_tracks=False)
+            if placed.get("error"):
+                return placed["error"]
         try:
             device = engine.choose(engine.devices(), "master")
         except engine.EngineError as exc:
@@ -1105,6 +1234,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         depth_db: float = 6.0,
         seconds: float = 4.0,
         apply: bool = True,
+        place_devices: bool = True,
     ) -> Any:
         """Stop two parts fighting over a band — the way a side-chained dynamic EQ does it: puts
         a LiveBridge Unmask device on `track` (the part that gives way: the bass against the
@@ -1120,6 +1250,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             depth_db: the most it cuts (0..18 dB; 3-6 is transparent, 8+ is an effect).
             seconds: listening window (2..15) — loop a section where both play.
             apply: false = measure and report the band only.
+            place_devices: put a LiveBridge Channel on both tracks first when they have no meter
+                (default).
 
         Returns:
             `{track, against, band:{band, hz, q, track_db, against_db}, threshold_db,
@@ -1141,6 +1273,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("q must be 0.3..8", cmd=cmd)
         if track.strip().lower() == against.strip().lower():
             return tool_error("track and against must be two different tracks", cmd=cmd)
+        if place_devices:
+            placed = place_meters([track, against], master=False)
+            if placed.get("error"):
+                return placed["error"]
         try:
             found = engine.devices()
         except engine.EngineError as exc:

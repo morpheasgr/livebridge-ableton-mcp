@@ -132,7 +132,12 @@ Low, Mid, Mid Freq, High, Comp Threshold/Ratio/Attack/Release/Makeup, Saturation
 Bass Mono, Bass Mono Freq, Trim) start neutral, so a fresh Channel leaves the sound alone. The
 meters hear the strip's output, so every Engine tool reads the processed part.
 
-`live_mix_auto` rests the strips (`mix.CHANNEL_NEUTRAL`), listens to every Channel at once,
+`live_mix_auto` first places what it needs (`place_devices=true`, default): a Channel at the end of
+every track that makes sound (an Engine there is removed — two meters only measure twice; a
+MIDI track without an instrument is skipped), an Engine on the master when `master=` is
+given, and waits until the devices answer; `live_master_auto`, `live_mix_phase` and
+`live_mix_unmask` place the meters they need the same way. It then rests the strips
+(`mix.CHANNEL_NEUTRAL`), listens to every Channel at once,
 guesses each part's role, applies `mix.channel_plan` (high-pass by role, a mud cut at 350 Hz when
 250-500 Hz holds too much for the role, a boxy kick at 300 Hz, harsh 2-5 kHz at 3.5 kHz, air on
 a dull vocal/hats/lead, compression from the measured peak and crest factor to the role's crest

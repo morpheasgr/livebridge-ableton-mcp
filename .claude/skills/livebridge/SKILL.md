@@ -224,16 +224,21 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     re-announcing a whole state) — mention one only if it explains a changed sound. A
     `before` of null means LiveBridge never read that value. Native plug-ins (after a
     handover) are not watched: use `live_device_parameters` on the rack instead.
-  - *Sound check, balance, master* (Engines on the tracks and the master, song playing):
+  - *Mix and master* — **one call, no devices to place**: start playback on the fullest section
+    (loop the drop) and run `live_mix_auto(genre=..., master="streaming")` (or "club",
+    "apple" ...). It puts a LiveBridge Channel at the end of every track that makes sound (it
+    replaces an Engine there) and an Engine on the master, sets each part's strip by role, fixes
+    kick vs bass (phase + side-chained band cut), balances the faders, then masters through the
+    LiveBridge Master device before the master's Engine. Needs Max for Live (Max 9 for the
+    Channel and Master). On the user's own mix: `apply=false` first (it then places nothing and
+    only plans from the Channels already there) and show the plan; report the `reasons` after.
+  - *Sound check, balance, master step by step* (each tool places the meters it needs):
     `live_sound_check()` -> silent or strangled parts and filters shut below their role's
     floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role
     levels by measurement (kick on top ...) and says whether each band problem is a master or a
     track fix; `live_master_auto(destination="streaming"|"club"|...)` drives EQ Eight -> Glue ->
     Limiter (or one LiveBridge Master device: `chain="livebridge"`, Max 9) to the loudness
-    target and stops before the punch collapses. With a LiveBridge Channel on each track (it
-    replaces the Engine there), `live_mix_auto(genre=..., master="streaming")` does it all:
-    per-part strips (high-pass, EQ, compression, bass mono) by role, then balance, then master.
-    Kick and bass cancelling each other: `live_mix_phase(track="Bass")` (polarity + all-pass
+    target and stops before the punch collapses. Kick and bass cancelling each other: `live_mix_phase(track="Bass")` (polarity + all-pass
     rotation, measured on the master); fighting over a band: `live_mix_unmask(track="Bass",
     against="Kick")` (the bass's band dips only while the kick plays). `WORKFLOWS.md`
     §19-20. On the user's own mix, run `apply=false` first and show the plan.

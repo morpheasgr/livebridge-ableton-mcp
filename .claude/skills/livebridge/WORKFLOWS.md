@@ -628,13 +628,19 @@ something is missing, thin or inaudible.
 ## 20. Balance and master by measurement
 
 User: *"balance the mix"*, *"kick should sit on top"*, *"master it for Spotify"*, *"make a club
-version"*. Needs a LiveBridge Engine at the end of each track and on the master (`SKILL.md`
-§4b says how to add them). Mixing first, mastering second; most "weak" masters are
-mix problems.
+version"*, *"mix and master this"*. The tools place their own devices (a LiveBridge Channel
+at the end of each sounding track, an Engine on the master, LiveBridge Master before it) —
+don't ask the user to drag anything in; Max for Live is needed (Max 9 for Channel/Master).
+Mixing first, mastering second; most "weak" masters are mix problems.
+
+**All in one**: loop the fullest section, start playback, `live_mix_auto(genre="techno",
+master="streaming")` — strips, kick/bass phase and unmasking, balance and master in one call.
+The steps below are the same work one tool at a time (to stop between steps, or to redo one).
+
 
 1. **Sound check** (§19) — nothing silent, nothing strangled.
-1b. **Channel strips** (LiveBridge Channel on the tracks, Max 9): `live_mix_auto(genre=...)`
-   rests each strip, listens to the raw part, sets high-pass, mud/harshness cuts, air,
+1b. **Channel strips** (`live_mix_auto(genre=..., balance=false, low_end=false)` for this step
+   only): places the Channels, rests each strip, listens to the raw part, sets high-pass, mud/harshness cuts, air,
    compression to the role's crest factor and bass mono, listens again, then balances (step 2)
    and, with `master="streaming"`, masters (step 4) in one call. Report the `reasons`; on the
    user's own mix run `apply=false` first. A move they dislike: one
