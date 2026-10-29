@@ -667,3 +667,53 @@ def test_balance_caps_each_move_and_skips_sparse_parts(app, song, mix_set, monke
     result = call_tool(app, "live_mix_balance", {"seconds": 3, "apply": False})
     assert "Hats" not in [p["name"] for p in result["parts"]]
     assert any("Hats plays only" in n for n in result["notes"])
+
+
+def _strips(mix_set, monkeypatch):
+    real = mix_set.devices
+
+    def with_strips(*a, **k):
+        found = real(*a, **k)
+        for device in found:
+            if device["role"] == "track":
+                device["strip"] = True
+        return found
+    monkeypatch.setattr(engine, "devices", with_strips)
+    for name in ("Kick", "Sub", "Pad", "Hats"):
+        factory.add_device(mix_set.track(name), "LiveBridge Channel", "MxDeviceAudioEffect",
+                           params=[{"name": n, "value": v, "min": min(v, -40.0),
+                                    "max": max(v, 1000.0),
+                                    **({"unit": "Hz", "min": 20.0, "max": 8000.0}
+                                       if "Freq" in n else {"unit": "dB"} if n == "High"
+                                       else {})}
+                                   for n, v in mix.CHANNEL_NEUTRAL.items()])
+
+
+def test_mix_auto_keeps_hand_set_controls_and_holds_the_loop(app, song, mix_set, monkeypatch,
+                                                             tmp_path):
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    _strips(mix_set, monkeypatch)
+    song.loop = False
+    args = {"seconds": 3, "balance": False, "low_end": False, "place_devices": False}
+    first = call_tool(app, "live_mix_auto", args)
+    assert any("Looped bars" in n for n in first["notes"]) and song.loop is False
+    hats = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
+    high = next(p for p in hats.parameters if p.name == "High")
+    high.value = -6.0                                  # the user's own shelf
+    again = call_tool(app, "live_mix_auto", args)
+    entry = next(t for t in again["tracks"] if t["name"] == "Hats")
+    assert "High" in entry["kept"] and high.value == pytest.approx(-6.0)
+    assert any("kept what you set by hand" in r for r in entry["reasons"])
+    # LiveBridge's own settings are not "kept": its high-pass is set again, not frozen
+    assert "HP Freq" not in entry["kept"] and entry["values"]["HP Freq"] == 300.0
+    full = call_tool(app, "live_mix_auto", dict(args, keep_manual=False))
+    assert "kept" not in next(t for t in full["tracks"] if t["name"] == "Hats")
+    assert high.value == pytest.approx(0.0)
+
+
+def test_balance_never_raises_more_than_the_cap():
+    parts = [{"name": "Kick", "role": "kick", "lufs": -10.0, "fader_db": 0.0},
+             {"name": "Tom", "role": "perc", "lufs": -40.0, "fader_db": 0.0}]
+    plan = mix.balance_plan(parts, max_move=6.0, raise_left={"Kick": 3.0, "Tom": 3.0})
+    tom = next(m for m in plan["moves"] if m["name"] == "Tom")
+    assert tom["move_db"] == 3.0 and tom["raise_capped"] is True

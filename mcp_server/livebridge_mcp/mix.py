@@ -320,7 +320,8 @@ def genre_balance(bands_db: dict[str, float], genre: str, tolerance: float = 4.0
 
 def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
                  anchor: str | None = None, max_db: float = 6.0, min_move: float = 0.5,
-                 max_move: float | None = None) -> dict[str, Any]:
+                 max_move: float | None = None,
+                 raise_left: dict[str, float] | None = None) -> dict[str, Any]:
     """Fader moves that put every part at its role's level.
 
     Args:
@@ -332,6 +333,8 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         min_move: smaller moves are left out.
         max_move: cap one move to this many dB (the rest waits for the next pass, measured
             again) — a wrong role or a sparse part cannot throw a fader 15 dB at once.
+        raise_left: per part, how many dB it may still go UP (a quiet reading is more often a
+            bad reading than a quiet part): raises beyond it are cut back (``raise_capped``).
 
     Returns:
         ``{anchor, moves:[{name, role, offset_lu, now_db, target_db, fader_db, new_fader_db,
@@ -363,12 +366,20 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         if capped:
             move = math.copysign(max_move, move)
             new_fader = part["fader_db"] + move
+        raise_capped = False
+        if raise_left is not None and move > 0:
+            left = max(0.0, raise_left.get(part["name"], move))
+            if move > left:
+                move, raise_capped = left, True
+                new_fader = part["fader_db"] + move
         entry = {"name": part["name"], "role": part.get("role"), "offset_lu": part["offset"],
                  "now_lufs": round(part["post"], 1), "target_lufs": round(target, 1),
                  "fader_db": round(part["fader_db"], 1), "new_fader_db": round(new_fader, 1),
                  "move_db": round(move, 1)}
         if capped:
             entry["capped"] = True
+        if raise_capped:
+            entry["raise_capped"] = True
         if abs(move) < min_move:
             unchanged.append(part["name"])
         else:

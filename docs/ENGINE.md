@@ -156,6 +156,15 @@ on, and `live_mix_job(job=..., wait_seconds=30)` returns the report (kept in mem
 `mix_jobs.json` in the library folder). One run at a time — another is refused as `busy`; a
 run's own nested calls (mix_auto -> balance -> master) run inline.
 
+While a run listens, the playhead must not move on into another section (a 130 s run on a
+23-track set balanced against a breakdown): the outermost run loops the bars that are playing
+(`transport.set_loop`, enough bars for the listening window) and gives the loop back at the
+end; with the user's own loop on, it keeps theirs. `live_mix_auto` also remembers what it set
+on each Channel (`channel_strips.json` in the library folder): a control that differs from
+both that and rest was set by hand and is kept on a rerun (`keep_manual`). The balance raises
+a fader at most `max_raise_db` (3 dB) per run and counts a part as playing only within 10 dB
+of its loudest moment (`active_share`).
+
 ## LiveBridge Unmask (Live 12)
 
 `max_for_live/LiveBridge Unmask/`: `plugin~ 1 2 3 4` (channels 3-4 are the device's second
