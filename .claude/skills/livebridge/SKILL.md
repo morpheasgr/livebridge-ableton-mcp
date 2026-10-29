@@ -236,7 +236,11 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     run goes on in Live; call `live_mix_job(job=<id>, wait_seconds=30)` until `status` is "done" and
     report its `result`. Never start another mix/master run meanwhile (it is refused as
     `busy`). Melodic house/techno or progressive: `genre="melodic_house"` (leads and pads stay
-    close to the kick); one-shots and fills are left to the ear (`notes` says which).
+    close to the kick); one-shots and fills are left to the ear (`notes` says which). While a
+    run listens it loops the bars that were playing (unless the user's own loop is on) and
+    gives the loop back after — start it where the fullest section plays. Strip controls the
+    user set by hand are kept on a rerun (`kept`); `keep_manual=false` resets them too. Muted
+    tracks (mute automation) still get strips — their meter hears the part before the mute.
   - *Sound check, balance, master step by step* (each tool places the meters it needs):
     `live_sound_check()` -> silent or strangled parts and filters shut below their role's
     floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role

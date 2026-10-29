@@ -1596,6 +1596,7 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `headroom_db` | float | `6.0` |
 | `max_move_db` | float | `6.0` |
 | `min_active` | float | `0.35` |
+| `max_raise_db` | float | `3.0` |
 
 Bridge: `mixer.get`, `mixer.set_many`, `transport.get`
 
@@ -1635,8 +1636,9 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `master_chain` | str | `"livebridge"` |
 | `place_devices` | bool | `true` |
 | `low_end` | bool | `true` |
+| `keep_manual` | bool | `true` |
 
-Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -3597,7 +3599,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `devices.list` |  | track=null, tree=false, detail="minimal", max_depth=4 | `live_device_list`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_host_bank`, `live_plugin_host_expose`, `live_theory_analyze` | List the devices of a track (flat, or as a tree through racks) |
 | `devices.modulation` | M | op="get", track=null, device=null, target=null, source=null, amount=null, parameter=null | `live_device_modulation` | Wavetable modulation matrix: read, set an amount, add a parameter as target |
 | `devices.move` | M | track=null, device=null, target_track=null, target_chain=null, position=-1 | `live_device_move`, `live_master_auto`, `live_mix_auto`, `live_mix_unmask` | Move a device to another position/track/chain |
-| `devices.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, only_changed=false, detail="summary" | `live_audio_align`, `live_device_parameters`, `live_sound_check`, `live_sound_load`, `live_sound_save` | List a device's parameters (paged, filterable, with display values) |
+| `devices.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, only_changed=false, detail="summary" | `live_audio_align`, `live_device_parameters`, `live_mix_auto`, `live_sound_check`, `live_sound_load`, `live_sound_save` | List a device's parameters (paged, filterable, with display values) |
 | `devices.properties` |  | track=null, device=null, include_lists=false | `live_device_properties` | Class-specific device properties (Wavetable, Drift, Hybrid Reverb, Looper ...) |
 | `devices.randomize` | M | track=null, device=null, parameters=null, seed=null, amount=1.0, include_quantized=true | `live_device_randomize` | Randomize device parameters (optional seed) |
 | `devices.reset_parameters` | M | track=null, device=null, parameters=null | `live_device_reset_parameters` | Reset parameters to their default values |
