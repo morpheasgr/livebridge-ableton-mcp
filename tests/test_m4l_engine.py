@@ -918,13 +918,11 @@ def test_fast_automation_recording_with_the_engine(engines, tcp_bridge, song):
     send("transport", 4, 600, 1)
     sent = lambda: [json.loads(line) for line in  # noqa: E731
                     outlets.read_text(encoding="utf-8").splitlines()]
-    assert engine.wait_for(lambda: ["call", "end_gesture", "live_set", "tracks", 0, "devices",
-                                    0, "parameters", 2] in sent(), 5)
+    assert engine.wait_for(lambda: any(m[0] == "setvalue" and m[1] == 1000 for m in sent()), 5)
     log = sent()
-    begin = log.index(["call", "begin_gesture", "live_set", "tracks", 0, "devices", 0,
-                       "parameters", 2])
     values = [m[1] for m in log if m[0] == "setvalue"]
-    assert begin < next(i for i, m in enumerate(log) if m[0] == "setvalue")
+    # Max's DeviceParameter has no begin_gesture / end_gesture (LOM dump 12.4.15)
+    assert not any(m[0] == "call" and "gesture" in str(m[1]) for m in log)
     assert len(values) >= 8 and values == sorted(values) and values[-1] == 1000
     assert values[0] == pytest.approx(100, abs=60)
     assert param.value == before                      # the Remote Script did not write
@@ -1029,5 +1027,5 @@ def test_arrangement_automation_jobs_through_the_engine(engines, tcp_bridge, son
     assert any(m[0] == "getvalues" for m in log)
     written = [m[1] for m in log if m[0] == "setvalue" and m[2:] == path]
     assert written and all(v == 0.5 for v in written)
-    assert ["call", "begin_gesture", *path] in log and ["call", "end_gesture", *path] in log
+    assert not any(m[0] == "call" and "gesture" in str(m[1]) for m in log)
     assert song.tempo == 124.0
