@@ -84,6 +84,10 @@ M4L_DEVICES = (
      ("Presets", "Audio Effects", "Max Audio Effect"), "lbchannel.js", "channel_dir",
      "at the end of each track (instead of the Engine there) -- a channel strip from "
      "Ableton's DSP plus the Engine's meters (Max 9); live_mix_auto sets it per part"),
+    ("LiveBridge Phase", REPO_ROOT / "max_for_live" / "LiveBridge Phase",
+     ("Presets", "Audio Effects", "Max Audio Effect"), "lb_phase.gendsp", "phase_dir",
+     "on a bass (or any part) -- polarity, delay and all-pass phase rotation; "
+     "live_mix_phase loads it and finds the setting that cancels least"),
     ("LiveBridge Master", REPO_ROOT / "max_for_live" / "LiveBridge Master",
      ("Presets", "Audio Effects", "Max Audio Effect"), "LiveBridge Master.amxd", "master_dir",
      "onto the master, before the Engine -- EQ, glue compressor, limiter and width from "

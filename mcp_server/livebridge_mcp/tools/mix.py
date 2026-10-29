@@ -44,6 +44,8 @@ def _reading(result: Any) -> dict[str, Any]:
 
 #: The Max device of chain="livebridge" (max_for_live/LiveBridge Master).
 _MASTER_DEVICE = "LiveBridge Master"
+#: The polarity / delay / all-pass device of live_mix_phase (max_for_live/LiveBridge Phase).
+_PHASE_DEVICE = "LiveBridge Phase"
 
 
 def _chain_devices(kind: str) -> tuple[tuple[str, str], ...]:
@@ -937,3 +939,139 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                                     seconds=max(3.0, seconds),
                                                     chain=master_chain)
         return result
+
+    # ------------------------------------------------------------------ phase
+    @mcp.tool()
+    def live_mix_phase(
+        track: str,
+        seconds: float = 2.0,
+        frequencies: list[float] | None = None,
+        apply: bool = True,
+    ) -> Any:
+        """Phase-align a part against the rest of the low end (bass against kick, a layered
+        kick against its partner) by measurement, like a phase-rotation plug-in's "analyze":
+        puts a LiveBridge Phase device on `track` (polarity, a short delay, all-pass phase
+        rotation at a frequency — the level never changes), then tries polarity normal/flipped
+        and an all-pass at each frequency while the song loops, reads how much low end (below
+        120 Hz) the master keeps each time, and keeps the setting that cancels least — only
+        when it beats the untouched sound by more than the measuring noise.
+
+        Args:
+            track: the part to rotate (the "submissive" one: usually the bass, not the kick).
+            seconds: listening per setting (1..6) — loop one bar where both parts play.
+            frequencies: all-pass frequencies to try in Hz (default 40, 55, 70, 90, 120, 160,
+                220; each with normal and flipped polarity).
+            apply: false = measure every setting, then put the device back to neutral.
+
+        Returns:
+            `{track, best:{invert, frequency?, low_db}, baseline_low_db, gain_db, noise_db,
+            applied, tried:[{invert, frequency?, low_db}], notes}`.
+
+        Gotchas: needs a LiveBridge Engine (or Channel) on the master and the song playing a
+        short loop where both parts sound; ~2 x 8 settings x `seconds`. A gain under ~1 dB is
+        not worth keeping. Needs Max for Live (any version).
+        """
+        cmd = "mix.phase"
+        if not 1 <= seconds <= 6:
+            return tool_error("seconds must be 1..6", cmd=cmd)
+        freqs = list(frequencies or (40.0, 55.0, 70.0, 90.0, 120.0, 160.0, 220.0))
+        if not 1 <= len(freqs) <= 12 or any(not 20 <= f <= 2000 for f in freqs):
+            return tool_error("frequencies: 1..12 values of 20..2000 Hz", cmd=cmd)
+        try:
+            device = engine.choose(engine.devices(), "master")
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        if device.get("role") != "master":
+            return tool_error("no LiveBridge Engine on the master track. " + _HOW_TO_ADD,
+                              type="not_found", cmd=cmd)
+        if playing() is False:
+            return tool_error("the transport is stopped: loop a bar where both parts play and "
+                              "start playback", type="invalid_state", cmd=cmd)
+
+        def phase_index() -> int | None:
+            listing = bridge_call(bridge, "devices.list", {"track": track})
+            for d in (listing.get("devices") or []) if isinstance(listing, dict) else []:
+                if _PHASE_DEVICE.lower() in str(d.get("name", "")).lower():
+                    return d.get("index")
+            return None
+
+        notes: list[str] = []
+        index = phase_index()
+        if index is None:
+            loaded = bridge_call(bridge, "browser.load", {
+                "query": _PHASE_DEVICE, "category": "audio_effect", "track": track},
+                timeout=60.0)
+            if _is_error(loaded):
+                if loaded.get("type") == "not_found":
+                    loaded["error"] += (" — is the LiveBridge Phase device installed (the "
+                                        "installer puts it in the User Library)?")
+                return loaded
+            end = time.time() + 10.0
+            while index is None and time.time() < end:
+                time.sleep(0.3)
+                index = phase_index()
+            if index is None:
+                return tool_error("LiveBridge Phase did not appear on the track",
+                                  type="timeout", cmd=cmd)
+            notes.append(f"Loaded LiveBridge Phase on {track}.")
+
+        def setting(invert: int, frequency: float | None) -> Any:
+            values: dict[str, Any] = {"Invert": float(invert), "Delay": 0.0,
+                                      "Phase Stages": 1.0 if frequency else 0.0}
+            if frequency:
+                values["Phase Freq"] = float(frequency)
+            return bridge_call(bridge, "devices.set_parameters",
+                               {"track": track, "device": index, "values": values})
+
+        def low_db() -> float | None:
+            reading = engine.listen(device, seconds, kind="mix")
+            loud = (reading or {}).get("loudness") or {}
+            bands = ((reading or {}).get("spectrum") or {}).get("bands_db") or {}
+            if loud.get("lufs") is None or not bands:
+                return None
+            share = sum(10 ** (float(bands.get(b, -90.0)) / 10) for b in ("sub", "bass"))
+            return round(float(loud["lufs"]) + 10 * math.log10(max(share, 1e-9)), 2)
+
+        tried: list[dict[str, Any]] = []
+        try:
+            candidates = [(0, None), (1, None)] + [(i, f) for f in freqs for i in (0, 1)]
+            for invert, frequency in candidates:
+                answer = setting(invert, frequency)
+                if _is_error(answer):
+                    return answer
+                time.sleep(0.4)                     # the glide settles in ~10 ms; be safe
+                level = low_db()
+                entry: dict[str, Any] = {"invert": bool(invert), "low_db": level}
+                if frequency:
+                    entry["frequency"] = frequency
+                tried.append(entry)
+            setting(0, None)
+            time.sleep(0.4)
+            again = low_db()
+        except engine.EngineError as exc:
+            setting(0, None)
+            return _engine_failure(exc, cmd)
+        valid = [t for t in tried if t["low_db"] is not None]
+        if not valid or tried[0]["low_db"] is None:
+            return tool_error("the master was silent while measuring: loop a bar where the "
+                              "parts play", type="invalid_state", cmd=cmd)
+        baseline = tried[0]["low_db"]
+        noise = abs((again if again is not None else baseline) - baseline)
+        best = max(valid, key=lambda t: t["low_db"])
+        gain = round(best["low_db"] - baseline, 2)
+        keep = apply and best is not tried[0] and gain > max(1.0, 2 * noise)
+        if keep:
+            answer = setting(1 if best["invert"] else 0, best.get("frequency"))
+            if _is_error(answer):
+                return answer
+            notes.append(f"Kept {'flipped polarity' if best['invert'] else 'normal polarity'}"
+                         + (f" with an all-pass at {best['frequency']:g} Hz"
+                            if best.get("frequency") else "")
+                         + f": +{gain:g} dB of low end on the master.")
+        elif gain <= max(1.0, 2 * noise):
+            notes.append(f"No setting beat the untouched sound by more than the noise "
+                         f"({gain:+g} dB vs ±{noise:g} dB): left neutral. The parts were not "
+                         "fighting in phase — look at levels or EQ instead.")
+        return {"track": track, "best": best, "baseline_low_db": baseline, "gain_db": gain,
+                "noise_db": round(noise, 2), "applied": bool(keep), "tried": tried,
+                "notes": notes}

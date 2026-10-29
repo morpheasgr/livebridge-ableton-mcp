@@ -639,6 +639,11 @@ mix problems.
    and, with `master="streaming"`, masters (step 4) in one call. Report the `reasons`; on the
    user's own mix run `apply=false` first. A move they dislike: one
    `live_device_set_parameter(device="LiveBridge Channel", parameter=..., value=...)`.
+1c. **Phase** (kick and bass fighting, a thin low end): loop one bar where both play,
+   `live_mix_phase(track="Bass")` puts LiveBridge Phase on the bass, tries polarity and an
+   all-pass at 40-220 Hz, and keeps the setting that leaves the most low end on the master —
+   only when it beats the untouched sound by more than the measuring noise. Rotate the
+   submissive part (bass, a layer), never the kick.
 2. **Balance**: loop the fullest section, `live_mix_balance(genre="techno")` (or without a
    genre: kick on top, sub -1, bass -3, snare -3, vocal -2, lead -6, keys -8, percussion -9,
    pads -10, hats -11, fx -13 LU). It measures every part pre-fader, sets the faders in dB (one
