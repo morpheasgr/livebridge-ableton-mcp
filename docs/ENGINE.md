@@ -126,8 +126,8 @@ device never touches the set.
 follow actions — `lbchannel.js` / `lbchannel_context.js` are copies of `engine.js` /
 `context.js` under their own names, the Node script started with `@args channel` so `hello`
 says `strip: true`) with a channel strip between `plugin~` and the meters: Auto Filter as a
-clean 24 dB high-pass -> Channel EQ (per side) -> Stereo Compressor (RMS, knee 6) -> Saturator
-(per side, Soft Sine) -> Utility. Its 16 parameters (`CHANNEL_PARAMS` in `build.py`: HP Freq,
+clean 24 dB high-pass -> Channel EQ, Compressor and Saturator (Soft Sine), each once per
+side -> Utility. Its 16 parameters (`CHANNEL_PARAMS` in `build.py`: HP Freq,
 Low, Mid, Mid Freq, High, Comp Threshold/Ratio/Attack/Release/Makeup, Saturation, Drive, Width,
 Bass Mono, Bass Mono Freq, Trim) start neutral, so a fresh Channel leaves the sound alone. The
 meters hear the strip's output, so every Engine tool reads the processed part.
@@ -156,9 +156,9 @@ keeps the best setting only when it beats the untouched sound by more than the m
 
 `max_for_live/LiveBridge Master/LiveBridge Master.amxd`, built by `build.py` like the others:
 Ableton's own device DSP as Max objects (the Ableton DSP package, `abl.device.*`) in one
-audio effect — Channel EQ (once per side) -> Stereo Compressor (RMS) -> Limiter -> Utility.
+audio effect — Channel EQ and Compressor (each once per side; `abl.device.stereocompressor~` from the reference pages is missing in Max 9.1.5) -> Limiter -> Utility.
 Every control is a Live parameter (`MASTER_PARAMS` in `build.py`): EQ Low Cut, EQ
-Low/Mid/Mid Freq/High, Comp Threshold/Ratio/Attack/Release/Auto Release/Knee/Makeup/Mix, Limit
+Low/Mid/Mid Freq/High, Comp Threshold/Ratio/Attack/Release/Makeup, Limit
 Gain/Ceiling/Mode/Lookahead/Auto Release, Width, Bass Mono, Bass Mono Freq, Output — so
 `live_device_*`, automation and `live_master_auto(chain="livebridge")` drive it like any
 device. The reference pages document these objects' parameters but not their inlets and

@@ -189,7 +189,9 @@ def test_master_device_is_built_and_wired():
         assert source in boxes and destination in boxes, line
         assert outlet < boxes[source]["numoutlets"] and inlet < boxes[destination]["numinlets"]
     texts = [b.get("text", "") for b in boxes.values()]
-    for dsp in ("abl.device.channeleq~", "abl.device.stereocompressor~",
+    # abl.device.stereocompressor~ (documented) is missing in Max 9.1.5: never use it
+    assert not any("stereocompressor" in t for t in texts)
+    for dsp in ("abl.device.channeleq~", "abl.device.compressor~",
                 "abl.device.limiter~", "abl.device.utility~"):
         assert any(t.startswith(dsp) for t in texts), dsp
     names = [b["saved_attribute_attributes"]["valueof"]["parameter_longname"]

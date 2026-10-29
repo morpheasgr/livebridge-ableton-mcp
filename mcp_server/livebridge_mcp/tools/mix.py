@@ -666,7 +666,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 ready = bridge_call(bridge, "devices.set_parameters", {
                     "track": "master", "device": find(devices, _MASTER_DEVICE)["index"],
                     "values": {"EQ Low Cut": "on", "Comp Ratio": 2.0,
-                               "Comp Auto Release": "on", "Limit Mode": "True peak"}})
+                               "Limit Mode": "True peak"}})
                 if _is_error(ready):
                     manual.append("LiveBridge Master: EQ Low Cut on, Comp Ratio 2, Limit Mode "
                                   f"True peak (not set: {ready.get('error')}).")

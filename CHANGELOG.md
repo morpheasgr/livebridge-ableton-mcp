@@ -5,6 +5,7 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
+- Fix: LiveBridge Master and Channel were silent in Max 9.1.5 — `abl.device.stereocompressor~` (documented) is not there; both use `abl.device.compressor~` once per side now (no knee/mix/auto-release controls).
 - LiveBridge Phase: polarity, delay and all-pass phase rotation in gen~ (any Max). New tool `live_mix_phase` (220 tools): tries polarity and all-pass frequencies on a part while the song loops and keeps the setting that leaves the most low end on the master — Fuser-style phase analysis by measurement.
 - LiveBridge Channel (Max 9): the Engine plus a channel strip from Ableton's DSP (high-pass, Channel EQ, Stereo Compressor, Saturator, Utility), every control a Live parameter, neutral at rest. New tool `live_mix_auto` (219 tools): rests the strips, listens to the raw parts, sets each strip for its role with a reason per move (`mix.channel_plan`), listens again, then balances and masters if asked.
 - Engine 1.7.0: `live_engine_modulate(mode="offset")` modulates through `live.modulate~` — around the parameter's own value like Live's LFO, the knob stays the user's, nothing to restore. The default stays `"replace"` (`live.remote~`).
