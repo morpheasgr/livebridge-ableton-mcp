@@ -310,10 +310,12 @@ def test_compressors_hear_their_own_signal():
     compresses (Live report: threshold/ratio ignored, only the makeup gain worked)."""
     for path in (m4l_build.MASTER_AMXD, m4l_build.CHANNEL_AMXD):
         _type, patcher = m4l_build.read_amxd(path.read_bytes())
-        feeds = {(l["patchline"]["destination"][0], l["patchline"]["destination"][1]):
-                 l["patchline"]["source"][0] for l in patcher["patcher"]["lines"]}
+        feeds: dict = {}
+        for line in patcher["patcher"]["lines"]:
+            key = tuple(line["patchline"]["destination"])
+            feeds.setdefault(key, set()).add(line["patchline"]["source"][0])
         for comp, eq in (("obj-compl", "obj-eql"), ("obj-compr", "obj-eqr")):
-            assert feeds[(comp, 0)] == eq and feeds[(comp, 1)] == eq, (path.name, comp)
+            assert eq in feeds[(comp, 0)] and feeds[(comp, 1)] == {eq}, (path.name, comp)
 
 
 def test_frame_fields_agree_everywhere():
