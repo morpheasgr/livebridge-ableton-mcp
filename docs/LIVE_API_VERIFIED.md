@@ -1139,7 +1139,8 @@ Max devices (`LiveAPI`, `live.object`) see a narrower object model than the Remo
 From a set with every object type and most device classes (members merged across all objects
 of a type; 930 objects):
 
-- **Python only**: `Application.browser` (Max cannot load devices or browse), undo grouping
+- **Python only**: `Application.browser` (Max cannot browse or load presets/plug-ins; it can
+  insert NATIVE devices by name with `Track.insert_device`, Live 12.3+), undo grouping
   (`Song.begin_undo_step` / `end_undo_step`), `Song`/`Track` `get_data` / `set_data`,
   `DeviceParameter.begin_gesture` / `end_gesture` (so the Engine's fast automation pass
   writes plain values since 1.6.2), clip automation envelopes (`automation_envelope`,
@@ -1153,5 +1154,14 @@ of a type; 930 objects):
   (slices, warp), Wavetable's modulation matrix, Drift's and Meld's voice settings, Looper's
   transport functions, Compressor's sidechain routing, Hybrid Reverb's IR selection, and the
   view selection (`selected_parameter`, `detail_clip`, `selected_drum_pad`...).
-- Not settled by the dump: the master track's mixer (`crossfader`, `cue_volume`,
-  `song_tempo`) was not walked, so "Python only" there is unproven.
+- The master track's mixer was not walked by the dump; Cycling '74's LOM reference
+  (https://docs.cycling74.com/apiref/lom/, written for Live 12.4.5) documents `crossfader`,
+  `cue_volume` and `song_tempo` there (master only), so they are reachable from Max.
+- The reference agrees on the rest: no `begin_gesture`/`end_gesture` on DeviceParameter, no
+  undo-step grouping or `get_data`/`set_data` on Song. It also lists types the dump set did
+  not contain (DrumCellDevice, ShifterDevice, TakeLane, TuningSystem — a Song child, read as
+  a property only when no tuning is loaded).
+- Max rules from the Live API overview (https://docs.cycling74.com/userguide/m4l/live_api_overview/):
+  no set changes from inside a notification (defer them, `deferlow`), ids are per device and
+  not saved (navigate again after loading), `live.thisdevice` before the first API call, and
+  `live.remote~` bypasses undo and disables the parameter's automation while it controls it.
