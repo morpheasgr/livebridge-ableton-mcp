@@ -441,3 +441,61 @@ def test_master_auto_keeps_the_drop_bigger_than_the_breakdown(app, song, mix_set
     if contrast["after_lu"] < contrast["before_lu"] - 2:
         assert any("backed off" in n for n in result["notes"])
     assert song.is_playing is False                           # stopped again afterwards
+
+
+# ----------------------------------------------------------------------------- channel strips
+
+def test_channel_plan_rules():
+    raw = {"loudness": {"lufs": -14.0, "peak_db": -3.0, "crest_db": 14.0},
+           "spectrum": {"bands_db": {"sub": -20, "bass": -12, "low_mid": -8, "mud": -4,
+                                     "mid": -5, "presence": -9, "high": -20, "air": -30}}}
+    vocal = mix.channel_plan("vocal", raw)["values"]
+    assert vocal["HP Freq"] == 90.0 and vocal["Mid Freq"] == 350.0 and vocal["Mid"] < 0
+    assert vocal["High"] == 2.0 and vocal["Comp Ratio"] == 4.0
+    # 4:1 taking ~6 dB off a -3 dB peak: threshold -3 - 6 / 0.75 = -11
+    assert vocal["Comp Threshold"] == pytest.approx(-11.0) and vocal["Comp Makeup"] == 3.0
+    sub = mix.channel_plan("sub", {"loudness": {"crest_db": 6.5, "peak_db": -6.0},
+                                   "spectrum": {"bands_db": {"sub": -1.0}}})["values"]
+    assert sub == {"Bass Mono": 1.0, "Width": 0.0}       # no high-pass, dynamics fine
+    pad = mix.channel_plan("pad", {"loudness": {"crest_db": 20, "peak_db": -1},
+                                   "spectrum": {"bands_db": {"mud": -10, "presence": -10}}})
+    assert "Comp Ratio" not in pad["values"] and pad["values"]["HP Freq"] == 150.0
+    dull_bass = mix.channel_plan("bass", {"spectrum": {"bands_db": {
+        "sub": -3, "bass": -3, "presence": -30, "high": -40, "air": -50}}})["values"]
+    assert dull_bass["Saturation"] == 20.0 and dull_bass["Bass Mono"] == 1.0
+    assert set(mix.channel_plan(None, None)["values"]) == {"HP Freq"}
+
+
+def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
+    real = mix_set.devices
+
+    def with_strips(*a, **k):
+        found = real(*a, **k)
+        for device in found:
+            if device["role"] == "track":
+                device["strip"] = True
+        return found
+    monkeypatch.setattr(engine, "devices", with_strips)
+    for name in ("Kick", "Sub", "Pad", "Hats"):
+        factory.add_device(mix_set.track(name), "LiveBridge Channel", "MxDeviceAudioEffect",
+                           params=[{"name": n, "value": v, "min": min(v, -40.0),
+                                    "max": max(v, 1000.0)}
+                                   for n, v in mix.CHANNEL_NEUTRAL.items()])
+    plan = call_tool(app, "live_mix_auto", {"apply": False, "seconds": 3})
+    assert plan["applied"] is False and {t["name"] for t in plan["tracks"]} == {
+        "Kick", "Sub", "Pad", "Hats"}
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": True})
+    assert result["applied"]
+    by_name = {t["name"]: t for t in result["tracks"]}
+    assert by_name["Hats"]["role"] == "hats" and by_name["Hats"]["values"]["HP Freq"] == 300.0
+    assert by_name["Sub"]["values"]["Bass Mono"] == 1.0 and "after" in by_name["Sub"]
+    strip = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
+    assert {p.name: p.value for p in strip.parameters}["HP Freq"] == 300.0
+    assert "parts" in result["balance"] or "plan" in result["balance"]
+    for bad in ({"seconds": 1}, {"master_chain": "rack"}, {"roles": {"Kick": "tuba"}}):
+        assert call_tool(app, "live_mix_auto", bad)["type"] == "bad_args", bad
+
+
+def test_mix_auto_without_channels(app, song, mix_set):
+    answer = call_tool(app, "live_mix_auto", {})
+    assert answer["type"] == "not_found" and "LiveBridge Channel" in answer["error"]

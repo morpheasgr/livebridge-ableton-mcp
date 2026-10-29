@@ -633,6 +633,12 @@ version"*. Needs a LiveBridge Engine at the end of each track and on the master 
 mix problems.
 
 1. **Sound check** (§19) — nothing silent, nothing strangled.
+1b. **Channel strips** (LiveBridge Channel on the tracks, Max 9): `live_mix_auto(genre=...)`
+   rests each strip, listens to the raw part, sets high-pass, mud/harshness cuts, air,
+   compression to the role's crest factor and bass mono, listens again, then balances (step 2)
+   and, with `master="streaming"`, masters (step 4) in one call. Report the `reasons`; on the
+   user's own mix run `apply=false` first. A move they dislike: one
+   `live_device_set_parameter(device="LiveBridge Channel", parameter=..., value=...)`.
 2. **Balance**: loop the fullest section, `live_mix_balance(genre="techno")` (or without a
    genre: kick on top, sub -1, bass -3, snare -3, vocal -2, lead -6, keys -8, percussion -9,
    pads -10, hats -11, fx -13 LU). It measures every part pre-fader, sets the faders in dB (one

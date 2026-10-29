@@ -120,6 +120,26 @@ together.
 The Remote Script is not involved, so a busy Live main thread never delays the device and the
 device never touches the set.
 
+## LiveBridge Channel (Max 9)
+
+`max_for_live/LiveBridge Channel/`: the Engine patch (meters, listening, capture, modulation,
+follow actions — `lbchannel.js` / `lbchannel_context.js` are copies of `engine.js` /
+`context.js` under their own names, the Node script started with `@args channel` so `hello`
+says `strip: true`) with a channel strip between `plugin~` and the meters: Auto Filter as a
+clean 24 dB high-pass -> Channel EQ (per side) -> Stereo Compressor (RMS, knee 6) -> Saturator
+(per side, Soft Sine) -> Utility. Its 16 parameters (`CHANNEL_PARAMS` in `build.py`: HP Freq,
+Low, Mid, Mid Freq, High, Comp Threshold/Ratio/Attack/Release/Makeup, Saturation, Drive, Width,
+Bass Mono, Bass Mono Freq, Trim) start neutral, so a fresh Channel leaves the sound alone. The
+meters hear the strip's output, so every Engine tool reads the processed part.
+
+`live_mix_auto` rests the strips (`mix.CHANNEL_NEUTRAL`), listens to every Channel at once,
+guesses each part's role, applies `mix.channel_plan` (high-pass by role, a mud cut at 350 Hz when
+250-500 Hz holds too much for the role, a boxy kick at 300 Hz, harsh 2-5 kHz at 3.5 kHz, air on
+a dull vocal/hats/lead, compression from the measured peak and crest factor to the role's crest
+target, bass mono on kick/sub/bass, saturation on a bass or lead with nothing above 2 kHz),
+listens again, then optionally runs `live_mix_balance` and `live_master_auto`. Put one Channel
+per track instead of an Engine (two Engines on a track just measure twice).
+
 ## LiveBridge Master (Max 9)
 
 `max_for_live/LiveBridge Master/LiveBridge Master.amxd`, built by `build.py` like the others:

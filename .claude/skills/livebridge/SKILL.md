@@ -230,7 +230,9 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     levels by measurement (kick on top ...) and says whether each band problem is a master or a
     track fix; `live_master_auto(destination="streaming"|"club"|...)` drives EQ Eight -> Glue ->
     Limiter (or one LiveBridge Master device: `chain="livebridge"`, Max 9) to the loudness
-    target and stops before the punch collapses. `WORKFLOWS.md`
+    target and stops before the punch collapses. With a LiveBridge Channel on each track (it
+    replaces the Engine there), `live_mix_auto(genre=..., master="streaming")` does it all:
+    per-part strips (high-pass, EQ, compression, bass mono) by role, then balance, then master. `WORKFLOWS.md`
     §19-20. On the user's own mix, run `apply=false` first and show the plan.
   - *Follow actions / generative playback*: Live's API has none, the Engine plays them:
     `live_engine_follow(target="Drums", every="2 bars", actions={"next": 3, "other": 1},
