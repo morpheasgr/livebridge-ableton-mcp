@@ -254,6 +254,15 @@ module.exports = {
       setImmediate(() => global.__maxHandlers.values(args[1], ...Array(count).fill(0.5)));
       return;
     }
+    if (args[0] === "lomdump") {
+      // like context.js: write the walk's JSON to the file, then answer with the type count
+      const types = { Song: { type: "Song", path: "live_set", properties: [["tempo", "float"]],
+                              functions: ["start_playing"], children: [["tracks", "Track", true]] } };
+      fs.writeFileSync(args.slice(1).join(" "), JSON.stringify(
+        { live_version: "12.4.15", max_version: "9.1.2", objects_looked_at: 3, types: types }));
+      setImmediate(() => global.__maxHandlers.lomdumped(1));
+      return;
+    }
     if (args[0] === "call" && args[1] === "fire" && args.indexOf("clip_slots") > 0) {
       recorder.playing = args[args.length - 1];
       return;
@@ -524,6 +533,26 @@ def test_capture_records_every_device_at_the_same_moment(engines):
     assert busy.value.type == "busy"
     assert call_tool(app, "live_engine_capture", {"seconds": 0.1})["type"] == "bad_args"
     assert call_tool(app, "live_engine_capture", {"tracks": ["Drums"]})["type"] == "not_found"
+
+
+def test_lom_dump_and_its_markdown(engines, tmp_path, monkeypatch):
+    _placed(engines, "track", "Bass")
+    _wait_roles(1)
+    (device,) = engine.devices()
+    dump = engine.request(device, "lom_dump", timeout=10)
+    assert dump["types"]["Song"]["functions"] == ["start_playing"]
+    assert dump["node_version"].startswith("v") and dump["engine_version"] == device["version"]
+    assert not list((tmp_path / "captures").glob("lom-dump-*"))      # the file is cleaned up
+    import dump_m4l_lom
+    monkeypatch.setattr(dump_m4l_lom, "DOCS", str(tmp_path))
+    (tmp_path / "LIVE_API_DUMP_12.4.15.json").write_text(json.dumps({"classes": {
+        "Live.Song.Song": {"members": {"tempo": {"kind": "property"},
+                                       "name": {"kind": "property"},
+                                       "add_tempo_listener": {"kind": "method"}}}}}))
+    text = dump_m4l_lom.markdown(dump)
+    assert "Python only: `name`" in text and "Max only: `start_playing`, `tracks`" in text
+    assert dump_m4l_lom.main([]) == 0
+    assert (tmp_path / "LIVE_M4L_LOM_12.4.15.md").is_file()
 
 
 def test_capture_failure_is_reported(engines):
