@@ -499,3 +499,50 @@ def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
 def test_mix_auto_without_channels(app, song, mix_set):
     answer = call_tool(app, "live_mix_auto", {})
     assert answer["type"] == "not_found" and "LiveBridge Channel" in answer["error"]
+
+
+def _phase_device(track):
+    return factory.add_device(track, "LiveBridge Phase", "MxDeviceAudioEffect", params=[
+        {"name": "Invert", "value": 0, "min": 0, "max": 1, "is_quantized": True,
+         "value_items": ("off", "on")},
+        {"name": "Phase Freq", "value": 100.0, "min": 20.0, "max": 2000.0, "unit": "Hz"},
+        {"name": "Phase Q", "value": 0.7, "min": 0.1, "max": 10.0},
+        {"name": "Phase Stages", "value": 0, "min": 0, "max": 4, "is_quantized": True,
+         "value_items": ("Off", "1", "2", "3", "4")},
+        {"name": "Delay", "value": 0.0, "min": 0.0, "max": 10.0, "unit": "ms"}])
+
+
+def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkeypatch):
+    phase = _phase_device(mix_set.track("Sub"))
+    plain = mix_set.master_reading
+
+    def reading():
+        lufs, crest, share = plain()
+        p = {q.name: q.value for q in phase.parameters}
+        # Sub flipped and rotated at 70 Hz lines up with the kick: 3 dB more low end
+        if p["Invert"] == 1 and p["Phase Stages"] == 1 and abs(p["Phase Freq"] - 70) < 1:
+            lufs += 3.0
+        elif p["Invert"] == 1:
+            lufs += 1.0
+        return lufs, crest, share
+    monkeypatch.setattr(mix_set, "master_reading", reading)
+    result = call_tool(app, "live_mix_phase", {"track": "Sub", "seconds": 1})
+    assert result["applied"] and result["best"] == {"invert": True, "frequency": 70.0,
+                                                    "low_db": result["best"]["low_db"]}
+    assert result["gain_db"] == pytest.approx(3.0, abs=0.3)
+    assert len(result["tried"]) == 2 + 2 * 7
+    p = {q.name: q.value for q in phase.parameters}
+    assert p["Invert"] == 1 and p["Phase Stages"] == 1 and p["Phase Freq"] == 70.0
+    # nothing to gain: left neutral
+    monkeypatch.setattr(mix_set, "master_reading", plain)
+    flat = call_tool(app, "live_mix_phase", {"track": "Sub", "seconds": 1,
+                                             "frequencies": [60, 120]})
+    assert flat["applied"] is False and any("neutral" in n for n in flat["notes"])
+    assert {q.name: q.value for q in phase.parameters}["Phase Stages"] == 0
+    for bad in ({"track": "Sub", "seconds": 9}, {"track": "Sub", "frequencies": [5]}):
+        assert call_tool(app, "live_mix_phase", bad)["type"] == "bad_args"
+
+
+def test_mix_phase_needs_the_device(app, song, mix_set):
+    answer = call_tool(app, "live_mix_phase", {"track": "Sub", "seconds": 1})
+    assert answer["type"] == "not_found" and "LiveBridge Phase" in answer["error"]

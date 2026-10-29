@@ -140,6 +140,18 @@ target, bass mono on kick/sub/bass, saturation on a bass or lead with nothing ab
 listens again, then optionally runs `live_mix_balance` and `live_master_auto`. Put one Channel
 per track instead of an Engine (two Engines on a track just measure twice).
 
+## LiveBridge Phase
+
+`max_for_live/LiveBridge Phase/`: `plugin~ -> gen~ lb_phase -> plugout~` (any Max version):
+polarity, a 0-10 ms delay and up to four RBJ all-pass stages at one frequency and Q — the level
+never changes, the phase around Phase Freq turns (one stage: 0 to -360 degrees across it, -180
+at the frequency; the idea of the Little Labs IBP rather than a Hilbert-transform rotator, whose
+low-end accuracy depends on the sample rate). Settings glide so a sweep does not click.
+`live_mix_phase` loops the user's bar, tries normal/flipped polarity alone and with an all-pass
+at each frequency, reads the master's low end (below 120 Hz) through its Engine each time, and
+keeps the best setting only when it beats the untouched sound by more than the measuring noise
+(the untouched sound is measured at the start and again at the end).
+
 ## LiveBridge Master (Max 9)
 
 `max_for_live/LiveBridge Master/LiveBridge Master.amxd`, built by `build.py` like the others:

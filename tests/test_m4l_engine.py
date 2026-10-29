@@ -248,6 +248,25 @@ def test_channel_device_is_the_engine_plus_a_strip():
     assert initial == mix.CHANNEL_NEUTRAL                    # a fresh Channel is at rest
 
 
+def test_phase_device_is_built_and_wired():
+    _type, patcher = m4l_build.read_amxd(m4l_build.PHASE_AMXD.read_bytes())
+    boxes = {b["box"]["id"]: b["box"] for b in patcher["patcher"]["boxes"]}
+    for line in patcher["patcher"]["lines"]:
+        (source, outlet), (destination, inlet) = (line["patchline"]["source"],
+                                                  line["patchline"]["destination"])
+        assert outlet < boxes[source]["numoutlets"] and inlet < boxes[destination]["numinlets"]
+    names = [b["saved_attribute_attributes"]["valueof"]["parameter_longname"]
+             for b in boxes.values() if b.get("parameter_enable")]
+    assert names == ["Invert", "Phase Freq", "Phase Q", "Phase Stages", "Delay"]
+    code = json.loads(m4l_build.PHASE_GENDSP.read_text(encoding="utf-8"))
+    code = next(b["box"]["code"] for b in code["patcher"]["boxes"]
+                if b["box"]["maxclass"] == "codebox")
+    # every Live parameter has its gen~ Param, every stage its state
+    for message in ("invert", "freq", "q", "stages", "delayms"):
+        assert f"Param {message}(" in code
+    assert code.count("if (stages >") == m4l_build.PHASE_STAGES
+
+
 def test_frame_fields_agree_everywhere():
     js = ENGINE_JS.read_text(encoding="utf-8")
     fields = re.findall(r'"(\w+)"', js[js.index("const FRAME_FIELDS"):js.index("];",
