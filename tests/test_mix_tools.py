@@ -483,10 +483,10 @@ def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
                                     **({"unit": "Hz", "min": 20.0, "max": 8000.0}
                                        if "Freq" in n else {})}
                                    for n, v in mix.CHANNEL_NEUTRAL.items()])
-    plan = call_tool(app, "live_mix_auto", {"apply": False, "seconds": 3})
+    plan = call_tool(app, "live_mix_auto", {"apply": False, "seconds": 3, "place_devices": False})
     assert plan["applied"] is False and {t["name"] for t in plan["tracks"]} == {
         "Kick", "Sub", "Pad", "Hats"}
-    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": True})
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": True, "place_devices": False})
     assert result["applied"]
     by_name = {t["name"]: t for t in result["tracks"]}
     assert by_name["Hats"]["role"] == "hats" and by_name["Hats"]["values"]["HP Freq"] == 300.0
@@ -572,11 +572,11 @@ def test_mix_unmask_routes_the_side_chain_and_sets_the_band(app, song, mix_set):
             ("Release", 120.0, 10.0, 1000.0))] + [
         {"name": "Freq", "value": 80.0, "min": 20.0, "max": 8000.0, "unit": "Hz"}])
     plan = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Kick",
-                                              "apply": False, "seconds": 2})
+                                              "apply": False, "seconds": 2, "place_devices": False})
     assert plan["applied"] is False and plan["band"]["band"] in ("sub", "bass")
     assert (plan["attack_ms"], plan["release_ms"]) == (2.0, 100.0)       # a kick: fast
     done = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Kick",
-                                              "seconds": 2, "depth_db": 4})
+                                              "seconds": 2, "depth_db": 4, "place_devices": False})
     assert done["applied"] and done["routing"]["input"]["type"] == "Kick"
     assert unmask.audio_inputs[1].routing_type.display_name == "Kick"
     p = {q.name: q.value for q in unmask.parameters}
@@ -589,5 +589,56 @@ def test_mix_unmask_routes_the_side_chain_and_sets_the_band(app, song, mix_set):
 
 
 def test_mix_unmask_needs_meters_on_both(app, song, mix_set):
-    answer = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Nowhere"})
+    answer = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Nowhere",
+                                                "place_devices": False})
     assert answer["type"] == "not_found" and "Nowhere" in answer["error"]
+
+
+def test_mix_auto_places_the_devices_itself(app, song, mix_set, monkeypatch):
+    """No Channel anywhere: live_mix_auto loads one at the end of every sounding track
+    (an Engine there is replaced, a MIDI track without instrument is skipped)."""
+    import Live
+    browser = Live.Application.get_application().browser
+    factory.add_browser_item(browser.audio_effects, "LiveBridge Channel",
+                             uri="query:AudioFx#LiveBridge%20Channel", is_device=True,
+                             load_kind="device")
+    from Live import _model
+    plain_load = _model.Browser._load_device
+
+    def load_channel(self, item, track):          # the stub loads a generic device: give it
+        device = plain_load(self, item, track)     # the Channel's parameters
+        if item.name == "LiveBridge Channel":
+            device._parameters = list(device._parameters[:1]) + [
+                _model.DeviceParameter(n, v, min(v, -40.0), max(v, 1000.0),
+                                       canonical_parent=device)
+                if "Freq" not in n else
+                _model.DeviceParameter(n, v, 20.0, 8000.0, unit="Hz", canonical_parent=device)
+                for n, v in mix.CHANNEL_NEUTRAL.items()]
+        return device
+    monkeypatch.setattr(_model.Browser, "_load_device", load_channel)
+    empty = factory.add_track(song, "Empty MIDI", "midi")                   # no instrument
+    old = factory.add_device(mix_set.track("Pad"), "LiveBridge Engine", "MxDeviceAudioEffect")
+    real = mix_set.devices
+
+    def with_strips(*a, **k):
+        found = real(*a, **k)
+        for device in found:
+            if device["role"] == "track":
+                track = mix_set.track(device["track"])
+                device["strip"] = any(d.name == "LiveBridge Channel" for d in track.devices)
+        return found
+    monkeypatch.setattr(engine, "devices", with_strips)
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": False,
+                                              "low_end": False})
+    placed = result["placed"]
+    assert set(placed["placed"]) >= {"Kick", "Sub", "Pad", "Hats"}   # + the set's others
+    assert placed["replaced"] == ["Pad"] and old not in mix_set.track("Pad").devices
+    assert any("Empty MIDI" in s for s in placed["skipped"])
+    assert not any(d.name == "LiveBridge Channel" for d in empty.devices)
+    for name in ("Kick", "Sub", "Pad", "Hats"):
+        assert mix_set.track(name).devices[-1].name == "LiveBridge Channel"
+    assert {t["name"] for t in result["tracks"]} == {"Kick", "Sub", "Pad", "Hats"}
+    # a second run finds them in place
+    again = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": False,
+                                             "low_end": False})
+    assert again.get("placed", {}).get("placed", []) == []           # nothing new to place

@@ -1613,12 +1613,13 @@ Master the song to a loudness target by measurement: uses (or builds) EQ Eight -
 | `quiet_bar` | float \| null | `null` |
 | `max_gain_db` | float | `18.0` |
 | `chain` | str | `"native"` |
+| `place_devices` | bool | `true` |
 
-Bridge: `browser.load`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_auto`
 
-Mix every part by measurement: on each track with a LiveBridge Channel (a channel strip from Ableton's DSP in front of the Engine's meters: high-pass, EQ, compressor, saturation, width/bass mono, trim — all Live parameters), it sets the strip to rest, listens to the raw part, guesses its role, then sets the strip for that role: high-pass, mud / harshness cuts and air from the measured bands, compression to the role's crest factor, bass mono on the low end, a little saturation on a dull bass or lead. Then it listens again and reports before/after with the reason for every move. With `balance` it then sets the faders (`live_mix_balance`), with `master` it masters (`live_master_auto`).
+Mix (and master) the song by measurement in one call — the devices it needs are put in place by the tool itself. On each track with a LiveBridge Channel (a channel strip from Ableton's DSP in front of the Engine's meters: high-pass, EQ, compressor, saturation, width/bass mono, trim — all Live parameters), it sets the strip to rest, listens to the raw part, guesses its role, then sets the strip for that role: high-pass, mud / harshness cuts and air from the measured bands, compression to the role's crest factor, bass mono on the low end, a little saturation on a dull bass or lead. Then it listens again and reports before/after with the reason for every move. With `balance` it then sets the faders (`live_mix_balance`), with `master` it masters (`live_master_auto`).
 
 | Argument | Type | Default |
 |---|---|---|
@@ -1629,9 +1630,11 @@ Mix every part by measurement: on each track with a LiveBridge Channel (a channe
 | `apply` | bool | `true` |
 | `balance` | bool | `true` |
 | `master` | str \| null | `null` |
-| `master_chain` | str | `"native"` |
+| `master_chain` | str | `"livebridge"` |
+| `place_devices` | bool | `true` |
+| `low_end` | bool | `true` |
 
-Bridge: `browser.load`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -1643,8 +1646,9 @@ Phase-align a part against the rest of the low end (bass against kick, a layered
 | `seconds` | float | `2.0` |
 | `frequencies` | list[float] \| null | `null` |
 | `apply` | bool | `true` |
+| `place_devices` | bool | `true` |
 
-Bridge: `browser.load`, `devices.list`, `devices.set_parameters`, `transport.get`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.list`, `devices.set_parameters`, `tracks.list`, `transport.get`
 
 #### `live_mix_unmask`
 
@@ -1659,8 +1663,9 @@ Stop two parts fighting over a band — the way a side-chained dynamic EQ does i
 | `depth_db` | float | `6.0` |
 | `seconds` | float | `4.0` |
 | `apply` | bool | `true` |
+| `place_devices` | bool | `true` |
 
-Bridge: `browser.load`, `devices.list`, `devices.move`, `devices.set_parameters`, `routing.route`, `transport.get`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.list`, `devices.move`, `devices.set_parameters`, `routing.route`, `tracks.list`, `transport.get`
 
 <a id="module-mixer"></a>
 
@@ -3538,7 +3543,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `automation.state` |  | track=null, parameter=null, device=null, include_all=false | `live_automation_state` | Automation state (none/playing/overridden) of a parameter, a track or the whole set |
 | `automation.write` | M | parameter, points, track=null, slot=null, clip=null, device=null, mode="step", resolution=16, end=null, normalized=false, clear=false, extend_clip=false | `live_automation_write` | Write a clip envelope from points [{time, value}] as steps or linear ramps |
 | `browser.browse` |  | path=null, uri=null, name=null, offset=0, limit=100, filter=null, kind=null, detail="summary" | `live_browser_browse` | List a browser folder's children by path, uri or name (paged) |
-| `browser.cache` |  | action="info" | `live_browser_search` (refresh=true) | Browser search cache: info or clear |
+| `browser.cache` |  | action="info" | `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask` | Browser search cache: info or clear |
 | `browser.hotswap` |  | action="info", track=null, device=null, drum_pad=null | `live_browser_hotswap` | Hot-swap target: info, set (device / drum pad) or clear |
 | `browser.load` | M | uri=null, path=null, query=null, root=null, category=null, track=null, slot=null, new_track=null, track_name=null, position="end", hotswap=false, device=null, drum_pad=null, plugin_format=null, max_seconds=10.0 | `live_browser_hotswap`, `live_browser_load`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_host_bank`, `live_plugin_host_load`, `live_preset_load` | Load a browser item (by uri, path or search) onto a track; reports what changed |
 | `browser.preview` |  | uri=null, path=null, query=null, root=null, category=null, stop=false | `live_browser_preview` | Preview (audition) a browser item, or stop the preview |
@@ -3570,7 +3575,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `cues.set` | M | cue, name=null, time=null, restore=null | `live_cue_set` | Rename and/or move a cue point |
 | `cues.toggle` | M | time=null, restore=null, zoom=null | `live_cue_add` | Live's Set/Delete Locator button at a time (default: the playhead) |
 | `devices.action` | M | action, track=null, device=null, args=null, target_track=null, slot=null, parameter=null | `live_device_action` | Run a class-specific device method (Looper record/overdub/export, CC resend ...) |
-| `devices.delete` | M | track=null, device=null | `live_device_delete`, `live_plugin_host_bank`, `live_plugin_host_expose` | Delete a device from its track or chain |
+| `devices.delete` | M | track=null, device=null | `live_device_delete`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_host_bank`, `live_plugin_host_expose` | Delete a device from its track or chain |
 | `devices.duplicate` | M | track=null, device=null | `live_device_duplicate` | Duplicate a device (copy lands right after it) |
 | `devices.find` |  | query=null, class_name=null, kind=null, type=null, include_nested=true, include_returns=true, limit=100 | `live_device_find` | Find devices anywhere in the set by name, class or kind |
 | `devices.get` |  | track=null, device=null, detail="summary", max_parameters=64 | `live_device_get` | One device: summary, state, rack/plugin/Simpler extras |
@@ -3639,7 +3644,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `record.status` |  |  | `live_record_session`, `live_record_status` | Everything about recording right now |
 | `record.stop` | M | stop_transport=false, stop_clips=false, disarm=false | `live_record_stop` | Stop recording (arrangement + session) |
 | `routing.get` |  | track, include_available=true | `live_routing_get` | Current + available input/output routing of a track |
-| `routing.route` | M | source, destination, method="input", channel=null, monitoring=null, device=null | `live_mix_unmask`, `live_routing_route` | Route track A into track B (input, output or compressor side-chain) |
+| `routing.route` | M | source, destination, method="input", channel=null, monitoring=null, device=null | `live_mix_auto`, `live_mix_unmask`, `live_routing_route` | Route track A into track B (input, output or compressor side-chain) |
 | `routing.set` | M | track, input_type=null, input_channel=null, output_type=null, output_channel=null, monitoring=null | `live_routing_set` | Set input/output routing type/channel and monitoring |
 | `routing.summary` |  | include_returns=true, include_master=true | `live_routing_summary` | Compact routing overview of every track |
 | `samples.import` | M | file_path, track=null, mode="session", slot=null, time=null, target="auto", track_name=null, name=null, warp=null, select=false, overwrite=false, note=null | `live_drumrack_set_pad`, `live_sample_import`, `live_splice_import_downloaded` | Import an audio file into a session slot, the arrangement or a Simpler |
@@ -3679,7 +3684,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `tracks.find` |  | name, limit=20 | `live_tracks_find` | Find tracks by (part of) their name |
 | `tracks.get` |  | track, detail="full" | `live_engine_follow`, `live_engine_unfollow`, `live_tracks_get` | One track in detail (+ freeze and group info) |
 | `tracks.group` | M | track, fold=null | `live_tracks_group` | Group info: members and fold state; fold/unfold |
-| `tracks.list` |  | include_returns=true, include_master=true, type=null, name=null, frozen=null, armed=null, detail="summary", offset=0, limit=null | `live_memory_note`, `live_memory_recall`, `live_sound_check`, `live_tracks_list` | List tracks (regular/return/master) with filters and paging |
+| `tracks.list` |  | include_returns=true, include_master=true, type=null, name=null, frozen=null, armed=null, detail="summary", offset=0, limit=null | `live_master_auto`, `live_memory_note`, `live_memory_recall`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_sound_check`, `live_tracks_list` | List tracks (regular/return/master) with filters and paging |
 | `tracks.select` |  | track | `live_tracks_select` | Select a track in Live's UI |
 | `tracks.set` | M | track, name=null, color=null, mute=null, solo=null, arm=null, fold=null, exclusive=false | `live_tracks_set` | Rename/colour/mute/solo/arm/fold one or more tracks in one step |
 | `tracks.stop_clips` | M | track=null, quantized=true | `live_tracks_stop_clips` | Stop the clips of one/several/all tracks |
