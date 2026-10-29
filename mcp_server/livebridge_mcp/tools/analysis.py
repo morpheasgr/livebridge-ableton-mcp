@@ -37,6 +37,13 @@ _AUDIO_TIMEOUT_HINT = "pass start=/duration= (seconds) to analyse a shorter wind
 _MAX_MASKING_SOURCES = 8
 
 
+def _scale_text(scale: Any) -> str | None:
+    """Live's ``{root, name}`` scale as a key text ("F# minor"), or None."""
+    if isinstance(scale, dict) and scale.get("root") and scale.get("name"):
+        return f"{scale['root']} {str(scale['name']).lower()}"
+    return None
+
+
 def _parse_key(text: str) -> dict[str, Any] | None:
     """"A minor", "F# dorian", "Bbm", "C" -> ``{"tonic", "mode"}`` (None when not a key)."""
     match = _KEY_RE.match(text)
@@ -117,8 +124,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             clips: or several clips analysed TOGETHER (that is what finds clashes between
                 bass and chords): `[{"track": "Bass", "slot": 0}, {"track": "Pad", "slot": 0},
                 "song.tracks[3].clip_slots[0].clip"]` (max 16). Clips are aligned at beat 0.
-            key: force the key instead of detecting it — "A minor", "F# dorian", "Bbm", or
-                "song" for the scale set in Live. Modes: major, minor, dorian, phrygian,
+            key: force the key instead of detecting it — "A minor", "F# dorian", "Bbm",
+                "song" for the scale set in Live, or "clip" for the (first) clip's own scale
+                (Live 12.4.15+). Modes: major, minor, dorian, phrygian,
                 lydian, mixolydian, harmonic minor.
             segment: chord window in beats (default: one bar, half a bar when chords change
                 faster).
@@ -127,7 +135,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{key:{name, tonic, mode, confidence}, key_candidates:[{name, score}],
-            scale_notes, song_scale? (Live's own scale setting when it differs), chords:[{at
+            scale_notes, song_scale? / clip_scale? (Live's scale setting when it differs),
+            chords:[{at
             (beat), bar, name, roman, confidence, extra?}], progression ("i VI III VII" — the
             shortest repeating unit, usable in live_clip_write_chords), out_of_key:[{part,
             note, count, beats, at}], clashes:[{kind: "semitone"|"low_mud", parts, notes, at,
@@ -180,22 +189,25 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if match and int(match.group(2)):
                 beats_per_bar = int(match.group(1)) * 4.0 / int(match.group(2))
             scale = state.get("scale") if isinstance(state.get("scale"), dict) else None
-            if scale and scale.get("root") and scale.get("name"):
-                song_scale = f"{scale['root']} {str(scale['name']).lower()}"
-        if key is not None:
+            song_scale = _scale_text(scale)
+        from_clip = key is not None and key.strip().lower() == "clip"
+        if key is not None and not from_clip:
             wanted = song_scale if key.strip().lower() == "song" else key
             forced = _parse_key(wanted) if wanted else None
             if forced is None:
                 return tool_error(
-                    "key must look like 'A minor', 'F# dorian', 'Bbm' or 'song' (modes: "
-                    + ", ".join(theory.SCALES) + ")"
+                    "key must look like 'A minor', 'F# dorian', 'Bbm', 'song' or 'clip' "
+                    "(modes: " + ", ".join(theory.SCALES) + ")"
                     + ("" if wanted else " — Live reports no song scale"), cmd=cmd)
 
         parts = []
+        clip_scale = None
         for address in addresses:
             answer = fetch_notes(address)
             if _is_error(answer) or not isinstance(answer, dict):
                 return answer
+            if clip_scale is None:
+                clip_scale = _scale_text(answer.get("scale"))
             path = str(answer.get("clip") or "")
             label = str(answer.get("name") or "")
             track_name, drum_clip = track_of(path, label)
@@ -208,6 +220,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 name = f"{name} ({path})"
             parts.append({"name": name, "notes": answer.get("notes") or [],
                           "length": answer.get("length") or 0.0, "drums": drum_clip})
+        if from_clip:
+            forced = _parse_key(clip_scale) if clip_scale else None
+            if forced is None:
+                return tool_error(
+                    "key='clip' needs a clip with its own scale in a mode the analysis knows ("
+                    + ", ".join(theory.SCALES) + "); "
+                    + (f"this clip's is {clip_scale}" if clip_scale
+                       else "this Live has no clip scales (12.4.15+)"), cmd=cmd)
         result = theory.analyze_parts(parts, beats_per_bar=beats_per_bar, segment=segment,
                                       key=forced)
         detected = (result.get("key") or {}).get("name")
@@ -218,6 +238,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 f"Live's scale setting is {song_scale} but the notes say {detected}: set the "
                 "song key (live_transport_set) so fit_scale, Roman-numeral chords and Live's "
                 "scale highlighting work in the right key.")
+        # Only a clip scale of its own: one equal to the song's is covered by the hint above.
+        if clip_scale and detected and forced is None and _parse_key(clip_scale) and \
+                _parse_key(clip_scale) != _parse_key(detected) and \
+                (not song_scale or _parse_key(clip_scale) != _parse_key(song_scale)):
+            result["clip_scale"] = clip_scale
+            result["suggestions"].append(
+                f"The clip's own scale is {clip_scale} but the notes say {detected}: set it "
+                "with live_clip_set(scale_name=..., root_note=...) so Live's highlighting and "
+                "MIDI Tools follow the right key.")
         return result
 
     @mcp.tool()
@@ -242,7 +271,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             track, slot / clip: the melody clip (a chordal part is checked as its top voice).
             harmony: chord/bass clips under it (`[{"track": "Pad", "slot": 0}, ...]`, max 8):
                 enables the tension-note check and helps the key.
-            key: force the key ("A minor", "F# dorian", "song" = Live's scale setting).
+            key: force the key ("A minor", "F# dorian", "song" = Live's scale setting,
+                "clip" = the melody clip's own scale, Live 12.4.15+).
             mood: melancholy, anger, calm, euphoria, tension, nostalgia, hope, loneliness,
                 triumph (or sad, euphoric, dark, uplifting, epic ...).
             length: phrase length in beats (default: the clip length).
@@ -274,19 +304,29 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if match and int(match.group(2)):
                 beats_per_bar = int(match.group(1)) * 4.0 / int(match.group(2))
             scale = state.get("scale") if isinstance(state.get("scale"), dict) else None
-            if scale and scale.get("root") and scale.get("name"):
-                song_scale = f"{scale['root']} {str(scale['name']).lower()}"
+            song_scale = _scale_text(scale)
         forced = None
-        if key is not None:
+        from_clip = key is not None and key.strip().lower() == "clip"
+        if key is not None and not from_clip:
             wanted = song_scale if key.strip().lower() == "song" else key
             forced = _parse_key(wanted) if wanted else None
             if forced is None:
-                return tool_error("key must look like 'A minor', 'F# dorian', 'Bbm' or 'song'"
+                return tool_error("key must look like 'A minor', 'F# dorian', 'Bbm', 'song' "
+                                  "or 'clip'"
                                   + ("" if wanted else " — Live reports no song scale"),
                                   cmd=cmd)
         melody = fetch_notes(address_args(track, slot, clip))
         if _is_error(melody) or not isinstance(melody, dict):
             return melody
+        if from_clip:
+            clip_scale = _scale_text(melody.get("scale"))
+            forced = _parse_key(clip_scale) if clip_scale else None
+            if forced is None:
+                return tool_error("key='clip' needs a clip with its own scale in a mode the "
+                                  "analysis knows; " + (f"this clip's is {clip_scale}"
+                                                        if clip_scale else
+                                                        "this Live has no clip scales "
+                                                        "(12.4.15+)"), cmd=cmd)
         under: list[Any] = []
         for item in harmony or []:
             if isinstance(item, str):

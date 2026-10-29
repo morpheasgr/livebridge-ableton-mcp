@@ -5,6 +5,8 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
+- Max for Live API dump: Engine 1.6.0 answers `lom_dump` (its `context.js` walks Live's object model through LiveAPI `info`); `tests/dump_m4l_lom.py` writes `docs/LIVE_M4L_LOM_<version>.md` with, per type, what the Python API has that Max cannot reach and the reverse.
+- Per-clip scale (Live 12.4.15): `live_clip_set(scale_name=, root_note=, scale_mode=)`, `scale` in `live_clip_get` and the clip summaries, `key="clip"` in `live_theory_analyze` / `live_theory_melody`, and a `clip_scale` hint when a clip's own scale disagrees with its notes. Older Live answers `unsupported`.
 - The open set's name: `live_set_snapshot` reports `set_name`/`set_path` (`Song.name`/`Song.file_path`), or `unsaved: true` for a set never saved.
 - Session memory files notes under the open set's name and finds the project by the set's file on recall (`matched_by: "set"`); notes written before the set was saved say `unsaved_set` and move over with `live_memory_update(project=..., whole_project=true)`.
 - Version bump so `live_status` shows whether the new code runs; `live_status` also reports the MCP server's `pid` and `started` time.

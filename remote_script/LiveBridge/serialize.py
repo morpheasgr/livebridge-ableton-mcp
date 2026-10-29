@@ -294,6 +294,28 @@ def _path_index(path):
 # per type
 # --------------------------------------------------------------------------
 
+NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+
+def scale_of(obj):
+    """``{name, root_note, root, mode, intervals}`` of a Song or (Live 12.4.15+) a Clip, or
+    None when the object has no scale properties."""
+    get = compat.safe_getattr
+    if not compat.has(obj, "scale_name"):
+        return None
+    root = get(obj, "root_note")
+    data = {"name": get(obj, "scale_name"), "root_note": root, "mode": get(obj, "scale_mode")}
+    if isinstance(root, int) and not isinstance(root, bool) and 0 <= root < 12:
+        data["root"] = NOTE_NAMES[root]
+    intervals = get(obj, "scale_intervals")
+    if intervals is not None:
+        try:
+            data["intervals"] = [int(i) for i in intervals]
+        except (TypeError, ValueError):
+            pass
+    return _prune(data)
+
+
 def set_file(song):
     """Which set is open: ``{set_name, set_path, project_path?}`` (``Song.name`` and
     ``Song.file_path``), or ``{unsaved: true}`` for a set never saved (Live answers "")."""
@@ -496,6 +518,9 @@ def summarize_clip(clip, detail, ctx):
                                 get(clip, "signature_denominator", 4)),
         "is_arrangement_clip": bool(get(clip, "is_arrangement_clip", False)),
     })
+    scale = scale_of(clip)        # the clip's own scale (Live 12.4.15+)
+    if scale:
+        data["scale"] = scale
     if get(clip, "is_arrangement_clip", False):
         data["start_time"] = _num(get(clip, "start_time"), 4)
         data["end_time"] = _num(get(clip, "end_time"), 4)

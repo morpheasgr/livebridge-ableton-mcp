@@ -159,3 +159,35 @@ def test_production_guide_is_served_and_names_real_tools():
     tools = {t.name for t in asyncio.run(_APP.list_tools())}
     mentioned = set(re.findall(r"`(live_[a-z_]+)", text))
     assert mentioned and mentioned <= tools, sorted(mentioned - tools)
+
+
+def test_clip_scale_set_read_and_used_by_the_theory_tools(tcp_bridge, song):
+    """Live 12.4.15: each clip has its own scale (scale_name/root_note/scale_mode)."""
+    _APP.bridge.switch(host="127.0.0.1", port=tcp_bridge.port, token="")
+    done = call_tool(_APP, "live_clip_set", {"track": "Bass", "slot": 0, "scale_name": "minor",
+                                             "root_note": "A", "scale_mode": True})
+    assert set(done["changed"]) == {"scale_name", "root_note", "scale_mode"}
+    scale = call_tool(_APP, "live_clip_get", {"track": "Bass", "slot": 0})["scale"]
+    assert scale["name"] == "Minor" and scale["root"] == "A" and scale["mode"] is True
+    assert scale["intervals"][:3] == [0, 2, 3]
+    forced = call_tool(_APP, "live_theory_analyze", {"track": "Bass", "slot": 0, "key": "clip"})
+    assert forced["key"]["name"] == "A minor"
+    # The C bassline against its own A minor clip scale (the song says C major): a hint.
+    hinted = call_tool(_APP, "live_theory_analyze", {"track": "Bass", "slot": 0})
+    if not hinted["key"]["name"].startswith("A minor"):
+        assert hinted["clip_scale"] == "A minor"
+    assert call_tool(_APP, "live_clip_set", {"track": "Bass", "slot": 0,
+                                             "scale_name": "Klingon"})["type"] == "bad_args"
+
+
+def test_clip_scale_on_older_live_is_unsupported(tcp_bridge, song, monkeypatch):
+    from LiveBridge import compat
+    _APP.bridge.switch(host="127.0.0.1", port=tcp_bridge.port, token="")
+    real = compat.has
+    monkeypatch.setattr(compat, "has", lambda obj, name: False if name == "scale_name"
+                        and type(obj).__name__ == "Clip" else real(obj, name))
+    answer = call_tool(_APP, "live_clip_set", {"track": "Bass", "slot": 0, "root_note": 2})
+    assert answer["type"] == "unsupported"
+    assert "scale" not in call_tool(_APP, "live_clip_get", {"track": "Bass", "slot": 0})
+    assert call_tool(_APP, "live_theory_analyze",
+                     {"track": "Bass", "slot": 0, "key": "clip"})["type"] == "bad_args"

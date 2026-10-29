@@ -8,8 +8,9 @@ stdlib only, Python 3.11 inside Live) + an MCP server (`mcp_server/livebridge_mc
   the real dumps `docs/LIVE_API_DUMP_12.4.5.md` / `_12.4.15.md` (newest) win when they disagree (§19 lists the corrections, §20 what 12.4.15 changed).
 - Tests: `.venv/bin/python -m pytest -q tests` (uses the fake `Live` package in `tests/live_stub`).
 - Real Live (when running): `.venv/bin/python tests/integration_check.py --scenario beat
-  --scenario arrangement --no-play` (temporary `LB_` tracks, deleted again); `installers/bundle.py`
-  zips the repo for another machine. Dev loop: `tests/live_dev.py sync [--modules X]` copies the
+  --scenario arrangement --no-play` (temporary `LB_` tracks, deleted again); `tests/dump_live_api.py` (Python API) and
+  `tests/dump_m4l_lom.py` (Max for Live's view, through a LiveBridge Engine) write the API dumps
+  in `docs/`; `installers/bundle.py` zips the repo for another machine. Dev loop: `tests/live_dev.py sync [--modules X]` copies the
   handler plus the top-level helpers it imports (`plugin_racks_lib.py`) and data files
   (`plugin_maps/*.json`) and hot-reloads them; `server.py`/`dispatcher.py`/`config.py` changes
   need `tests/live_dev.py restart`.

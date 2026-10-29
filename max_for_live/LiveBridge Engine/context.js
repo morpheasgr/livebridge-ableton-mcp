@@ -18,6 +18,10 @@
 // For the fast automation recording: "call begin_gesture|end_gesture <path...>" and
 // "setvalue <value> <path...>" (the parameter objects are kept between calls); for sampling
 // "getvalues <id> <path|path|...>" answers "values <id> <value per path...>".
+//
+// For the API dump (tests/dump_m4l_lom.py): "lomdump <file>" walks Live's object model as Max
+// sees it (LiveAPI "info": properties, functions, children of each object type, devices per
+// class), writes it as JSON to <file> and answers "lomdumped <object count>".
 
 autowatch = 0;
 inlets = 1;
@@ -224,4 +228,105 @@ function devicename() {
         var name = api.get("name");
         outlet(0, "devicename", name instanceof Array ? name.join(" ") : String(name));
     }
+}
+
+// ---------------------------------------------------------------------------- API dump
+
+var LOM_ROOTS = ["live_app", "live_app view", "live_set", "live_set view", "this_device"];
+var LOM_MAX_OBJECTS = 600;
+var LOM_LIST_ITEMS = 24;        // items of one child list looked at
+var LOM_LIST_REPEATS = 4;       // stop a list after this many already-known types in a row
+
+function lomInfo(api) {
+    var data = { type: api.type, description: "", properties: [], functions: [], children: [] };
+    var lines = String(api.info).split("\n");
+    for (var i = 0; i < lines.length; i++) {
+        var words = lines[i].replace(/^\s+|\s+$/g, "").split(" ");
+        var head = words.shift();
+        if (head === "description") {
+            data.description = words.join(" ");
+        } else if (head === "property") {
+            data.properties.push([words[0], words.slice(1).join(" ")]);
+        } else if (head === "function") {
+            data.functions.push(words[0]);
+        } else if (head === "children" || head === "child") {
+            data.children.push([words[0], words.slice(1).join(" "), head === "children"]);
+        }
+    }
+    return data;
+}
+
+function lomKey(api) {
+    var type = String(api.type);
+    if (/Device$/.test(type) || type === "Device") {
+        var cls = api.get("class_name");
+        return type + ":" + (cls instanceof Array ? cls.join(" ") : String(cls));
+    }
+    return type;
+}
+
+function lomdump() {
+    var file = arrayfromargs(arguments).join(" ");
+    var types = {};
+    var queue = LOM_ROOTS.slice();
+    var looked = 0;
+    while (queue.length && looked < LOM_MAX_OBJECTS) {
+        var path = queue.shift();
+        var api = new LiveAPI(path);
+        looked++;
+        if (!api || api.id == 0) {
+            continue;
+        }
+        var key = lomKey(api);
+        if (types[key]) {
+            continue;
+        }
+        var info = lomInfo(api);
+        info.path = path;
+        types[key] = info;
+        for (var c = 0; c < info.children.length; c++) {
+            var name = info.children[c][0];
+            if (!info.children[c][2]) {
+                queue.push(path + " " + name);
+                continue;
+            }
+            var count = api.getcount(name);
+            var known = 0;
+            for (var n = 0; n < Math.min(count, LOM_LIST_ITEMS); n++) {
+                var item = new LiveAPI(path + " " + name + " " + n);
+                looked++;
+                if (!item || item.id == 0) {
+                    continue;
+                }
+                if (types[lomKey(item)]) {
+                    if (++known >= LOM_LIST_REPEATS && !/devices|chains|drum_pads/.test(name)) {
+                        break;
+                    }
+                    continue;
+                }
+                known = 0;
+                queue.push(path + " " + name + " " + n);
+            }
+        }
+    }
+    var app = new LiveAPI("live_app");
+    var dump = {
+        max_version: typeof max !== "undefined" ? String(max.version) : null,
+        live_version: [app.call("get_major_version"), app.call("get_minor_version"),
+                       app.call("get_bugfix_version")].join("."),
+        objects_looked_at: looked,
+        types: types
+    };
+    var text = JSON.stringify(dump);
+    var out = new File(file, "write", "TEXT");
+    if (!out.isopen) {
+        outlet(0, "lomdumped", -1);
+        return;
+    }
+    out.eof = 0;
+    for (var at = 0; at < text.length; at += 8000) {     // writestring takes limited chunks
+        out.writestring(text.substr(at, 8000));
+    }
+    out.close();
+    outlet(0, "lomdumped", Object.keys(types).length);
 }

@@ -50,7 +50,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.5.2";
+const VERSION = "1.6.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -93,6 +93,7 @@ const state = {
   waiters: new Set(),
   port: null,
   capturing: false,
+  lomDump: null,                      // callback while context.js writes an API dump
   mods: new Map(),                    // slot -> modulation
   resolving: new Map(),               // slot -> callback waiting for context.js
   transport: null,                    // {beat, tempo, playing, at}
@@ -1044,6 +1045,50 @@ function framesNow(seconds) {
   return state.frames.filter((frame) => frame[0] >= from);
 }
 
+// The Live object model as Max for Live sees it: context.js walks it and writes JSON to a
+// file (too big for Max messages); the answer is that file's content plus Max/Node versions.
+const LOM_DUMP_MS = 60000;
+
+function lomDump(reply) {
+  if (!maxApi) {
+    reply({ type: "unsupported", message: "the dump needs the device running in Live" });
+    return;
+  }
+  if (state.lomDump) {
+    reply({ type: "busy", message: "a dump is already running" });
+    return;
+  }
+  const folder = captureDir();
+  const file = path.join(folder, "lom-dump-" + process.pid + ".json");
+  try {
+    fs.mkdirSync(folder, { recursive: true });
+    fs.rmSync(file, { force: true });
+  } catch (error) {
+    reply({ type: "io", message: "cannot prepare " + file + ": " + error.message });
+    return;
+  }
+  const timer = setTimeout(() => {
+    state.lomDump = null;
+    reply({ type: "timeout", message: "context.js did not finish the dump" });
+  }, LOM_DUMP_MS);
+  state.lomDump = (count) => {
+    clearTimeout(timer);
+    state.lomDump = null;
+    let dump;
+    try {
+      dump = JSON.parse(fs.readFileSync(file, "utf8"));
+      fs.rmSync(file, { force: true });
+    } catch (error) {
+      reply({ type: "io", message: "could not read the dump (" + count + "): " + error.message });
+      return;
+    }
+    dump.node_version = process.version;
+    dump.engine_version = VERSION;
+    reply(null, dump);
+  };
+  maxApi.outlet("lomdump", ...file.split(path.sep).join("/").split(" "));
+}
+
 function handle(request, reply) {
   const args = request.args && typeof request.args === "object" ? request.args : {};
   if (request.cmd === "hello") {
@@ -1090,6 +1135,8 @@ function handle(request, reply) {
     follow(args, reply);
   } else if (request.cmd === "unfollow") {
     unfollow(args, reply);
+  } else if (request.cmd === "lom_dump") {
+    lomDump(reply);
   } else {
     reply({ type: "unknown_command", message: "unknown command " + JSON.stringify(request.cmd) });
   }
@@ -1182,6 +1229,7 @@ function start() {
     maxApi.addHandler("resolved", resolved);
     maxApi.addHandler("info", info);
     maxApi.addHandler("values", values);
+    maxApi.addHandler("lomdumped", (count) => state.lomDump && state.lomDump(Number(count)));
   }
   if (maxApi) {
     maxApi.outlet("ready");          // opens the patch's gate: messages may come in now

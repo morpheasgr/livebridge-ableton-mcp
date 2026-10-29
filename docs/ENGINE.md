@@ -81,7 +81,10 @@ together.
   and `capture` (`seconds` ≤ 60, `name`: a plain `.wav` file name
   in the capture folder, `at`: start time in epoch ms, at most 5 s ahead — the MCP server
   gives every device the same `at`). Captures are written by the patch's `sfrecord~`
-  (`open <path>`, `1`, `0`); `LIVEBRIDGE_CAPTURE_DIR` moves the folder.
+  (`open <path>`, `1`, `0`); `LIVEBRIDGE_CAPTURE_DIR` moves the folder. `lom_dump` (1.6.0+, a
+  dev command): `context.js` walks Live's object model as Max sees it (LiveAPI `info` of every
+  object type, devices once per class) and the answer is that walk plus the Max, Node and
+  Engine versions; `tests/dump_m4l_lom.py` writes it to `docs/LIVE_M4L_LOM_<version>.md`.
 - **Host side** (`mcp_server/livebridge_mcp/engine.py`): turns frames into readings. LUFS is
   K-weighted and averaged over the window, excluding frames below -70 LUFS (no relative gate);
   the peak is a sample peak, so values can differ from a mastering meter by a fraction of a dB.
