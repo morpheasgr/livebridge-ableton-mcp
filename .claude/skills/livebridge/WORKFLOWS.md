@@ -639,6 +639,10 @@ mix problems.
    and, with `master="streaming"`, masters (step 4) in one call. Report the `reasons`; on the
    user's own mix run `apply=false` first. A move they dislike: one
    `live_device_set_parameter(device="LiveBridge Channel", parameter=..., value=...)`.
+1b2. **Clashes** (kick and bass, vocal and pad on the same band): `live_mix_unmask(track="Bass",
+   against="Kick")` measures both, picks the band where both are strong, and puts a LiveBridge
+   Unmask (side-chained dynamic EQ) on the bass: it cuts that band only while the kick plays
+   in it (`depth_db` 3-6 is transparent). Dominant part first; one call per pair.
 1c. **Phase** (kick and bass fighting, a thin low end): loop one bar where both play,
    `live_mix_phase(track="Bass")` puts LiveBridge Phase on the bass, tries polarity and an
    all-pass at 40-220 Hz, and keeps the setting that leaves the most low end on the master —

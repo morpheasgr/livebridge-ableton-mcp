@@ -140,6 +140,19 @@ target, bass mono on kick/sub/bass, saturation on a bass or lead with nothing ab
 listens again, then optionally runs `live_mix_balance` and `live_master_auto`. Put one Channel
 per track instead of an Engine (two Engines on a track just measure twice).
 
+## LiveBridge Unmask (Live 12)
+
+`max_for_live/LiveBridge Unmask/`: `plugin~ 1 2 3 4` (channels 3-4 are the device's second
+audio input — Live 12's side-chain for Max devices, a `Live.DeviceIO` in the Python API) ->
+`gen~ lb_unmask` -> `plugout~`. The side-chain is band-passed at Freq/Q and followed (Attack,
+Release); while it is over Threshold the track gets a bell cut at the same Freq/Q, 1 dB per dB
+over, at most Depth — a side-chained dynamic EQ, the idea of Fuser's nodes. The current cut
+shows on the device. `live_routing_route(method="sidechain")` routes the second input of any
+such Max device (as it does a Compressor's side-chain). `live_mix_unmask` measures both parts
+through their Channels/Engines, picks the band where both are strong (`mix.clash_band`), sets
+the threshold 9 dB under the dominant part's band level and its timing by role (kick: 2 ms /
+100 ms), places the device before the track's meter and routes the side-chain.
+
 ## LiveBridge Phase
 
 `max_for_live/LiveBridge Phase/`: `plugin~ -> gen~ lb_phase -> plugout~` (any Max version):

@@ -1161,6 +1161,10 @@ of a type; 930 objects):
   undo-step grouping or `get_data`/`set_data` on Song. It also lists types the dump set did
   not contain (DrumCellDevice, ShifterDevice, TakeLane, TuningSystem — a Song child, read as
   a property only when no tuning is loaded).
+- A Max audio device gets a second audio input (Live 12's side-chain for Max devices) when its
+  `plugin~` declares channels 3-4; the Python API reaches it as `device.audio_inputs[1]` (a
+  `DeviceIO`: `available_routing_types`, writable `routing_type` / `routing_channel`) —
+  `live.routing` on the Max side configures the same Device I/O.
 - Max rules from the Live API overview (https://docs.cycling74.com/userguide/m4l/live_api_overview/):
   no set changes from inside a notification (defer them, `deferlow`), ids are per device and
   not saved (navigate again after loading), `live.thisdevice` before the first API call, and

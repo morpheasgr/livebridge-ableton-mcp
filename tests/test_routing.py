@@ -244,6 +244,20 @@ def test_route_sidechain(bridge, song, ext):
                method="sidechain", device="Reverb")[0] == "unsupported"
 
 
+def test_route_sidechain_into_a_max_device(bridge, song, ext):
+    """A Max device with plugin~ 1 2 3 4: its second audio input is the side-chain."""
+    unmask = ext.add_max_sidechain_device(song.tracks[1])
+    result = ok(bridge, "routing.route", source="Drums", destination="Vocals",
+                method="sidechain", device="LiveBridge Unmask", channel="Post FX")
+    assert result["device"].endswith("devices[%d]" % (len(song.tracks[1].devices) - 1))
+    assert result["routing"]["input"] == {"type": "Drums", "channel": "Post FX",
+                                          **{k: v for k, v in result["routing"]["input"].items()
+                                             if k not in ("type", "channel")}}
+    assert result["sidechain_enabled"] is True and not result.get("notes")
+    assert unmask.audio_inputs[1].routing_type.display_name == "Drums"
+    assert unmask.audio_inputs[0].routing_type.display_name == "No Input"   # main untouched
+
+
 def test_route_sidechain_needs_a_capable_device(bridge, ext):
     kind, message = err(bridge, "routing.route", source="Drums", destination="Vocals",
                         method="sidechain")

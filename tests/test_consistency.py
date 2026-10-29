@@ -84,6 +84,7 @@ TOOL_NAMES = sorted(t.name for t in asyncio.run(_APP.list_tools()))
 #: Arguments for tools that need some (everything else is called with no arguments).
 SAMPLE_ARGS = {
     "live_mix_phase": {"track": "Bass"},
+    "live_mix_unmask": {"track": "Bass", "against": "Drums"},
     "live_arrangement_create_clip": {"track": "Bass", "start": 16},
     "live_arrangement_duplicate_clip": {"time": 32, "track": "Bass", "slot": 0,
                                         "automation": False},

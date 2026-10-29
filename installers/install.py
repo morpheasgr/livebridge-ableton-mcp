@@ -84,6 +84,10 @@ M4L_DEVICES = (
      ("Presets", "Audio Effects", "Max Audio Effect"), "lbchannel.js", "channel_dir",
      "at the end of each track (instead of the Engine there) -- a channel strip from "
      "Ableton's DSP plus the Engine's meters (Max 9); live_mix_auto sets it per part"),
+    ("LiveBridge Unmask", REPO_ROOT / "max_for_live" / "LiveBridge Unmask",
+     ("Presets", "Audio Effects", "Max Audio Effect"), "lb_unmask.gendsp", "unmask_dir",
+     "on the part that gives way -- a side-chained dynamic EQ (Live 12); live_mix_unmask "
+     "loads it, routes the side-chain and sets the band"),
     ("LiveBridge Phase", REPO_ROOT / "max_for_live" / "LiveBridge Phase",
      ("Presets", "Audio Effects", "Max Audio Effect"), "lb_phase.gendsp", "phase_dir",
      "on a bass (or any part) -- polarity, delay and all-pass phase rotation; "
