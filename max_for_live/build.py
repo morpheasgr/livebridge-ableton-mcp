@@ -467,18 +467,34 @@ _MASTER_DSP = (
     # one channel each); the others are stereo.
     ("eql", "abl.device.channeleq~", 1, 1),
     ("eqr", "abl.device.channeleq~", 1, 1),
-    ("compl", "abl.device.compressor~", 1, 1),
-    ("compr", "abl.device.compressor~", 1, 1),
+    # inlet 2 is the compressor's side-chain (its detector): fed the same signal, or it
+    # hears silence and only applies the makeup gain
+    ("compl", "abl.device.compressor~", 2, 1),
+    ("compr", "abl.device.compressor~", 2, 1),
     ("lim", "abl.device.limiter~", 2, 2),
     ("util", "abl.device.utility~", 2, 2),
 )
 
 
+#: Control grid of the generated devices: 3 rows fit Live's device height (169 px) with each
+#: dial's name above and value below it.
+_ROWS, _CELL_W, _CELL_H = 3, 62.0, 52.0
+
+
+def _grid_width(count: int, left: float = 10.0) -> float:
+    """Device width for ``count`` controls starting at ``left``."""
+    return left + _CELL_W * math.ceil(count / _ROWS) + 8.0
+
+
 def _master_param_box(i: int, spec: tuple, prefix: str = "p", left: float = 10.0) -> dict:
     name, kind, low, high, initial, unit = spec[:6]
-    col, row = divmod(i, 4)
-    rect = [left + 56.0 * col, 4.0 + 40.0 * row, 52.0, 36.0]
-    valueof: dict = {"parameter_longname": name, "parameter_shortname": name[:12],
+    col, row = divmod(i, _ROWS)
+    rect = [left + _CELL_W * col, 4.0 + _CELL_H * row, _CELL_W - 4.0, _CELL_H - 4.0]
+    if kind != "dial":                    # buttons and menus: one text line, centred
+        rect = [rect[0], rect[1] + 14.0, rect[2], 20.0]
+    # Live's API names a Max parameter by its SHORT name: keep it whole (a cut "Comp Thresho"
+    # broke every tool that sets "Comp Threshold")
+    valueof: dict = {"parameter_longname": name, "parameter_shortname": name,
                      "parameter_initial_enable": 1, "parameter_initial": [initial]}
     if kind == "toggle":
         maxclass, outlets = "live.text", ["", ""]
@@ -544,6 +560,7 @@ def master_patcher() -> dict:
     # audio: plugin~ -> EQ (L, R) -> compressor -> limiter -> utility -> plugout~
     lines += [_line("obj-plugin", 0, "obj-eql", 0), _line("obj-plugin", 1, "obj-eqr", 0),
               _line("obj-eql", 0, "obj-compl", 0), _line("obj-eqr", 0, "obj-compr", 0),
+              _line("obj-eql", 0, "obj-compl", 1), _line("obj-eqr", 0, "obj-compr", 1),
               _line("obj-compl", 0, "obj-lim", 0), _line("obj-compr", 0, "obj-lim", 1),
               _line("obj-lim", 0, "obj-util", 0), _line("obj-lim", 1, "obj-util", 1)]
     lines += [_line("obj-util", 0, "obj-plugout", 0), _line("obj-util", 1, "obj-plugout", 1)]
@@ -552,7 +569,7 @@ def master_patcher() -> dict:
         "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
         "rect": [80.0, 80.0, 1100.0, 700.0], "openinpresentation": 1,
         "default_fontsize": 10.0, "default_fontface": 0, "default_fontname": "Arial",
-        "gridsize": [15.0, 15.0], "devicewidth": 340.0,
+        "gridsize": [15.0, 15.0], "devicewidth": _grid_width(len(MASTER_PARAMS)),
         "description": "LiveBridge Master: EQ, glue compressor, limiter and width from "
                        "Ableton's own DSP, run by live_master_auto",
         "boxes": boxes, "lines": lines, "dependency_cache": [],
@@ -594,8 +611,10 @@ _CHANNEL_DSP = (
            "@drive 0. @lfoamount 0. @envamount 0. @mix 1.", 2, 2),
     ("eql", "abl.device.channeleq~", 1, 1),
     ("eqr", "abl.device.channeleq~", 1, 1),
-    ("compl", "abl.device.compressor~", 1, 1),
-    ("compr", "abl.device.compressor~", 1, 1),
+    # inlet 2 is the compressor's side-chain (its detector): fed the same signal, or it
+    # hears silence and only applies the makeup gain
+    ("compl", "abl.device.compressor~", 2, 1),
+    ("compr", "abl.device.compressor~", 2, 1),
     ("satl", "abl.dsp.saturator~ @curve 1 @mix 0.", 1, 1),
     ("satr", "abl.dsp.saturator~ @curve 1 @mix 0.", 1, 1),
     ("util", "abl.device.utility~", 2, 2),
@@ -630,12 +649,13 @@ def channel_patcher() -> dict:
         _line("obj-plugin", 0, "obj-hp", 0), _line("obj-plugin", 1, "obj-hp", 1),
         _line("obj-hp", 0, "obj-eql", 0), _line("obj-hp", 1, "obj-eqr", 0),
         _line("obj-eql", 0, "obj-compl", 0), _line("obj-eqr", 0, "obj-compr", 0),
+        _line("obj-eql", 0, "obj-compl", 1), _line("obj-eqr", 0, "obj-compr", 1),
         _line("obj-compl", 0, "obj-satl", 0), _line("obj-compr", 0, "obj-satr", 0),
         _line("obj-satl", 0, "obj-util", 0), _line("obj-satr", 0, "obj-util", 1),
     ]
     _wire_params(CHANNEL_PARAMS, body["boxes"], body["lines"], prefix="c", left=200.0,
                  top=800.0)
-    body["devicewidth"] = 200.0 + 56.0 * math.ceil(len(CHANNEL_PARAMS) / 4) + 8.0
+    body["devicewidth"] = _grid_width(len(CHANNEL_PARAMS), 200.0)
     body["description"] = ("LiveBridge Channel: a channel strip from Ableton's DSP plus the "
                            "Engine's meters, set by live_mix_auto")
     body["dependency_cache"] = [
@@ -720,7 +740,7 @@ def phase_patcher() -> dict:
         "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
         "rect": [80.0, 80.0, 900.0, 500.0], "openinpresentation": 1,
         "default_fontsize": 10.0, "default_fontface": 0, "default_fontname": "Arial",
-        "gridsize": [15.0, 15.0], "devicewidth": 130.0,
+        "gridsize": [15.0, 15.0], "devicewidth": _grid_width(len(PHASE_PARAMS)),
         "description": "LiveBridge Phase: polarity, delay and all-pass phase rotation for "
                        "kick/bass alignment, set by live_mix_phase",
         "boxes": boxes, "lines": lines,
@@ -799,11 +819,11 @@ def unmask_patcher() -> dict:
         _box("obj-snap", "snapshot~ 50", [240.0, 380.0, 90.0, 22.0], 2, 1, ["float"]),
         {"box": {"id": "obj-cut", "maxclass": "flonum", "numinlets": 1, "numoutlets": 2,
                  "outlettype": ["", "bang"], "format": 6, "presentation": 1,
-                 "presentation_rect": [10.0, 128.0, 60.0, 20.0],
+                 "presentation_rect": [_grid_width(len(UNMASK_PARAMS)), 40.0, 56.0, 20.0],
                  "patching_rect": [240.0, 420.0, 60.0, 22.0]}},
         {"box": {"id": "obj-cutlabel", "maxclass": "comment", "text": "cut dB",
                  "numinlets": 1, "numoutlets": 0, "presentation": 1,
-                 "presentation_rect": [72.0, 128.0, 50.0, 20.0],
+                 "presentation_rect": [_grid_width(len(UNMASK_PARAMS)), 20.0, 56.0, 20.0],
                  "patching_rect": [310.0, 420.0, 50.0, 20.0]}},
         {"box": {"id": "obj-title", "maxclass": "comment", "text": "LiveBridge Unmask",
                  "numinlets": 1, "numoutlets": 0, "fontsize": 11.0, "fontface": 1,
@@ -817,7 +837,7 @@ def unmask_patcher() -> dict:
         "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
         "rect": [80.0, 80.0, 900.0, 500.0], "openinpresentation": 1,
         "default_fontsize": 10.0, "default_fontface": 0, "default_fontname": "Arial",
-        "gridsize": [15.0, 15.0], "devicewidth": 130.0,
+        "gridsize": [15.0, 15.0], "devicewidth": _grid_width(len(UNMASK_PARAMS)) + 70.0,
         "description": "LiveBridge Unmask: a side-chained dynamic EQ — cuts this track's band "
                        "only while the side-chain plays it (set by live_mix_unmask)",
         "boxes": boxes, "lines": lines,

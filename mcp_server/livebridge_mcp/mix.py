@@ -578,11 +578,18 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None) -> dict[str, 
         reduce = min(crest - crest_target, 8.0)
         threshold = max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio)))
         values.update({"Comp Threshold": round(threshold, 1), "Comp Ratio": ratio,
-                       "Comp Attack": attack, "Comp Release": release,
-                       "Comp Makeup": round(reduce / 2.0, 1)})
+                       "Comp Attack": attack, "Comp Release": release})
+        # makeup only when the attack catches the peaks: a slow attack lets the transient
+        # through, and makeup would push that peak higher (the faders restore the level)
+        makeup = round(reduce / 2.0, 1) if attack <= 5.0 else 0.0
+        if makeup:
+            values["Comp Makeup"] = makeup
         reasons.append(f"crest {crest:g} dB vs ~{crest_target:g} for a {label}: {ratio:g}:1 "
                        f"from {threshold:.1f} dB (about {reduce:.1f} dB off the peaks), "
-                       f"attack {attack:g} ms, release {release:g} ms")
+                       f"attack {attack:g} ms, release {release:g} ms"
+                       + (f", makeup +{makeup:g} dB" if makeup else
+                          " — no makeup: the attack lets the transient through, the fader "
+                          "restores the level"))
     if mono:
         values["Bass Mono"] = 1.0
         reasons.append("bass mono below 120 Hz: the low end stays centred")
