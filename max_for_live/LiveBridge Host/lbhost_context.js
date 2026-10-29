@@ -233,9 +233,14 @@ function devicename() {
 // ---------------------------------------------------------------------------- API dump
 
 var LOM_ROOTS = ["live_app", "live_app view", "live_set", "live_set view", "this_device"];
-var LOM_MAX_OBJECTS = 600;
-var LOM_LIST_ITEMS = 24;        // items of one child list looked at
-var LOM_LIST_REPEATS = 4;       // stop a list after this many already-known types in a row
+var LOM_MAX_OBJECTS = 6000;
+var LOM_LIST_ITEMS = 64;        // items of one child list looked at
+var LOM_SHORT_LISTS = { clip_slots: 16, arrangement_clips: 8, drum_pads: 16, parameters: 8,
+                        scenes: 8, cue_points: 4 };
+// Containers are walked on every object (each track, chain and clip slot can hold device
+// classes or clips not seen yet); everything else only on the first object of its type.
+var LOM_CONTAINERS = { tracks: 1, return_tracks: 1, devices: 1, chains: 1, return_chains: 1,
+                       clip_slots: 1, arrangement_clips: 1, clip: 1, master_track: 1 };
 
 function lomInfo(api) {
     var data = { type: api.type, description: "", properties: [], functions: [], children: [] };
@@ -268,43 +273,35 @@ function lomKey(api) {
 function lomdump() {
     var file = arrayfromargs(arguments).join(" ");
     var types = {};
+    var seen = {};              // object ids already walked
     var queue = LOM_ROOTS.slice();
     var looked = 0;
     while (queue.length && looked < LOM_MAX_OBJECTS) {
         var path = queue.shift();
         var api = new LiveAPI(path);
         looked++;
-        if (!api || api.id == 0) {
+        if (!api || api.id == 0 || seen[api.id]) {
             continue;
         }
+        seen[api.id] = 1;
         var key = lomKey(api);
-        if (types[key]) {
-            continue;
-        }
+        var first = !types[key];
         var info = lomInfo(api);
-        info.path = path;
-        types[key] = info;
+        if (first) {
+            info.path = path;
+            types[key] = info;
+        }
         for (var c = 0; c < info.children.length; c++) {
             var name = info.children[c][0];
+            if (name === "canonical_parent" || (!first && !LOM_CONTAINERS[name])) {
+                continue;
+            }
             if (!info.children[c][2]) {
                 queue.push(path + " " + name);
                 continue;
             }
-            var count = api.getcount(name);
-            var known = 0;
-            for (var n = 0; n < Math.min(count, LOM_LIST_ITEMS); n++) {
-                var item = new LiveAPI(path + " " + name + " " + n);
-                looked++;
-                if (!item || item.id == 0) {
-                    continue;
-                }
-                if (types[lomKey(item)]) {
-                    if (++known >= LOM_LIST_REPEATS && !/devices|chains|drum_pads/.test(name)) {
-                        break;
-                    }
-                    continue;
-                }
-                known = 0;
+            var count = Math.min(api.getcount(name), LOM_SHORT_LISTS[name] || LOM_LIST_ITEMS);
+            for (var n = 0; n < count; n++) {
                 queue.push(path + " " + name + " " + n);
             }
         }
