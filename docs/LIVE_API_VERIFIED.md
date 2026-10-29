@@ -1119,3 +1119,16 @@ on Operator (`devices.set_state(save_to_compare_slot=true)`); `record.status` re
 MIDI track's input meter as `{level}` only (no left/right); a refused connection beyond
 `max_clients` reads the `"too many clients (max 4)"` line; `system.status` → `bind {bound: true,
 attempts: 1}` after a restart.
+
+## 20. Live 12.4.15 (dump `docs/LIVE_API_DUMP_12.4.15.md`, Windows)
+
+Compared with the 12.4.5 dump: no class, module function or enum was added or removed, and no
+member changed kind or read/write. The only API change:
+
+- **`Clip` has its own scale** (new): `scale_name` (rw), `root_note` (rw, 0..11 = C..B),
+  `scale_mode` (rw) and `scale_intervals` (read-only list of half-steps from the root). Same
+  names and meaning as the `Song` scale properties, per clip.
+
+Not a change: `Song.name` ("the current Live Set's name") and `Song.file_path` were already in
+12.4.5. The browser lists in the runtime section stop after the first 40 children per root, so
+names that differ there (Roar, Saturator… past the cut) are not removals.

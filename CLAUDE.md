@@ -5,7 +5,7 @@ stdlib only, Python 3.11 inside Live) + an MCP server (`mcp_server/livebridge_mc
 
 - Spec: `docs/ARCHITECTURE.md` (components, layout, threading, LOM paths, serialization, tool naming)
   and `docs/PROTOCOL.md` (wire protocol). Follow them exactly. Live API: `docs/LIVE_API_VERIFIED.md`;
-  the real 12.4.5 dump `docs/LIVE_API_DUMP_12.4.5.md` wins when they disagree (§19 lists the corrections).
+  the real dumps `docs/LIVE_API_DUMP_12.4.5.md` / `_12.4.15.md` (newest) win when they disagree (§19 lists the corrections, §20 what 12.4.15 changed).
 - Tests: `.venv/bin/python -m pytest -q tests` (uses the fake `Live` package in `tests/live_stub`).
 - Real Live (when running): `.venv/bin/python tests/integration_check.py --scenario beat
   --scenario arrangement --no-play` (temporary `LB_` tracks, deleted again); `installers/bundle.py`
