@@ -546,3 +546,44 @@ def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkey
 def test_mix_phase_needs_the_device(app, song, mix_set):
     answer = call_tool(app, "live_mix_phase", {"track": "Sub", "seconds": 1})
     assert answer["type"] == "not_found" and "LiveBridge Phase" in answer["error"]
+
+
+
+def test_clash_band():
+    kick = {"spectrum": {"bands_db": {"sub": -3, "bass": -4, "low_mid": -12, "mid": -20}}}
+    bass = {"spectrum": {"bands_db": {"sub": -8, "bass": -2, "low_mid": -6, "mid": -14}}}
+    clash = mix.clash_band(bass, kick)
+    assert clash["band"] == "bass" and clash["hz"] == pytest.approx(84.9, abs=0.1)
+    assert 0.5 <= clash["q"] <= 4
+    hats = {"spectrum": {"bands_db": {"high": -3, "air": -4, "sub": -40}}}
+    assert mix.clash_band(bass, hats) is None
+
+
+def test_mix_unmask_routes_the_side_chain_and_sets_the_band(app, song, mix_set):
+    from live_stub_ext import routing as routing_ext
+    sub = mix_set.track("Sub")
+    unmask = routing_ext.add_max_sidechain_device(sub, params=[
+        {"name": n, "value": v, "min": lo, "max": hi} for n, v, lo, hi in (
+            ("Freq", 80.0, 20.0, 8000.0), ("Q", 1.0, 0.3, 8.0), ("Depth", 6.0, 0.0, 18.0),
+            ("Threshold", -30.0, -60.0, 0.0), ("Attack", 5.0, 0.5, 100.0),
+            ("Release", 120.0, 10.0, 1000.0))])
+    plan = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Kick",
+                                              "apply": False, "seconds": 2})
+    assert plan["applied"] is False and plan["band"]["band"] in ("sub", "bass")
+    assert (plan["attack_ms"], plan["release_ms"]) == (2.0, 100.0)       # a kick: fast
+    done = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Kick",
+                                              "seconds": 2, "depth_db": 4})
+    assert done["applied"] and done["routing"]["input"]["type"] == "Kick"
+    assert unmask.audio_inputs[1].routing_type.display_name == "Kick"
+    p = {q.name: q.value for q in unmask.parameters}
+    assert p["Freq"] == pytest.approx(done["band"]["hz"]) and p["Depth"] == 4.0
+    assert p["Threshold"] == done["threshold_db"] and "after" in done
+    for bad in ({"track": "Sub", "against": "Sub"}, {"track": "Sub", "against": "Kick",
+                                                     "depth_db": 30},
+                {"track": "Sub", "against": "Kick", "frequency": 5}):
+        assert call_tool(app, "live_mix_unmask", bad)["type"] == "bad_args", bad
+
+
+def test_mix_unmask_needs_meters_on_both(app, song, mix_set):
+    answer = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Nowhere"})
+    assert answer["type"] == "not_found" and "Nowhere" in answer["error"]

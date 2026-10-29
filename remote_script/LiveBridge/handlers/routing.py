@@ -140,10 +140,13 @@ def _assign(obj, prop, option, label):
 
 
 def _current(obj, which):
-    kind = compat.safe_getattr(obj, "%s_routing_type" % which)
+    """``{type, channel, ...}`` of ``<which>_routing_*`` (``which`` None: a Device I/O's
+    ``routing_*``)."""
+    prefix = "%s_" % which if which else ""
+    kind = compat.safe_getattr(obj, "%srouting_type" % prefix)
     if kind is None:
         return None
-    channel = compat.safe_getattr(obj, "%s_routing_channel" % which)
+    channel = compat.safe_getattr(obj, "%srouting_channel" % prefix)
     data = {"type": _name(kind), "channel": _name(channel) if channel is not None else None}
     category = compat.safe_getattr(kind, "category")
     if category is not None:
@@ -320,19 +323,35 @@ def _option_for_track(ctx, options, source):
     return None
 
 
+def _sidechain_input(obj):
+    """``(routing object, property prefix)`` of a device's side-chain, or None: a Compressor's
+    ``input_routing_*``, or the second audio input (a Device I/O, ``routing_*``) of a Max
+    device whose ``plugin~`` declares channels 3-4 (Live 12)."""
+    if compat.has(obj, "available_input_routing_types"):
+        return obj, "input_"
+    inputs = list(compat.safe_getattr(obj, "audio_inputs", ()) or ())
+    if len(inputs) >= 2 and compat.has(inputs[1], "available_routing_types"):
+        return inputs[1], ""
+    return None
+
+
 def _sidechain_device(ctx, track, device):
+    """``(device, routing object, prefix)`` of the side-chain to route."""
     if device is not None:
         obj = ctx.device(track, device)
-        if not compat.has(obj, "available_input_routing_types"):
+        found = _sidechain_input(obj)
+        if found is None:
             raise BridgeError("unsupported", "%r has no side-chain routing in the Python API "
-                              "(Live 12.4.5 exposes it on Compressor only)"
+                              "(Compressor, or a Max device with a second audio input)"
                               % compat.safe_getattr(obj, "name", ""))
-        return obj
+        return (obj,) + found
     for obj in compat.safe_getattr(track, "devices", ()) or ():
-        if compat.has(obj, "available_input_routing_types"):
-            return obj
+        found = _sidechain_input(obj)
+        if found is not None:
+            return (obj,) + found
     raise BridgeError("unsupported", "no device on %r exposes side-chain routing to the Python "
-                      "API (Live 12.4.5: Compressor only) — add a Compressor first"
+                      "API (Compressor, or a Max device with a side-chain input such as "
+                      "LiveBridge Unmask) — add one first"
                       % compat.safe_getattr(track, "name", ""))
 
 
@@ -380,7 +399,8 @@ def routing_route(ctx, source, destination, method="input", channel=None, monito
         Live only offers tracks of a compatible kind (MIDI into MIDI tracks,
         audio into audio tracks); otherwise ``not_found`` lists the choices.
         Routing the master into a track uses its "Main"/"Resampling" input.
-        Only Compressor exposes side-chain routing to the Python API.
+        Side-chain routing reaches Live's Compressor and Max devices with a second audio
+        input (``plugin~ 1 2 3 4``, e.g. LiveBridge Unmask) — their input 2 is the side-chain.
     """
     method = str(method or "input").strip().lower()
     if method not in ("input", "output", "sidechain"):
@@ -396,37 +416,41 @@ def routing_route(ctx, source, destination, method="input", channel=None, monito
     if src == dst:
         raise BridgeError("bad_args", "source and destination are the same track")
     notes = []
+    owner = None
     if method == "input":
-        target, prop_prefix, label = dst, "input", compat.safe_getattr(dst, "name", "")
+        target, prop_prefix, label = dst, "input_", compat.safe_getattr(dst, "name", "")
     elif method == "output":
-        target, prop_prefix, label = src, "output", compat.safe_getattr(src, "name", "")
+        target, prop_prefix, label = src, "output_", compat.safe_getattr(src, "name", "")
     else:
-        target = _sidechain_device(ctx, dst, device)
-        prop_prefix, label = "input", compat.safe_getattr(target, "name", "")
-    types_prop = "available_%s_routing_types" % prop_prefix
+        owner, target, prop_prefix = _sidechain_device(ctx, dst, device)
+        label = compat.safe_getattr(owner, "name", "")
+    types_prop = "available_%srouting_types" % prop_prefix
     if not compat.has(target, types_prop):
-        raise BridgeError("invalid_state", "%r has no %s routing" % (label, prop_prefix))
+        raise BridgeError("invalid_state", "%r has no %s routing"
+                          % (label, prop_prefix.rstrip("_") or "side-chain"))
     options = _options(target, types_prop)
     wanted = dst if method == "output" else src
     option = _option_for_track(ctx, options, wanted)
     if option is None:
         raise BridgeError("not_found", "%r does not offer %r as %s routing (choices: %s)"
-                          % (label, compat.safe_getattr(wanted, "name", ""), prop_prefix,
+                          % (label, compat.safe_getattr(wanted, "name", ""),
+                             prop_prefix.rstrip("_") or "side-chain",
                              ", ".join(repr(_name(o)) for o in options)))
-    _assign(target, "%s_routing_type" % prop_prefix, option, str(label))
+    _assign(target, "%srouting_type" % prop_prefix, option, str(label))
     if channel is not None:
-        choice = match_option(_options(target, "available_%s_routing_channels" % prop_prefix),
-                              channel, "%s routing channel" % prop_prefix)
-        _assign(target, "%s_routing_channel" % prop_prefix, choice, str(label))
+        choice = match_option(_options(target, "available_%srouting_channels" % prop_prefix),
+                              channel, "routing channel")
+        _assign(target, "%srouting_channel" % prop_prefix, choice, str(label))
     if monitoring is not None:
         set_monitoring(dst, monitoring)
     result = {"method": method,
               "source": compat.safe_getattr(src, "name"),
               "destination": compat.safe_getattr(dst, "name")}
     if method == "sidechain":
-        enabled = _enable_sidechain(target)
-        result["device"] = ctx.path_of(target)
-        result["routing"] = {"input": _current(target, "input")}
+        max_input = prop_prefix == ""
+        enabled = True if max_input else _enable_sidechain(owner)
+        result["device"] = ctx.path_of(owner)
+        result["routing"] = {"input": _current(target, "input" if not max_input else None)}
         result["sidechain_enabled"] = enabled
         if enabled is None:
             notes.append("could not find the device's side-chain on/off switch — enable "

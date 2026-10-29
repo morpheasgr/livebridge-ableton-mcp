@@ -31,7 +31,7 @@ import re
 from typing import Any, Iterable
 
 __all__ = ["CHANNEL_NEUTRAL", "DESTINATIONS", "GENRES", "ROLE_OFFSETS", "STRIP_ROLES",
-           "band_decisions", "balance_plan", "channel_plan",
+           "band_decisions", "balance_plan", "channel_plan", "clash_band",
            "filter_cutoffs", "genre_balance", "genre_key", "guess_role", "parse_hz",
            "patch_health", "role_from_name", "role_from_sound"]
 
@@ -590,3 +590,34 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None) -> dict[str, 
             values["Width"] = 0.0
             reasons.append("sub fully mono")
     return {"values": values, "reasons": reasons}
+
+
+# ----------------------------------------------------------------------------- clashes
+
+#: (band, low Hz, high Hz) — the Engine's 8 bands.
+BAND_EDGES = (("sub", 20, 60), ("bass", 60, 120), ("low_mid", 120, 250), ("mud", 250, 500),
+              ("mid", 500, 2000), ("presence", 2000, 5000), ("high", 5000, 10000),
+              ("air", 10000, 20000))
+
+
+def clash_band(track: dict[str, Any], against: dict[str, Any], floor_db: float = -15.0
+               ) -> dict[str, Any] | None:
+    """The band where both parts are strong (each within ``floor_db`` of its own total):
+    ``{band, hz (centre), q, track_db, against_db}`` — the louder of the two shares weakest —
+    or None when they share nothing."""
+    a = ((track.get("spectrum") or {}).get("bands_db")) or {}
+    b = ((against.get("spectrum") or {}).get("bands_db")) or {}
+    best = None
+    for name, low, high in BAND_EDGES:
+        if name not in a or name not in b:
+            continue
+        mine, theirs = float(a[name]), float(b[name])
+        if mine < floor_db or theirs < floor_db:
+            continue
+        score = min(mine, theirs)
+        if best is None or score > best[0]:
+            centre = math.sqrt(low * high)
+            best = (score, {"band": name, "hz": round(centre, 1),
+                            "q": round(max(0.5, min(4.0, centre / (high - low))), 2),
+                            "track_db": round(mine, 1), "against_db": round(theirs, 1)})
+    return best[1] if best else None

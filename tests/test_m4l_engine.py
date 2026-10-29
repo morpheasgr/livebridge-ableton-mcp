@@ -269,6 +269,23 @@ def test_phase_device_is_built_and_wired():
     assert code.count("if (stages >") == m4l_build.PHASE_STAGES
 
 
+def test_unmask_device_has_a_side_chain_input():
+    _type, patcher = m4l_build.read_amxd(m4l_build.UNMASK_AMXD.read_bytes())
+    boxes = {b["box"]["id"]: b["box"] for b in patcher["patcher"]["boxes"]}
+    assert boxes["obj-plugin"]["text"] == "plugin~ 1 2 3 4"      # channels 3-4: side-chain
+    lines = [(l["patchline"]["source"], l["patchline"]["destination"])
+             for l in patcher["patcher"]["lines"]]
+    for (source, outlet), (destination, inlet) in lines:
+        assert outlet < boxes[source]["numoutlets"] and inlet < boxes[destination]["numinlets"]
+    assert {(o, i) for (s, o), (d, i) in lines if s == "obj-plugin" and d == "obj-ugen"} == {
+        (n, n) for n in range(4)}
+    names = [b["saved_attribute_attributes"]["valueof"]["parameter_longname"]
+             for b in boxes.values() if b.get("parameter_enable")]
+    assert names == ["Freq", "Q", "Depth", "Threshold", "Attack", "Release"]
+    gen = json.loads(m4l_build.UNMASK_GENDSP.read_text(encoding="utf-8"))["patcher"]
+    assert sum(1 for b in gen["boxes"] if b["box"].get("text", "").startswith("in ")) == 4
+
+
 def test_frame_fields_agree_everywhere():
     js = ENGINE_JS.read_text(encoding="utf-8")
     fields = re.findall(r'"(\w+)"', js[js.index("const FRAME_FIELDS"):js.index("];",

@@ -246,3 +246,78 @@ def add_compressor(track, name="Compressor"):
     ]
     track._devices.append(device)
     return device
+
+
+def add_max_sidechain_device(track, name="LiveBridge Unmask", params=None):
+    """A Max audio effect whose ``plugin~`` declares channels 3-4: ``audio_inputs`` = (main
+    input, side-chain), each a ``Live.DeviceIO.DeviceIO`` with ``available_routing_types`` /
+    ``routing_type`` / channels (the Live 12.4.15 dump)."""
+    import Live
+    from Live import _model
+
+    RoutingType = Live.Track.RoutingType
+    RoutingChannel = Live.Track.RoutingChannel
+    Category = Live.Track.RoutingTypeCategory
+
+    class DeviceIO(_model.LomObject):
+        def __init__(self, host, main):
+            _model.LomObject.__init__(self, host)
+            self._main = main
+            self._type = None
+            self._channel = None
+
+        def _choices(self):
+            device = self._canonical_parent
+            own = device._canonical_parent
+            song = getattr(own, "_canonical_parent", None)
+            tracks = list(song._tracks) + list(song._return_tracks) if song else []
+            result = [RoutingType(t.name, Category.track, t) for t in tracks if t is not own]
+            return tuple(result + [RoutingType("No Input", Category.none)])
+
+        @property
+        def available_routing_types(self):
+            return self._choices()
+
+        @property
+        def available_routing_channels(self):
+            if self._type is None or self._type.display_name == "No Input":
+                return ()
+            return tuple(RoutingChannel(n) for n in ("Pre FX", "Post FX", "Post Mixer"))
+
+        @property
+        def routing_type(self):
+            return self._type or self._choices()[-1]
+
+        @routing_type.setter
+        def routing_type(self, value):
+            if value not in self._choices():
+                raise ValueError("pick one of available_routing_types")
+            self._type = value
+            channels = self.available_routing_channels
+            self._channel = channels[0] if channels else None
+
+        @property
+        def routing_channel(self):
+            return self._channel
+
+        @routing_channel.setter
+        def routing_channel(self, value):
+            if value not in self.available_routing_channels:
+                raise ValueError("pick one of available_routing_channels")
+            self._channel = value
+
+    class MaxDevice(_model.Device):
+        def __init__(self, host):
+            _model.Device.__init__(self, name, "MxDeviceAudioEffect",
+                                   Live.Device.DeviceType.audio_effect, canonical_parent=host)
+            self._inputs = (DeviceIO(self, True), DeviceIO(self, False))
+
+        @property
+        def audio_inputs(self):
+            return self._inputs
+
+    device = MaxDevice(track)
+    for spec in params or ():
+        device._parameters.append(_model.DeviceParameter(canonical_parent=device, **spec))
+    track._devices.append(device)
+    return device

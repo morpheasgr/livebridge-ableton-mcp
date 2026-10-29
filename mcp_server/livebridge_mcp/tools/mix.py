@@ -46,6 +46,11 @@ def _reading(result: Any) -> dict[str, Any]:
 _MASTER_DEVICE = "LiveBridge Master"
 #: The polarity / delay / all-pass device of live_mix_phase (max_for_live/LiveBridge Phase).
 _PHASE_DEVICE = "LiveBridge Phase"
+#: The side-chained dynamic EQ of live_mix_unmask (max_for_live/LiveBridge Unmask).
+_UNMASK_DEVICE = "LiveBridge Unmask"
+#: Side-chain timing by the dominant part's role: (attack ms, release ms).
+_UNMASK_TIMING = {"kick": (2.0, 100.0), "snare": (2.0, 120.0), "drums": (3.0, 120.0),
+                  "perc": (3.0, 100.0), "vocal": (10.0, 250.0), "lead": (10.0, 200.0)}
 
 
 def _chain_devices(kind: str) -> tuple[tuple[str, str], ...]:
@@ -1075,3 +1080,158 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         return {"track": track, "best": best, "baseline_low_db": baseline, "gain_db": gain,
                 "noise_db": round(noise, 2), "applied": bool(keep), "tried": tried,
                 "notes": notes}
+
+
+    # ------------------------------------------------------------------ unmask
+    @mcp.tool()
+    def live_mix_unmask(
+        track: str,
+        against: str,
+        frequency: float | None = None,
+        q: float | None = None,
+        depth_db: float = 6.0,
+        seconds: float = 4.0,
+        apply: bool = True,
+    ) -> Any:
+        """Stop two parts fighting over a band — the way a side-chained dynamic EQ does it: puts
+        a LiveBridge Unmask device on `track` (the part that gives way: the bass against the
+        kick, the pad against the vocal), feeds it `against` as side-chain, and cuts `track`'s
+        clashing band only while `against` plays in it (1 dB per dB over the threshold, at most
+        `depth_db`) — nothing changes between the hits. Without `frequency` it measures both
+        parts and picks the band where both are strong.
+
+        Args:
+            track: the part that gives way.
+            against: the part that wins (its signal drives the cut).
+            frequency, q: the band to cut (default: the measured clash, its centre and width).
+            depth_db: the most it cuts (0..18 dB; 3-6 is transparent, 8+ is an effect).
+            seconds: listening window (2..15) — loop a section where both play.
+            apply: false = measure and report the band only.
+
+        Returns:
+            `{track, against, band:{band, hz, q, track_db, against_db}, threshold_db,
+            depth_db, attack_ms, release_ms, applied, routing?, before:{track_band_db},
+            after?:{track_band_db}, notes}`.
+
+        Gotchas: both tracks need a LiveBridge Channel or Engine (to be measured), the song
+        must play. Needs Live 12 (a Max device's side-chain input). The cut shows on the
+        device ("cut dB"). Run it per pair, the dominant part first (kick > bass, vocal > pad).
+        """
+        cmd = "mix.unmask"
+        if not 0 <= depth_db <= 18:
+            return tool_error("depth_db must be 0..18", cmd=cmd)
+        if not 2 <= seconds <= 15:
+            return tool_error("seconds must be 2..15", cmd=cmd)
+        if frequency is not None and not 20 <= frequency <= 8000:
+            return tool_error("frequency must be 20..8000 Hz", cmd=cmd)
+        if q is not None and not 0.3 <= q <= 8:
+            return tool_error("q must be 0.3..8", cmd=cmd)
+        if track.strip().lower() == against.strip().lower():
+            return tool_error("track and against must be two different tracks", cmd=cmd)
+        try:
+            found = engine.devices()
+        except engine.EngineError as exc:
+            return _engine_failure(exc, cmd)
+        meters = {str(d.get("track") or "").lower(): d for d in found
+                  if d.get("role") == "track"}
+        missing = [n for n in (track, against) if n.strip().lower() not in meters]
+        if missing:
+            return tool_error("no LiveBridge Channel or Engine on " + " and ".join(missing)
+                              + " (it measures the parts). " + _HOW_TO_ADD,
+                              type="not_found", cmd=cmd)
+        if playing() is False:
+            return tool_error("the transport is stopped: loop a section where both parts play",
+                              type="invalid_state", cmd=cmd)
+        pair = [meters[track.strip().lower()], meters[against.strip().lower()]]
+        mine, theirs = listen_all(pair, seconds)
+        for reading in (mine, theirs):
+            if isinstance(reading, engine.EngineError):
+                return _engine_failure(reading, cmd)
+        notes: list[str] = []
+        clash = mix.clash_band(mine, theirs)
+        if frequency is not None:
+            name = next((n for n, lo, hi in mix.BAND_EDGES if lo <= frequency < hi), "air")
+            clash = {"band": name, "hz": float(frequency), "q": float(q or 1.0),
+                     "track_db": ((mine.get("spectrum") or {}).get("bands_db") or {}).get(name),
+                     "against_db": ((theirs.get("spectrum") or {}).get("bands_db")
+                                    or {}).get(name)}
+        elif clash is None:
+            return {"track": track, "against": against, "band": None, "applied": False,
+                    "notes": ["The two parts share no strong band (each within 15 dB of its "
+                              "own total): nothing to unmask. Check levels instead "
+                              "(live_mix_balance)."]}
+        if q is not None:
+            clash["q"] = float(q)
+        loud = (theirs.get("loudness") or {}).get("lufs")
+        band_level = (loud if loud is not None else -20.0) + float(clash["against_db"] or 0.0)
+        threshold = round(max(-60.0, min(0.0, band_level - 9.0)), 1)
+        role = mix.guess_role(against, theirs)["role"]
+        attack, release = _UNMASK_TIMING.get(role or "", (5.0, 150.0))
+        result: dict[str, Any] = {
+            "track": track, "against": against, "band": clash, "threshold_db": threshold,
+            "depth_db": depth_db, "attack_ms": attack, "release_ms": release,
+            "applied": False, "before": {"track_band_db": clash.get("track_db")},
+            "notes": notes}
+        if not apply:
+            return result
+
+        def unmask_index() -> int | None:
+            listing = bridge_call(bridge, "devices.list", {"track": track})
+            for d in (listing.get("devices") or []) if isinstance(listing, dict) else []:
+                if _UNMASK_DEVICE.lower() in str(d.get("name", "")).lower():
+                    return d.get("index")
+            return None
+
+        index = unmask_index()
+        if index is None:
+            loaded = bridge_call(bridge, "browser.load", {
+                "query": _UNMASK_DEVICE, "category": "audio_effect", "track": track},
+                timeout=60.0)
+            if _is_error(loaded):
+                if loaded.get("type") == "not_found":
+                    loaded["error"] += (" — is the LiveBridge Unmask device installed (the "
+                                        "installer puts it in the User Library)?")
+                return loaded
+            end = time.time() + 10.0
+            while index is None and time.time() < end:
+                time.sleep(0.3)
+                index = unmask_index()
+            if index is None:
+                return tool_error("LiveBridge Unmask did not appear on the track",
+                                  type="timeout", cmd=cmd)
+            # in front of the track's meter (Channel / Engine), so the meter hears the cut
+            listing = bridge_call(bridge, "devices.list", {"track": track})
+            meter_at = next((d.get("index") for d in (listing.get("devices") or [])
+                             if "livebridge channel" in str(d.get("name", "")).lower()
+                             or "livebridge engine" in str(d.get("name", "")).lower()), None) \
+                if isinstance(listing, dict) else None
+            if meter_at is not None and meter_at < index:
+                moved = bridge_call(bridge, "devices.move", {"track": track, "device": index,
+                                                             "position": meter_at})
+                if _is_error(moved):
+                    return moved
+                index = unmask_index()
+            notes.append(f"Loaded LiveBridge Unmask on {track}.")
+        answer = bridge_call(bridge, "devices.set_parameters", {
+            "track": track, "device": index, "values": {
+                "Freq": float(clash["hz"]), "Q": float(clash["q"]), "Depth": float(depth_db),
+                "Threshold": threshold, "Attack": attack, "Release": release}})
+        if _is_error(answer):
+            return answer
+        routed = bridge_call(bridge, "routing.route", {
+            "source": against, "destination": track, "method": "sidechain", "device": index})
+        if _is_error(routed):
+            routed["error"] = ("could not feed the side-chain (Live 12 is needed for a Max "
+                               "device's side-chain input): " + str(routed.get("error")))
+            return routed
+        result["routing"] = routed.get("routing")
+        result["applied"] = True
+        time.sleep(_SETTLE_S)
+        after = engine.listen(pair[0], seconds)
+        bands = ((after.get("spectrum") or {}).get("bands_db")) or {}
+        result["after"] = {"track_band_db": bands.get(clash["band"])}
+        if bands.get(clash["band"]) is not None and clash.get("track_db") is not None:
+            notes.append(f"{track}'s {clash['band']} band: {clash['track_db']} -> "
+                         f"{round(bands[clash['band']], 1)} dB of its total (averaged over "
+                         "the window; the cut itself only happens on the hits).")
+        return result
