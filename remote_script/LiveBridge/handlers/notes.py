@@ -28,6 +28,7 @@ import random
 import re
 
 from .. import compat
+from .. import serialize
 from ..registry import BridgeError, command
 from .clips import (as_bool, as_float, as_int, beats_per_bar, clip_region, extend_clip_to,
                     live_call, midi_clip_for_writing, owner_track, resolve_clip, rnd)
@@ -807,8 +808,12 @@ def _timeline_hint(clip, result):
 
 
 def _summary(ctx, clip):
-    return {"clip": ctx.path_of(clip), "name": compat.safe_getattr(clip, "name"),
+    data = {"clip": ctx.path_of(clip), "name": compat.safe_getattr(clip, "name"),
             "length": rnd(compat.safe_getattr(clip, "length", 0.0))}
+    scale = serialize.scale_of(clip)     # the clip's own scale (Live 12.4.15+)
+    if scale:
+        data["scale"] = scale
+    return data
 
 
 # ==========================================================================

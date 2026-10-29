@@ -2031,6 +2031,9 @@ class Clip(LomObject):
         self._end_marker = length
         self._looping = True
         self._muted = False
+        self._scale_name = "Major"      # Live 12.4.15: every clip has its own scale
+        self._root_note = 0
+        self._scale_mode = False
         self._is_playing = False
         self._is_recording = False
         self._is_triggered = False
@@ -2069,7 +2072,17 @@ class Clip(LomObject):
     color = _rw("color", _as_int)
     color_index = _rw("color_index", _as_int, _range_check(0, 69, "color_index"))
     muted = _rw("muted", _as_bool)
+    root_note = _rw("root_note", _as_int, _range_check(0, 11, "root_note"))
+    scale_mode = _rw("scale_mode", _as_bool)
+    scale_name = _rw("scale_name", _as_str)
     view = _ro("view")
+
+    @property
+    def scale_intervals(self):
+        for name, intervals in _SCALES:
+            if name == self._scale_name:
+                return intervals
+        return (0, 2, 4, 5, 7, 9, 11)
     is_midi_clip = property(lambda self: self._is_midi)
     is_audio_clip = property(lambda self: not self._is_midi)
     is_arrangement_clip = property(lambda self: self._is_arrangement)

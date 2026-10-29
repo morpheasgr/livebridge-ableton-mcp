@@ -145,6 +145,10 @@ place: kick, bass, lead/vocal front and centre; pads, FX, backing back and wide.
   scale_name="Minor")`) — then
   `fit_scale`, Roman-numeral chords and `key="song"` all agree. Existing material?
   `live_theory_analyze(clips=[...])` tells you the key, the progression and what clashes.
+  Live 12.4.15+ also gives each clip its own scale: a part in another mode (a borrowed-chord
+  section, a modulation) gets `live_clip_set(scale_name=..., root_note=...)` and is checked
+  with `key="clip"`; `clip_scale` in the analysis flags a clip whose scale disagrees with its
+  notes.
 - Progressions that work (minor keys dominate electronic music): `i VI III VII` (epic/trance/
   pop), `i VII VI VII`, `i iv VI V`, `i VI iv v`, `VI VII i` (uplifting 3-chord), one-chord
   vamps with a moving bass (techno, house). Major: `I V vi IV`, `vi IV I V`, `IV I V vi`,

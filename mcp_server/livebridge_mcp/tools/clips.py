@@ -357,10 +357,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         pitch_fine: float | None = None,
         ram_mode: bool | None = None,
         groove: int | str | None = None,
+        scale_name: str | None = None,
+        root_note: int | str | None = None,
+        scale_mode: bool | None = None,
     ) -> Any:
         """Change any clip properties in one call (one undo step): rename, colour, mute, loop,
-        markers, length, launch behaviour, groove and audio settings. Pass only what should
-        change.
+        markers, length, launch behaviour, groove, the clip's own scale and audio settings.
+        Pass only what should change.
 
         Args:
             track, slot / clip: Which clip (session address, or path / name / "selected").
@@ -389,6 +392,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             groove: A Groove Pool groove (index or name, see live_groove_pool) — the clip plays
                 with that groove's swing/feel ("MPC 16 Swing-62"). Cannot be removed via the
                 API; set the groove's amounts to 0 instead.
+            scale_name, root_note, scale_mode: The clip's own scale (Live 12.4.15+; older Live
+                answers `unsupported`): a Live scale name ("Minor", "Dorian"), the root
+                ("F#", "Bb" or 0..11) and Scale Mode on/off (highlighting, MIDI Tools in
+                degrees). `live_clip_get` shows it as `scale`.
             Audio clips only:
             warping: Warp on/off.  warp_mode: "beats", "tones", "texture", "repitch", "complex",
                 "complex_pro" ("rex" for REX files).
@@ -437,7 +444,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             launch_mode=launch_mode, launch_quantization=launch_quantization, legato=legato,
             velocity_amount=velocity_amount, warping=warping, warp_mode=warp_mode, gain=gain,
             gain_db=gain_db, pitch_coarse=pitch_coarse, pitch_fine=pitch_fine,
-            ram_mode=ram_mode, groove=groove)
+            ram_mode=ram_mode, groove=groove, scale_name=scale_name, root_note=root_note,
+            scale_mode=scale_mode)
         if not changes:
             return tool_error("nothing to change — pass at least one property", cmd=cmd)
         args = address_args(track, slot, clip)

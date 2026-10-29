@@ -1044,7 +1044,8 @@ def clips_set(ctx, track=None, slot=None, clip=None, name=None, color_index=None
               end_marker=None, length=None, position=None, unit="beats", signature=None,
               launch_mode=None, launch_quantization=None, legato=None, velocity_amount=None,
               warping=None, warp_mode=None, gain=None, gain_db=None, pitch_coarse=None,
-              pitch_fine=None, ram_mode=None, groove=None):
+              pitch_fine=None, ram_mode=None, groove=None, scale_name=None, root_note=None,
+              scale_mode=None):
     """Set any number of clip properties in one undo step.
 
     Args:
@@ -1074,6 +1075,8 @@ def clips_set(ctx, track=None, slot=None, clip=None, name=None, color_index=None
         groove: a groove of the set's Groove Pool (index or name, see
             clips.grooves) — the clip then plays with that groove's timing /
             velocity feel (like dragging a groove onto the clip).
+        scale_name, root_note, scale_mode: the clip's own scale (Live 12.4.15+), same values
+            as transport.set ("Minor", "F#" or 0..11, on/off).
         Audio clips only: warping (bool), warp_mode ("beats", "tones",
         "texture", "repitch", "complex", "rex", "complex_pro"), gain (raw
         0..1) or gain_db (dB, e.g. -6), pitch_coarse (-48..48 semitones),
@@ -1114,10 +1117,21 @@ def clips_set(ctx, track=None, slot=None, clip=None, name=None, color_index=None
         live_call("clip." + prop, setattr, obj, prop, value)
         changed.append(prop)
 
+    from . import transport as transport_handlers   # transport -> view -> clips imports
+    scale_args = [v for v in (scale_name, root_note, scale_mode) if v is not None]
+    if scale_args and not compat.has(obj, "scale_name"):
+        raise BridgeError("unsupported", "clips have their own scale from Live 12.4.15; "
+                          "set the song scale with transport.set instead")
     if name is not None:
         put("name", str(name))
     if color_index is not None:
         put("color_index", as_int(color_index, "color_index", 0, 69))
+    if scale_name is not None:
+        put("scale_name", transport_handlers.parse_scale_name(scale_name))
+    if root_note is not None:
+        put("root_note", transport_handlers.parse_root_note(root_note))
+    if scale_mode is not None:
+        put("scale_mode", as_bool(scale_mode, "scale_mode"))
     if color is not None:
         mode, number = resolve.parse_color(color)
         put("color_index" if mode == "index" else "color", number)

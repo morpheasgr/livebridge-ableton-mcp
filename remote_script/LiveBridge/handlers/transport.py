@@ -526,19 +526,7 @@ def position_state(song, is_playing=None, position=None):
 
 
 def scale_state(song):
-    get = compat.safe_getattr
-    root = get(song, "root_note")
-    data = {"name": get(song, "scale_name"), "root_note": root,
-            "mode": get(song, "scale_mode")}
-    if isinstance(root, int) and 0 <= root < 12:
-        data["root"] = _NOTE_NAMES[root]
-    intervals = get(song, "scale_intervals")
-    if intervals is not None:
-        try:
-            data["intervals"] = [int(i) for i in intervals]
-        except (TypeError, ValueError):
-            pass
-    return serialize._prune(data)
+    return serialize.scale_of(song) or {}
 
 
 def transport_state(song):

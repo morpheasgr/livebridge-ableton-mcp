@@ -705,7 +705,7 @@ Bridge: `clips.stop`
 
 #### `live_clip_set`
 
-Change any clip properties in one call (one undo step): rename, colour, mute, loop, markers, length, launch behaviour, groove and audio settings. Pass only what should change.
+Change any clip properties in one call (one undo step): rename, colour, mute, loop, markers, length, launch behaviour, groove, the clip's own scale and audio settings. Pass only what should change.
 
 | Argument | Type | Default |
 |---|---|---|
@@ -737,6 +737,9 @@ Change any clip properties in one call (one undo step): rename, colour, mute, lo
 | `pitch_fine` | float \| null | `null` |
 | `ram_mode` | bool \| null | `null` |
 | `groove` | int \| str \| null | `null` |
+| `scale_name` | str \| null | `null` |
+| `root_note` | int \| str \| null | `null` |
+| `scale_mode` | bool \| null | `null` |
 
 Bridge: `clips.set`
 
@@ -3505,7 +3508,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `clips.list` |  | track=null, detail="minimal", include_arrangement=false, playing_only=false, offset=0, limit=200 | `live_clip_list` | List non-empty clips (session, optionally arrangement) of a track or the whole set |
 | `clips.quantize` | M | track=null, slot=null, clip=null, grid="1/16", amount=1.0 | `live_clip_edit` | Live's own quantize: MIDI notes, or warp markers of audio clips |
 | `clips.reverse` | M | track=null, slot=null, clip=null | `live_clip_edit` | Reverse a clip: MIDI notes are mirrored in the loop; audio where Live allows |
-| `clips.set` | M | track=null, slot=null, clip=null, name=null, color_index=null, color=null, muted=null, looping=null, loop_start=null, loop_end=null, start_marker=null, end_marker=null, length=null, position=null, unit="beats", signature=null, launch_mode=null, launch_quantization=null, legato=null, velocity_amount=null, warping=null, warp_mode=null, gain=null, gain_db=null, pitch_coarse=null, pitch_fine=null, ram_mode=null, groove=null | `live_clip_set` | Change clip properties: name, colour, loop, markers, length, launch, audio |
+| `clips.set` | M | track=null, slot=null, clip=null, name=null, color_index=null, color=null, muted=null, looping=null, loop_start=null, loop_end=null, start_marker=null, end_marker=null, length=null, position=null, unit="beats", signature=null, launch_mode=null, launch_quantization=null, legato=null, velocity_amount=null, warping=null, warp_mode=null, gain=null, gain_db=null, pitch_coarse=null, pitch_fine=null, ram_mode=null, groove=null, scale_name=null, root_note=null, scale_mode=null | `live_clip_set` | Change clip properties: name, colour, loop, markers, length, launch, audio |
 | `clips.stop` |  | track=null, slot=null, clip=null, quantized=true | `live_clip_stop` | Stop a clip, every clip of a track, or every clip in the set |
 | `clips.warp` | M | action="list", track=null, slot=null, clip=null, beat_time=null, sample_time=null, distance=null, to=null | `live_clip_warp` | Warp markers of an audio clip: list, add (pinned or at a sample position), move, remove |
 | `cues.add` | M | time=null, name=null, restore=null, zoom=null | `live_cue_add` | Add a cue point at a time (default: the playhead), optionally named |

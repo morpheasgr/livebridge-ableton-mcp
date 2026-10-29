@@ -5,6 +5,7 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
+- Per-clip scale (Live 12.4.15): `live_clip_set(scale_name=, root_note=, scale_mode=)`, `scale` in `live_clip_get` and the clip summaries, `key="clip"` in `live_theory_analyze` / `live_theory_melody`, and a `clip_scale` hint when a clip's own scale disagrees with its notes. Older Live answers `unsupported`.
 - The open set's name: `live_set_snapshot` reports `set_name`/`set_path` (`Song.name`/`Song.file_path`), or `unsaved: true` for a set never saved.
 - Session memory files notes under the open set's name and finds the project by the set's file on recall (`matched_by: "set"`); notes written before the set was saved say `unsaved_set` and move over with `live_memory_update(project=..., whole_project=true)`.
 - Version bump so `live_status` shows whether the new code runs; `live_status` also reports the MCP server's `pid` and `started` time.
