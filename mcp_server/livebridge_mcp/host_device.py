@@ -152,7 +152,7 @@ def host_patcher(instrument: bool, config: dict[str, Any] | None = None,
                 "presentation_rect": [200.0 + _DIAL_W * col, 4.0 + _DIAL_H * row, 44.0, 48.0],
                 "saved_attribute_attributes": {"valueof": {
                     "parameter_longname": entry["name"],
-                    "parameter_shortname": entry["name"][:12],
+                    "parameter_shortname": entry["name"],     # what Live's API calls it
                     "parameter_type": 0, "parameter_mmin": 0.0, "parameter_mmax": 1.0,
                     "parameter_unitstyle": 1, "parameter_initial_enable": 0}}}})
             boxes.append(_box(send, f"prepend {entry['index']}",

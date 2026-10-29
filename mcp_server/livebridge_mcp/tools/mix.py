@@ -48,6 +48,19 @@ _MASTER_DEVICE = "LiveBridge Master"
 _PHASE_DEVICE = "LiveBridge Phase"
 #: The side-chained dynamic EQ of live_mix_unmask (max_for_live/LiveBridge Unmask).
 _UNMASK_DEVICE = "LiveBridge Unmask"
+#: Frequency controls of the LiveBridge devices: their dials follow a curve, so Live's raw value
+#: is not in Hz — they are set as display text ("300 Hz"), which devices.set_parameters finds.
+_HZ_PARAMS = frozenset({"HP Freq", "Mid Freq", "Bass Mono Freq", "EQ Mid Freq", "Phase Freq",
+                        "Freq"})
+
+
+def _for_live(values: dict[str, Any]) -> dict[str, Any]:
+    """Device values ready for devices.set_parameters: frequencies as "<n> Hz" text."""
+    return {name: (f"{float(value):g} Hz" if name in _HZ_PARAMS and
+                   isinstance(value, (int, float)) else value)
+            for name, value in values.items()}
+
+
 #: Side-chain timing by the dominant part's role: (attack ms, release ms).
 _UNMASK_TIMING = {"kick": (2.0, 100.0), "snare": (2.0, 120.0), "drums": (3.0, 120.0),
                   "perc": (3.0, 100.0), "vocal": (10.0, 250.0), "lead": (10.0, 200.0)}
@@ -670,7 +683,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             elif class_name == _MASTER_DEVICE:
                 ready = bridge_call(bridge, "devices.set_parameters", {
                     "track": "master", "device": find(devices, _MASTER_DEVICE)["index"],
-                    "values": {"EQ Low Cut": "on", "Comp Ratio": 2.0,
+                    "values": {"EQ Low Cut": 1.0, "Comp Ratio": 2.0,
                                "Limit Mode": "True peak"}})
                 if _is_error(ready):
                     manual.append("LiveBridge Master: EQ Low Cut on, Comp Ratio 2, Limit Mode "
@@ -886,7 +899,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         def set_strip(name: str, index: int, values: dict[str, float]) -> Any:
             return bridge_call(bridge, "devices.set_parameters",
-                               {"track": name, "device": index, "values": values})
+                               {"track": name, "device": index, "values": _for_live(values)})
 
         indexes = {name: strip_index(name) for name in names}
         missing = [n for n, i in indexes.items() if i is None]
@@ -1026,7 +1039,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if frequency:
                 values["Phase Freq"] = float(frequency)
             return bridge_call(bridge, "devices.set_parameters",
-                               {"track": track, "device": index, "values": values})
+                               {"track": track, "device": index, "values": _for_live(values)})
 
         def low_db() -> float | None:
             reading = engine.listen(device, seconds, kind="mix")
@@ -1213,9 +1226,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 index = unmask_index()
             notes.append(f"Loaded LiveBridge Unmask on {track}.")
         answer = bridge_call(bridge, "devices.set_parameters", {
-            "track": track, "device": index, "values": {
+            "track": track, "device": index, "values": _for_live({
                 "Freq": float(clash["hz"]), "Q": float(clash["q"]), "Depth": float(depth_db),
-                "Threshold": threshold, "Attack": attack, "Release": release}})
+                "Threshold": threshold, "Attack": attack, "Release": release})})
         if _is_error(answer):
             return answer
         routed = bridge_call(bridge, "routing.route", {

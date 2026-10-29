@@ -479,7 +479,9 @@ def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
     for name in ("Kick", "Sub", "Pad", "Hats"):
         factory.add_device(mix_set.track(name), "LiveBridge Channel", "MxDeviceAudioEffect",
                            params=[{"name": n, "value": v, "min": min(v, -40.0),
-                                    "max": max(v, 1000.0)}
+                                    "max": max(v, 1000.0),
+                                    **({"unit": "Hz", "min": 20.0, "max": 8000.0}
+                                       if "Freq" in n else {})}
                                    for n, v in mix.CHANNEL_NEUTRAL.items()])
     plan = call_tool(app, "live_mix_auto", {"apply": False, "seconds": 3})
     assert plan["applied"] is False and {t["name"] for t in plan["tracks"]} == {
@@ -490,7 +492,7 @@ def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
     assert by_name["Hats"]["role"] == "hats" and by_name["Hats"]["values"]["HP Freq"] == 300.0
     assert by_name["Sub"]["values"]["Bass Mono"] == 1.0 and "after" in by_name["Sub"]
     strip = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
-    assert {p.name: p.value for p in strip.parameters}["HP Freq"] == 300.0
+    assert {p.name: p.value for p in strip.parameters}["HP Freq"] == pytest.approx(300, rel=0.01)
     assert "parts" in result["balance"] or "plan" in result["balance"]
     for bad in ({"seconds": 1}, {"master_chain": "rack"}, {"roles": {"Kick": "tuba"}}):
         assert call_tool(app, "live_mix_auto", bad)["type"] == "bad_args", bad
@@ -532,7 +534,8 @@ def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkey
     assert result["gain_db"] == pytest.approx(3.0, abs=0.3)
     assert len(result["tried"]) == 2 + 2 * 7
     p = {q.name: q.value for q in phase.parameters}
-    assert p["Invert"] == 1 and p["Phase Stages"] == 1 and p["Phase Freq"] == 70.0
+    assert p["Invert"] == 1 and p["Phase Stages"] == 1
+    assert p["Phase Freq"] == pytest.approx(70.0, rel=0.01)
     # nothing to gain: left neutral
     monkeypatch.setattr(mix_set, "master_reading", plain)
     flat = call_tool(app, "live_mix_phase", {"track": "Sub", "seconds": 1,
@@ -564,9 +567,10 @@ def test_mix_unmask_routes_the_side_chain_and_sets_the_band(app, song, mix_set):
     sub = mix_set.track("Sub")
     unmask = routing_ext.add_max_sidechain_device(sub, params=[
         {"name": n, "value": v, "min": lo, "max": hi} for n, v, lo, hi in (
-            ("Freq", 80.0, 20.0, 8000.0), ("Q", 1.0, 0.3, 8.0), ("Depth", 6.0, 0.0, 18.0),
+            ("Q", 1.0, 0.3, 8.0), ("Depth", 6.0, 0.0, 18.0),
             ("Threshold", -30.0, -60.0, 0.0), ("Attack", 5.0, 0.5, 100.0),
-            ("Release", 120.0, 10.0, 1000.0))])
+            ("Release", 120.0, 10.0, 1000.0))] + [
+        {"name": "Freq", "value": 80.0, "min": 20.0, "max": 8000.0, "unit": "Hz"}])
     plan = call_tool(app, "live_mix_unmask", {"track": "Sub", "against": "Kick",
                                               "apply": False, "seconds": 2})
     assert plan["applied"] is False and plan["band"]["band"] in ("sub", "bass")
@@ -576,7 +580,7 @@ def test_mix_unmask_routes_the_side_chain_and_sets_the_band(app, song, mix_set):
     assert done["applied"] and done["routing"]["input"]["type"] == "Kick"
     assert unmask.audio_inputs[1].routing_type.display_name == "Kick"
     p = {q.name: q.value for q in unmask.parameters}
-    assert p["Freq"] == pytest.approx(done["band"]["hz"]) and p["Depth"] == 4.0
+    assert p["Freq"] == pytest.approx(done["band"]["hz"], rel=0.01) and p["Depth"] == 4.0
     assert p["Threshold"] == done["threshold_db"] and "after" in done
     for bad in ({"track": "Sub", "against": "Sub"}, {"track": "Sub", "against": "Kick",
                                                      "depth_db": 30},

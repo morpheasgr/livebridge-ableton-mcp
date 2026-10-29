@@ -286,6 +286,36 @@ def test_unmask_device_has_a_side_chain_input():
     assert sum(1 for b in gen["boxes"] if b["box"].get("text", "").startswith("in ")) == 4
 
 
+def test_generated_devices_keep_full_names_and_fit():
+    """Live's API names a Max parameter by its short name: never cut it. Every control sits
+    inside Live's device height (169 px) and inside the device width."""
+    for path in (m4l_build.MASTER_AMXD, m4l_build.CHANNEL_AMXD, m4l_build.PHASE_AMXD,
+                 m4l_build.UNMASK_AMXD):
+        _type, patcher = m4l_build.read_amxd(path.read_bytes())
+        body = patcher["patcher"]
+        for item in body["boxes"]:
+            box = item["box"]
+            if box.get("parameter_enable") and "saved_attribute_attributes" in box:
+                valueof = box["saved_attribute_attributes"]["valueof"]
+                if "parameter_shortname" in valueof:
+                    assert valueof["parameter_shortname"] == valueof["parameter_longname"], \
+                        (path.name, valueof)
+            if box.get("presentation") and "presentation_rect" in box:
+                x, y, w, h = box["presentation_rect"]
+                assert y + h <= 169 and x + w <= body["devicewidth"] + 1, (path.name, box["id"])
+
+
+def test_compressors_hear_their_own_signal():
+    """abl.device.compressor~'s second inlet is its detector (side-chain): unfed, it never
+    compresses (Live report: threshold/ratio ignored, only the makeup gain worked)."""
+    for path in (m4l_build.MASTER_AMXD, m4l_build.CHANNEL_AMXD):
+        _type, patcher = m4l_build.read_amxd(path.read_bytes())
+        feeds = {(l["patchline"]["destination"][0], l["patchline"]["destination"][1]):
+                 l["patchline"]["source"][0] for l in patcher["patcher"]["lines"]}
+        for comp, eq in (("obj-compl", "obj-eql"), ("obj-compr", "obj-eqr")):
+            assert feeds[(comp, 0)] == eq and feeds[(comp, 1)] == eq, (path.name, comp)
+
+
 def test_frame_fields_agree_everywhere():
     js = ENGINE_JS.read_text(encoding="utf-8")
     fields = re.findall(r'"(\w+)"', js[js.index("const FRAME_FIELDS"):js.index("];",
