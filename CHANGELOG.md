@@ -5,6 +5,8 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
+- Engine 1.7.0: `live_engine_modulate(mode="offset")` modulates through `live.modulate~` — around the parameter's own value like Live's LFO, the knob stays the user's, nothing to restore. The default stays `"replace"` (`live.remote~`).
+- LiveBridge Master (Max 9): Ableton's Channel EQ, Stereo Compressor, Limiter and Utility DSP (`abl.device.*`) in one Max audio effect, every control a Live parameter; `live_master_auto(chain="livebridge")` uses it instead of EQ Eight -> Glue -> Limiter. The installer puts it in the User Library.
 - Engine 1.6.2: the fast automation pass no longer calls `begin_gesture`/`end_gesture`, which Max's LiveAPI does not have (each call was an error in the Max window). `docs/LIVE_M4L_LOM_12.4.15.md` and `LIVE_API_VERIFIED.md` §21: what Max for Live reaches compared with the Remote Script.
 - Max for Live API dump: Engine 1.6.1 answers `lom_dump` (members merged across every object of a type: LiveAPI lists only what each object has) (its `context.js` walks Live's object model through LiveAPI `info`); `tests/dump_m4l_lom.py` writes `docs/LIVE_M4L_LOM_<version>.md` with, per type, what the Python API has that Max cannot reach and the reverse.
 - Per-clip scale (Live 12.4.15): `live_clip_set(scale_name=, root_note=, scale_mode=)`, `scale` in `live_clip_get` and the clip summaries, `key="clip"` in `live_theory_analyze` / `live_theory_melody`, and a `clip_scale` hint when a clip's own scale disagrees with its notes. Older Live answers `unsupported`.

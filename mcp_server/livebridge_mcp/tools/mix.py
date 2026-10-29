@@ -42,6 +42,17 @@ def _reading(result: Any) -> dict[str, Any]:
             "crest_db": loud.get("crest_db")}
 
 
+#: The Max device of chain="livebridge" (max_for_live/LiveBridge Master).
+_MASTER_DEVICE = "LiveBridge Master"
+
+
+def _chain_devices(kind: str) -> tuple[tuple[str, str], ...]:
+    """(device name, class name or _MASTER_DEVICE) of a master chain, in order."""
+    if kind == "livebridge":
+        return ((_MASTER_DEVICE, _MASTER_DEVICE),)
+    return (("EQ Eight", "Eq8"), ("Glue Compressor", "GlueCompressor"), ("Limiter", "Limiter"))
+
+
 def register(mcp: Any, bridge: BridgeClient) -> None:
     """Register the mix tools on the MCP app."""
 
@@ -428,9 +439,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         loud_bar: float | None = None,
         quiet_bar: float | None = None,
         max_gain_db: float = 18.0,
+        chain: str = "native",
     ) -> Any:
         """Master the song to a loudness target by measurement: uses (or builds) EQ Eight ->
-        Glue Compressor -> Limiter on the master, ahead of the LiveBridge Engine, sets the
+        Glue Compressor -> Limiter (or the LiveBridge Master device, `chain="livebridge"`) on
+        the master, ahead of the LiveBridge Engine, sets the
         limiter ceiling, then raises the limiter gain step by step, measuring integrated LUFS,
         peak and crest factor on the master each time, until the target is reached. Stops early
         when the punch collapses (crest factor below the destination's minimum) and, with
@@ -450,6 +463,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 tool plays each before and after, and backs the limiter off when their
                 difference shrinks by more than 2 LU.
             max_gain_db: the most limiter gain it may use (0..24).
+            chain: "native" (EQ Eight, Glue Compressor, Limiter) or "livebridge": one
+                LiveBridge Master device (Ableton's Channel EQ, Compressor, Limiter and Utility
+                DSP in a single Max device, Max 9 / Live 12.2+: EQ Low Cut, Comp Ratio/Attack,
+                Limit Gain/Ceiling/Mode, Width, Bass Mono... all Live parameters).
 
         Returns:
             `{destination, target_lufs, ceiling_db, applied, chain, inserted, before:{lufs,
@@ -488,6 +505,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("seconds must be 3..20", cmd=cmd)
         if not 0 <= max_gain_db <= 24:
             return tool_error("max_gain_db must be 0..24", cmd=cmd)
+        if chain not in ("native", "livebridge"):
+            return tool_error("chain must be 'native' or 'livebridge'", cmd=cmd)
+        chain_kind = chain
         if (loud_bar is None) != (quiet_bar is None):
             return tool_error("pass both loud_bar and quiet_bar (or neither)", cmd=cmd)
         for bar in (loud_bar, quiet_bar):
@@ -537,7 +557,30 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 not _is_error(listing) else []
 
         def find(devices: list[dict[str, Any]], class_name: str) -> dict[str, Any] | None:
+            if class_name == _MASTER_DEVICE:
+                return next((d for d in devices
+                             if _MASTER_DEVICE.lower() in str(d.get("name", "")).lower()), None)
             return next((d for d in devices if d.get("class_name") == class_name), None)
+
+        def load_master_device(at: int) -> Any:
+            """LiveBridge Master from the User Library onto the master, moved to ``at``."""
+            loaded = bridge_call(bridge, "browser.load", {
+                "query": _MASTER_DEVICE, "category": "audio_effect", "track": "master"},
+                timeout=60.0)
+            if _is_error(loaded):
+                if loaded.get("type") == "not_found":
+                    loaded["error"] += (" — is the LiveBridge Master device installed (the "
+                                        "installer puts it in the User Library) and Max for "
+                                        "Live (Max 9) available?")
+                return loaded
+            if at >= 0:
+                placed = find(chain(), _MASTER_DEVICE)
+                if placed is not None and placed.get("index") != at:
+                    moved = bridge_call(bridge, "devices.move", {
+                        "track": "master", "device": placed["index"], "position": at})
+                    if _is_error(moved):
+                        return moved
+            return loaded
 
         try:
             before_contrast = contrast()
@@ -548,7 +591,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("the master is silent in this window: play the loudest section",
                               type="invalid_state", cmd=cmd)
         devices = chain()
-        limiter = find(devices, "Limiter")
+        limiter = find(devices, "Limiter" if chain_kind == "native" else _MASTER_DEVICE)
         foreign = [d for d in devices if d.get("type") == "audio_effect" and
                    d.get("class_name") in ("PluginDevice", "AuPluginDevice") and
                    _PLUGIN_LIMITER_RE.search(str(d.get("name")))]
@@ -557,6 +600,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                   "chain": [d.get("name") for d in devices], "inserted": [],
                                   "before": _reading(before), "notes": notes,
                                   "manual": manual}
+        if chain_kind == "livebridge" and limiter is None and find(devices, "Limiter"):
+            return tool_error("the master already has Live's Limiter: use chain='native' (or "
+                              "remove it) — two limiters would fight", type="invalid_state",
+                              cmd=cmd)
         if foreign and limiter is None:
             notes.append(f"The master already has a plug-in limiter ({foreign[0]['name']}): "
                          "no second limiter added. Raise its gain until the master reads "
@@ -567,9 +614,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if not apply:
             result["needed_gain_db"] = round(target - lufs_now, 1) if lufs_now is not None \
                 else None
-            missing = [n for n, c in (("EQ Eight", "Eq8"), ("Glue Compressor",
-                                                            "GlueCompressor"),
-                                      ("Limiter", "Limiter")) if not find(devices, c)]
+            missing = [n for n, c in _chain_devices(chain_kind) if not find(devices, c)]
             if missing:
                 notes.append("Would insert " + ", ".join(missing) + " before the Engine.")
             return result
@@ -580,15 +625,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if engine_at is not None and engine_at != len(devices) - 1:
             notes.append("The Engine is not last on the master: it measures before the "
                          "devices after it.")
-        for name, class_name in (("EQ Eight", "Eq8"), ("Glue Compressor", "GlueCompressor"),
-                                 ("Limiter", "Limiter")):
+        for name, class_name in _chain_devices(chain_kind):
             if find(devices, class_name):
                 continue
-            if class_name != "Limiter" and limiter is not None:
+            if class_name not in ("Limiter", _MASTER_DEVICE) and limiter is not None:
                 continue                      # the user's own chain: keep it as it is
             at = engine_at if engine_at is not None else -1
-            added = bridge_call(bridge, "devices.insert", {"name": name, "track": "master",
-                                                           "index": at})
+            if class_name == _MASTER_DEVICE:
+                added = load_master_device(at)
+            else:
+                added = bridge_call(bridge, "devices.insert", {"name": name, "track": "master",
+                                                               "index": at})
             if _is_error(added):
                 return added
             result["inserted"].append(name)
@@ -613,12 +660,25 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 manual.append("Glue Compressor: lower Threshold until it shows 1-3 dB of gain "
                               "reduction on the loudest section (the meter is not readable "
                               "through Live's API).")
+            elif class_name == _MASTER_DEVICE:
+                ready = bridge_call(bridge, "devices.set_parameters", {
+                    "track": "master", "device": find(devices, _MASTER_DEVICE)["index"],
+                    "values": {"EQ Low Cut": "on", "Comp Ratio": 2.0,
+                               "Comp Auto Release": "on", "Limit Mode": "True peak"}})
+                if _is_error(ready):
+                    manual.append("LiveBridge Master: EQ Low Cut on, Comp Ratio 2, Limit Mode "
+                                  f"True peak (not set: {ready.get('error')}).")
+                manual.append("LiveBridge Master: lower Comp Threshold until the loudest "
+                              "section shows 1-3 dB of gain reduction (open the device; the "
+                              "meter is not readable through Live's API).")
         result["chain"] = [d.get("name") for d in devices]
-        limiter = find(devices, "Limiter")
+        limiter = find(devices, "Limiter" if chain_kind == "native" else _MASTER_DEVICE)
         if limiter is None:
-            return tool_error("no Limiter on the master after inserting it", type="internal",
+            return tool_error("no limiter on the master after inserting it", type="internal",
                               cmd=cmd)
         index = limiter["index"]
+        gain_name, ceiling_name = ("Gain", "Ceiling") if chain_kind == "native" else (
+            "Limit Gain", "Limit Ceiling")
 
         def set_limiter(values: dict[str, str]) -> Any:
             return bridge_call(bridge, "devices.set_parameters",
@@ -626,14 +686,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         def limiter_gain() -> float:
             got = bridge_call(bridge, "devices.get_parameter",
-                              {"track": "master", "device": index, "parameter": "Gain"})
+                              {"track": "master", "device": index, "parameter": gain_name})
             if isinstance(got, dict) and not _is_error(got):
                 parsed = re.match(r"^\s*(-?\d+(?:\.\d+)?)", str(got.get("display", "")))
                 if parsed:
                     return float(parsed.group(1))
             return 0.0
 
-        answer = set_limiter({"Ceiling": f"{ceil} dB"})
+        answer = set_limiter({ceiling_name: f"{ceil} dB"})
         if _is_error(answer):
             return answer
         result["applied"] = True
@@ -682,7 +742,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                            "already louder than the target with the limiter at 0 dB gain: "
                            "turn the mix down")
                 break
-            answer = set_limiter({"Gain": f"{new_gain:.1f} dB"})
+            answer = set_limiter({gain_name: f"{new_gain:.1f} dB"})
             if _is_error(answer):
                 return answer
             gain = new_gain
@@ -698,7 +758,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if reading["crest_db"] is not None and reading["crest_db"] < min_crest and (
                     start_crest is None or reading["crest_db"] < start_crest - 1.5):
                 back = max(0.0, gain - 1.5)
-                set_limiter({"Gain": f"{back:.1f} dB"})
+                set_limiter({gain_name: f"{back:.1f} dB"})
                 gain = back
                 stopped = (f"crest factor fell to {reading['crest_db']} dB (below "
                            f"{min_crest:g} for {dest}): the limiter was backed off 1.5 dB — "
@@ -717,7 +777,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if after_contrast is not None and after_contrast < before_contrast - 2.0:
                 shrink = before_contrast - after_contrast
                 back = max(0.0, gain - shrink)
-                set_limiter({"Gain": f"{back:.1f} dB"})
+                set_limiter({gain_name: f"{back:.1f} dB"})
                 result["limiter_gain_db"] = round(back, 1)
                 notes.append(f"The drop and the quiet section moved {shrink:.1f} LU closer: the "
                              f"limiter was backed off to {back:.1f} dB so the drop still "

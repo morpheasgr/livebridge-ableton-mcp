@@ -213,7 +213,9 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     song (also "1/8d", "1/16t", "0.5 Hz"; shapes triangle, saw, square, random,
     smooth_random, steps=[...]); nothing is written and `live_engine_unmodulate` puts the
     value back. Use it to audition movement; when the user likes it, write it as automation
-    (`live_automation_*`) — modulations are not saved with the set.
+    (`live_automation_*`) — modulations are not saved with the set. `mode="offset"` (Engine
+    1.7+) swings around the knob like Live's own LFO and leaves the knob to the user (they can
+    keep turning it while it moves); the default `"replace"` takes the knob over.
   - *What the user turns in a hosted plug-in* (LiveBridge Host): every round is
     reset → user tweaks → read. 1) `live_plugin_host_parameters(touched="reset")` **before**
     asking them to tweak — the log otherwise still holds earlier rounds and restore bursts
@@ -227,7 +229,8 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role
     levels by measurement (kick on top ...) and says whether each band problem is a master or a
     track fix; `live_master_auto(destination="streaming"|"club"|...)` drives EQ Eight -> Glue ->
-    Limiter to the loudness target and stops before the punch collapses. `WORKFLOWS.md`
+    Limiter (or one LiveBridge Master device: `chain="livebridge"`, Max 9) to the loudness
+    target and stops before the punch collapses. `WORKFLOWS.md`
     §19-20. On the user's own mix, run `apply=false` first and show the plan.
   - *Follow actions / generative playback*: Live's API has none, the Engine plays them:
     `live_engine_follow(target="Drums", every="2 bars", actions={"next": 3, "other": 1},

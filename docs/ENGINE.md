@@ -101,6 +101,13 @@ together.
   once kept the LFO's last value) and then writes the saved value through the LiveAPI as well
   — that last write is one undo step. Modulations live in the device's
   Node process: they end with the device and are not saved with the set.
+- **Offset modulation** (`mode="offset"`, Engine 1.7): each slot also has a `line~` into a
+  `live.modulate~`, which adds -1..1 (1 = the parameter's whole range) to whatever value the
+  parameter has instead of taking it over — Live's own LFO behaviour. The shape swings
+  `depth/2` to each side; the user can keep moving the knob. Stopping glides the offset to 0
+  and lets go: nothing to restore, no undo step. Messages: `mod <slot> offset <v> [ms]` and
+  `mod <slot> oid <id>` (`value`/`id` stay `live.remote~`'s). An older Engine ignores `mode`,
+  so the MCP server only sends it to 1.7+.
 
 - **Follow actions**: Live 12.4.5's API has no follow-action properties, so the device plays
   them. On the same 20 ms tick, each rule watches the song position; a quarter beat (at most
@@ -112,6 +119,19 @@ together.
 
 The Remote Script is not involved, so a busy Live main thread never delays the device and the
 device never touches the set.
+
+## LiveBridge Master (Max 9)
+
+`max_for_live/LiveBridge Master/LiveBridge Master.amxd`, built by `build.py` like the others:
+Ableton's own device DSP as Max objects (the Ableton DSP package, `abl.device.*`) in one
+audio effect — Channel EQ (once per side) -> Stereo Compressor (RMS) -> Limiter -> Utility.
+Every control is a Live parameter (`MASTER_PARAMS` in `build.py`): EQ Low Cut, EQ
+Low/Mid/Mid Freq/High, Comp Threshold/Ratio/Attack/Release/Auto Release/Knee/Makeup/Mix, Limit
+Gain/Ceiling/Mode/Lookahead/Auto Release, Width, Bass Mono, Bass Mono Freq, Output — so
+`live_device_*`, automation and `live_master_auto(chain="livebridge")` drive it like any
+device. The reference pages document these objects' parameters but not their inlets and
+outlets; the patch assumes stereo in/out on the left inlets/outlets (Channel EQ is wired
+once per side, which works whether it is mono or stereo).
 
 ## Max facts the devices rely on
 
