@@ -1292,6 +1292,7 @@ Move a parameter continuously while the song plays — a tempo-synced LFO or ste
 | `phase` | float | `0.0` |
 | `steps` | list[float] \| null | `null` |
 | `seed` | int \| null | `null` |
+| `mode` | str | `"replace"` |
 
 Bridge: `devices.get_parameter`
 
@@ -1598,7 +1599,7 @@ Bridge: `mixer.get`, `mixer.set_many`, `transport.get`
 
 #### `live_master_auto`
 
-Master the song to a loudness target by measurement: uses (or builds) EQ Eight -> Glue Compressor -> Limiter on the master, ahead of the LiveBridge Engine, sets the limiter ceiling, then raises the limiter gain step by step, measuring integrated LUFS, peak and crest factor on the master each time, until the target is reached. Stops early when the punch collapses (crest factor below the destination's minimum) and, with `loud_bar`/`quiet_bar`, when the drop and the breakdown are being squashed together. Never stacks a second limiter on a chain that already has one from a plug-in.
+Master the song to a loudness target by measurement: uses (or builds) EQ Eight -> Glue Compressor -> Limiter (or the LiveBridge Master device, `chain="livebridge"`) on the master, ahead of the LiveBridge Engine, sets the limiter ceiling, then raises the limiter gain step by step, measuring integrated LUFS, peak and crest factor on the master each time, until the target is reached. Stops early when the punch collapses (crest factor below the destination's minimum) and, with `loud_bar`/`quiet_bar`, when the drop and the breakdown are being squashed together. Never stacks a second limiter on a chain that already has one from a plug-in.
 
 | Argument | Type | Default |
 |---|---|---|
@@ -1611,8 +1612,9 @@ Master the song to a loudness target by measurement: uses (or builds) EQ Eight -
 | `loud_bar` | float \| null | `null` |
 | `quiet_bar` | float \| null | `null` |
 | `max_gain_db` | float | `18.0` |
+| `chain` | str | `"native"` |
 
-Bridge: `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `browser.load`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `transport.get`, `transport.play`, `transport.stop`
 
 <a id="module-mixer"></a>
 
@@ -3492,7 +3494,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `browser.browse` |  | path=null, uri=null, name=null, offset=0, limit=100, filter=null, kind=null, detail="summary" | `live_browser_browse` | List a browser folder's children by path, uri or name (paged) |
 | `browser.cache` |  | action="info" | `live_browser_search` (refresh=true) | Browser search cache: info or clear |
 | `browser.hotswap` |  | action="info", track=null, device=null, drum_pad=null | `live_browser_hotswap` | Hot-swap target: info, set (device / drum pad) or clear |
-| `browser.load` | M | uri=null, path=null, query=null, root=null, category=null, track=null, slot=null, new_track=null, track_name=null, position="end", hotswap=false, device=null, drum_pad=null, plugin_format=null, max_seconds=10.0 | `live_browser_hotswap`, `live_browser_load`, `live_plugin_host_bank`, `live_plugin_host_load`, `live_preset_load` | Load a browser item (by uri, path or search) onto a track; reports what changed |
+| `browser.load` | M | uri=null, path=null, query=null, root=null, category=null, track=null, slot=null, new_track=null, track_name=null, position="end", hotswap=false, device=null, drum_pad=null, plugin_format=null, max_seconds=10.0 | `live_browser_hotswap`, `live_browser_load`, `live_master_auto`, `live_plugin_host_bank`, `live_plugin_host_load`, `live_preset_load` | Load a browser item (by uri, path or search) onto a track; reports what changed |
 | `browser.preview` |  | uri=null, path=null, query=null, root=null, category=null, stop=false | `live_browser_preview` | Preview (audition) a browser item, or stop the preview |
 | `browser.roots` |  | counts=true | `live_browser_roots`, `live_splice_setup_info` | Browser roots with item counts, extra roots, Splice and hot-swap info |
 | `browser.search` |  | query, root=null, category=null, limit=20, offset=0, loadable_only=false, plugin_format=null, max_depth=12, max_visits=40000, max_seconds=10.0, refresh=false, detail="summary" | `live_browser_search` | Search the browser (cached bounded walk) by words, root, category |
@@ -3530,7 +3532,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `devices.insert` | M | name, track=null, chain=null, index=-1, select=false | `live_audio_align`, `live_device_insert`, `live_master_auto` | Insert a Live device by name (native via insert_device, Max devices via the browser) |
 | `devices.list` |  | track=null, tree=false, detail="minimal", max_depth=4 | `live_device_list`, `live_master_auto`, `live_plugin_host_bank`, `live_plugin_host_expose`, `live_theory_analyze` | List the devices of a track (flat, or as a tree through racks) |
 | `devices.modulation` | M | op="get", track=null, device=null, target=null, source=null, amount=null, parameter=null | `live_device_modulation` | Wavetable modulation matrix: read, set an amount, add a parameter as target |
-| `devices.move` | M | track=null, device=null, target_track=null, target_chain=null, position=-1 | `live_device_move` | Move a device to another position/track/chain |
+| `devices.move` | M | track=null, device=null, target_track=null, target_chain=null, position=-1 | `live_device_move`, `live_master_auto` | Move a device to another position/track/chain |
 | `devices.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, only_changed=false, detail="summary" | `live_audio_align`, `live_device_parameters`, `live_sound_check`, `live_sound_load`, `live_sound_save` | List a device's parameters (paged, filterable, with display values) |
 | `devices.properties` |  | track=null, device=null, include_lists=false | `live_device_properties` | Class-specific device properties (Wavetable, Drift, Hybrid Reverb, Looper ...) |
 | `devices.randomize` | M | track=null, device=null, parameters=null, seed=null, amount=1.0, include_quantized=true | `live_device_randomize` | Randomize device parameters (optional seed) |

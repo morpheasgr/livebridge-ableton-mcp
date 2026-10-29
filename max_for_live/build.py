@@ -45,6 +45,8 @@ HOST_DIR = HERE / "LiveBridge Host"
 HOST_EFFECT_AMXD = HOST_DIR / "LiveBridge Host Effect.amxd"
 HOST_INSTRUMENT_AMXD = HOST_DIR / "LiveBridge Host Instrument.amxd"
 HOST_CONTEXT = HOST_DIR / "lbhost_context.js"
+MASTER_DIR = HERE / "LiveBridge Master"
+MASTER_AMXD = MASTER_DIR / "LiveBridge Master.amxd"
 
 AUDIO_EFFECT = 0x61616161          # 'aaaa'
 MIDI_EFFECT = 0x6D6D6D6D           # 'mmmm'
@@ -311,17 +313,27 @@ def engine_patcher() -> dict:
     ]
     for i in range(MOD_SLOTS):
         x = 700.0 + 110.0 * i
+        # "value"/"id" drive live.remote~ (replace mode: takes the parameter over),
+        # "offset"/"oid" drive live.modulate~ (offset mode: -1..1 around the user's value)
         boxes += [
-            _box(f"obj-modroute{i}", "route value id", [x, 420.0, 90.0, 22.0], 1, 3),
+            _box(f"obj-modroute{i}", "route value id offset oid", [x, 420.0, 100.0, 22.0], 1,
+                 5),
             _box(f"obj-line{i}", "line~", [x, 460.0, 40.0, 22.0], 2, 2, ["signal", "bang"]),
             _box(f"obj-modid{i}", "prepend id", [x + 45.0, 460.0, 60.0, 22.0], 1, 1),
             _box(f"obj-remote{i}", "live.remote~", [x, 500.0, 80.0, 22.0], 2, 0),
+            _box(f"obj-oline{i}", "line~", [x, 540.0, 40.0, 22.0], 2, 2, ["signal", "bang"]),
+            _box(f"obj-oid{i}", "prepend id", [x + 45.0, 540.0, 60.0, 22.0], 1, 1),
+            _box(f"obj-modulate{i}", "live.modulate~", [x, 580.0, 90.0, 22.0], 2, 1),
         ]
         lines += [_line("obj-modslot", i, f"obj-modroute{i}", 0),
                   _line(f"obj-modroute{i}", 0, f"obj-line{i}", 0),
                   _line(f"obj-line{i}", 0, f"obj-remote{i}", 0),
                   _line(f"obj-modroute{i}", 1, f"obj-modid{i}", 0),
-                  _line(f"obj-modid{i}", 0, f"obj-remote{i}", 1)]
+                  _line(f"obj-modid{i}", 0, f"obj-remote{i}", 1),
+                  _line(f"obj-modroute{i}", 2, f"obj-oline{i}", 0),
+                  _line(f"obj-oline{i}", 0, f"obj-modulate{i}", 0),
+                  _line(f"obj-modroute{i}", 3, f"obj-oid{i}", 0),
+                  _line(f"obj-oid{i}", 0, f"obj-modulate{i}", 1)]
     # metro -> trigger fires right to left: every snapshot~ reports into the pack, the
     # leftmost (pack's hot inlet) last, so one complete frame leaves per tick
     for i in range(n):
@@ -405,6 +417,134 @@ def midi_patcher() -> dict:
     }}
 
 
+# ----------------------------------------------------------------------------- LiveBridge Master
+
+#: Live parameter styles (parameter_unitstyle).
+_UNIT = {"float": 1, "ms": 2, "hz": 3, "db": 4, "pct": 5}
+#: The mastering chain's parameters: (name, kind, min, max, initial, unit or menu items,
+#: target objects, Max message, scale). Ableton's own DSP (abl.device.*) does the work; each
+#: dial is a Live parameter, so LiveBridge (and automation) set it like any device's.
+MASTER_PARAMS = (
+    ("EQ Low Cut", "toggle", 0, 1, 1, None, ("eql", "eqr"), "highpass", 1.0),
+    ("EQ Low", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "lowgain", 1.0),
+    ("EQ Mid", "dial", -12.0, 12.0, 0.0, "db", ("eql", "eqr"), "midgain", 1.0),
+    ("EQ Mid Freq", "dial", 120.0, 7500.0, 1000.0, "hz", ("eql", "eqr"), "midfreq", 1.0),
+    ("EQ High", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "highgain", 1.0),
+    ("Comp Threshold", "dial", -40.0, 0.0, 0.0, "db", ("comp",), "threshold", 1.0),
+    ("Comp Ratio", "dial", 1.0, 10.0, 2.0, "float", ("comp",), "compression", 1.0),
+    ("Comp Attack", "dial", 0.1, 100.0, 10.0, "ms", ("comp",), "attack", 1.0),
+    ("Comp Release", "dial", 10.0, 1000.0, 200.0, "ms", ("comp",), "release", 1.0),
+    ("Comp Auto Release", "toggle", 0, 1, 1, None, ("comp",), "autorelease", 1.0),
+    ("Comp Knee", "dial", 0.0, 18.0, 6.0, "db", ("comp",), "knee", 1.0),
+    ("Comp Makeup", "dial", -12.0, 24.0, 0.0, "db", ("comp",), "gain", 1.0),
+    ("Comp Mix", "dial", 0.0, 100.0, 100.0, "pct", ("comp",), "mix", 0.01),
+    ("Limit Gain", "dial", -24.0, 24.0, 0.0, "db", ("lim",), "gain", 1.0),
+    ("Limit Ceiling", "dial", -24.0, 0.0, -1.0, "db", ("lim",), "ceiling", 1.0),
+    ("Limit Mode", "menu", 0, 2, 2, ("Standard", "Soft clip", "True peak"), ("lim",), "mode",
+     1.0),
+    ("Limit Lookahead", "menu", 0, 2, 1, ("1.5 ms", "3 ms", "6 ms"), ("lim",), "lookahead",
+     1.0),
+    ("Limit Auto Release", "toggle", 0, 1, 1, None, ("lim",), "autorelease", 1.0),
+    ("Width", "dial", 0.0, 100.0, 100.0, "pct", ("util",), "width", 0.01),
+    ("Bass Mono", "toggle", 0, 1, 0, None, ("util",), "bass_mono", 1.0),
+    ("Bass Mono Freq", "dial", 50.0, 500.0, 120.0, "hz", ("util",), "bass_mono_frequency",
+     1.0),
+    ("Output", "dial", -24.0, 12.0, 0.0, "db", ("util",), "gain", 1.0),
+)
+_MASTER_DSP = (
+    # id, object, inlets, outlets. Channel EQ runs once per side (mono or stereo, either way
+    # one channel each); the others are stereo.
+    ("eql", "abl.device.channeleq~", 1, 1),
+    ("eqr", "abl.device.channeleq~", 1, 1),
+    ("comp", "abl.device.stereocompressor~ @model 1", 2, 2),
+    ("lim", "abl.device.limiter~", 2, 2),
+    ("util", "abl.device.utility~", 2, 2),
+)
+
+
+def _master_param_box(i: int, spec: tuple) -> dict:
+    name, kind, low, high, initial, unit = spec[:6]
+    col, row = divmod(i, 4)
+    rect = [10.0 + 56.0 * col, 4.0 + 40.0 * row, 52.0, 36.0]
+    valueof: dict = {"parameter_longname": name, "parameter_shortname": name[:12],
+                     "parameter_initial_enable": 1, "parameter_initial": [initial]}
+    if kind == "toggle":
+        maxclass, outlets = "live.text", ["", ""]
+        valueof.update(parameter_type=2, parameter_mmax=1, parameter_enum=["off", "on"])
+        extra = {"mode": 1, "text": name, "texton": name}      # mode 1 = toggle
+    elif kind == "menu":
+        maxclass, outlets = "live.menu", ["", "", "float"]
+        valueof.update(parameter_type=2, parameter_mmax=len(unit) - 1,
+                       parameter_enum=list(unit))
+        extra = {}
+    else:
+        maxclass, outlets = "live.dial", ["", "float"]
+        valueof.update(parameter_type=0, parameter_mmin=low, parameter_mmax=high,
+                       parameter_unitstyle=_UNIT[unit])
+        if unit == "hz":
+            valueof["parameter_exponent"] = 3.0
+        extra = {}
+    return {"box": {"id": f"obj-p{i}", "maxclass": maxclass, "varname": name,
+                    "numinlets": 1, "numoutlets": len(outlets), "outlettype": outlets,
+                    "parameter_enable": 1, "presentation": 1, "presentation_rect": rect,
+                    "patching_rect": [20.0 + 120.0 * (i % 8), 40.0 + 120.0 * (i // 8),
+                                      52.0, 36.0],
+                    "saved_attribute_attributes": {"valueof": valueof}, **extra}}
+
+
+def master_patcher() -> dict:
+    """LiveBridge Master: Channel EQ -> Stereo Compressor -> Limiter -> Utility, Ableton's own
+    DSP as Max objects (abl.device.*, Max 9 / Live 12.2+), every control a Live parameter."""
+    boxes = [
+        _box("obj-plugin", "plugin~", [20.0, 420.0, 60.0, 22.0], 2, 2, ["signal", "signal"]),
+        _box("obj-plugout", "plugout~", [20.0, 640.0, 60.0, 22.0], 2, 0),
+        {"box": {"id": "obj-title", "maxclass": "comment", "text": "LiveBridge Master",
+                 "numinlets": 1, "numoutlets": 0, "fontsize": 11.0, "fontface": 1,
+                 "patching_rect": [20.0, 10.0, 150.0, 20.0]}},
+    ]
+    lines = []
+    for n, (box_id, text, inlets, outlets) in enumerate(_MASTER_DSP):
+        boxes.append(_box(f"obj-{box_id}", text, [20.0 + 190.0 * n, 520.0 + 30.0 * (n % 2),
+                                                  180.0, 22.0],
+                          inlets, outlets, ["signal"] * outlets))
+    # audio: plugin~ -> EQ (L, R) -> compressor -> limiter -> utility -> plugout~
+    lines += [_line("obj-plugin", 0, "obj-eql", 0), _line("obj-plugin", 1, "obj-eqr", 0),
+              _line("obj-eql", 0, "obj-comp", 0), _line("obj-eqr", 0, "obj-comp", 1)]
+    for a, b in (("comp", "lim"), ("lim", "util")):
+        lines += [_line(f"obj-{a}", 0, f"obj-{b}", 0), _line(f"obj-{a}", 1, f"obj-{b}", 1)]
+    lines += [_line("obj-util", 0, "obj-plugout", 0), _line("obj-util", 1, "obj-plugout", 1)]
+    for i, spec in enumerate(MASTER_PARAMS):
+        name, kind, _low, _high, _initial, _unit, targets, message, scale = spec
+        boxes.append(_master_param_box(i, spec))
+        source = f"obj-p{i}"
+        if scale != 1.0:
+            boxes.append(_box(f"obj-s{i}", f"* {scale}", [20.0 + 120.0 * (i % 8),
+                                                         80.0 + 120.0 * (i // 8), 50.0, 22.0],
+                              2, 1))
+            lines.append(_line(source, 0, f"obj-s{i}", 0))
+            source = f"obj-s{i}"
+        # the utility's width is its side level (mid stays at 1)
+        text = "prepend midside 1." if message == "width" else f"prepend {message}"
+        boxes.append(_box(f"obj-m{i}", text, [20.0 + 120.0 * (i % 8),
+                                              110.0 + 120.0 * (i // 8), 110.0, 22.0], 1, 1))
+        lines.append(_line(source, 0, f"obj-m{i}", 0))
+        for target in targets:
+            lines.append(_line(f"obj-m{i}", 0, f"obj-{target}", 0))
+    return {"patcher": {
+        "fileversion": 1, "appversion": APP_VERSION, "classnamespace": "box",
+        "rect": [80.0, 80.0, 1100.0, 700.0], "openinpresentation": 1,
+        "default_fontsize": 10.0, "default_fontface": 0, "default_fontname": "Arial",
+        "gridsize": [15.0, 15.0], "devicewidth": 340.0,
+        "description": "LiveBridge Master: EQ, glue compressor, limiter and width from "
+                       "Ableton's own DSP, run by live_master_auto",
+        "boxes": boxes, "lines": lines, "dependency_cache": [],
+        "project": {"version": 1, "amxdtype": AUDIO_EFFECT, "readonly": 0, "devpathtype": 0,
+                    "devpath": ".", "sortmode": 0, "viewmode": 0,
+                    "contents": {"patchers": {}, "code": {}}, "layout": {},
+                    "searchpath": {}, "detailsvisible": 0},
+    }}
+
+
 def host_patcher(instrument: bool) -> dict:
     """The generic plug-in hosts (patch built by livebridge_mcp.host_device, shared with the
     per-plug-in bank devices live_plugin_host_bank writes)."""
@@ -437,6 +577,7 @@ def outputs() -> dict[Path, bytes]:
         HOST_EFFECT_AMXD: amxd(host_patcher(False), AUDIO_EFFECT),
         HOST_INSTRUMENT_AMXD: amxd(host_patcher(True), INSTRUMENT),
         HOST_CONTEXT: ENGINE_CONTEXT.read_bytes(),
+        MASTER_AMXD: amxd(master_patcher(), AUDIO_EFFECT),
     }
 
 

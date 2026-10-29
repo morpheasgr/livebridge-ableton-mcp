@@ -179,6 +179,42 @@ def test_amxd_is_built_and_wired():
     assert codebox[0]["code"] == m4l_build.genexpr()
 
 
+def test_master_device_is_built_and_wired():
+    device_type, patcher = m4l_build.read_amxd(m4l_build.MASTER_AMXD.read_bytes())
+    assert device_type == m4l_build.AUDIO_EFFECT
+    boxes = {b["box"]["id"]: b["box"] for b in patcher["patcher"]["boxes"]}
+    for line in patcher["patcher"]["lines"]:
+        (source, outlet), (destination, inlet) = (line["patchline"]["source"],
+                                                  line["patchline"]["destination"])
+        assert source in boxes and destination in boxes, line
+        assert outlet < boxes[source]["numoutlets"] and inlet < boxes[destination]["numinlets"]
+    texts = [b.get("text", "") for b in boxes.values()]
+    for dsp in ("abl.device.channeleq~", "abl.device.stereocompressor~",
+                "abl.device.limiter~", "abl.device.utility~"):
+        assert any(t.startswith(dsp) for t in texts), dsp
+    names = [b["saved_attribute_attributes"]["valueof"]["parameter_longname"]
+             for b in boxes.values() if b.get("parameter_enable")]
+    assert names == [p[0] for p in m4l_build.MASTER_PARAMS] and len(set(names)) == len(names)
+    assert {"Limit Gain", "Limit Ceiling", "Comp Ratio", "EQ Low Cut"} <= set(names)
+    # every control reaches its DSP object(s)
+    feeds = {}
+    for line in patcher["patcher"]["lines"]:
+        feeds.setdefault(line["patchline"]["source"][0], []).append(
+            line["patchline"]["destination"][0])
+
+    def reaches(start):
+        seen, todo = set(), [start]
+        while todo:
+            for nxt in feeds.get(todo.pop(), []):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    todo.append(nxt)
+        return seen
+    for i, spec in enumerate(m4l_build.MASTER_PARAMS):
+        assert {f"obj-{t}" for t in spec[6]} <= reaches(f"obj-p{i}"), spec[0]
+    assert "obj-plugout" in reaches("obj-plugin")
+
+
 def test_frame_fields_agree_everywhere():
     js = ENGINE_JS.read_text(encoding="utf-8")
     fields = re.findall(r'"(\w+)"', js[js.index("const FRAME_FIELDS"):js.index("];",
@@ -676,6 +712,56 @@ def test_modulation_shapes_and_sync(tmp_path):
     assert out["shifted"] == pytest.approx(25 + 50 * 0.125, abs=0.5)
     assert out["free"] == pytest.approx(25 + 50 * 0.25, abs=1.0)    # 2 Hz, 125 ms in
     assert not list(tmp_path.glob("*.json"))
+
+
+def test_offset_modulation_uses_live_modulate(engines, tcp_bridge, song):
+    """mode='offset': -1..1 around the user's value through live.modulate~, nothing restored."""
+    _process, send, outlets = engines()
+    send("context", "master", "Main")
+    _wait_roles(1)
+
+    def sent():
+        return [json.loads(line) for line in outlets.read_text(encoding="utf-8").splitlines()]
+
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    started = call_tool(app, "live_engine_modulate", {
+        "track": "Bass", "device": "Operator", "parameter": "Filter Freq", "shape": "sine",
+        "rate": "1/4", "depth": 0.4, "mode": "offset"})
+    mod = started["modulation"]
+    assert mod["mode"] == "offset" and mod["depth"] == 0.4 and "low" not in mod
+    log = sent()
+    first = next(i for i, m in enumerate(log) if m[:3] == ["mod", 0, "offset"])
+    assert first < log.index(["mod", 0, "oid", 102])
+    assert not any(m[:3] in (["mod", 0, "value"], ["mod", 0, "id"]) for m in log)
+    time.sleep(0.3)
+    offsets = [m[3] for m in sent() if m[:3] == ["mod", 0, "offset"]]
+    assert all(-0.2 - 1e-9 <= v <= 0.2 + 1e-9 for v in offsets) and \
+        max(offsets) - min(offsets) > 0.1
+    # the same parameter in the other mode: refused until this one stops
+    other = call_tool(app, "live_engine_modulate", {
+        "track": "Bass", "device": "Operator", "parameter": "Filter Freq", "mode": "replace"})
+    assert other["type"] == "invalid_state" and "offset mode" in other["error"]
+    for bad in ({"mode": "sideways"}, {"mode": "offset", "center": 0.5},
+                {"mode": "offset", "depth": 3}):
+        args = {"track": "Bass", "device": "Operator", "parameter": "Filter Freq", **bad}
+        assert call_tool(app, "live_engine_modulate", args)["type"] == "bad_args"
+
+    stopped = call_tool(app, "live_engine_unmodulate", {"all": True})
+    assert stopped["stopped"]
+    assert engine.wait_for(lambda: ["mod", 0, "oid", 0] in sent(), 3)
+    log = sent()
+    assert log.index(["mod", 0, "offset", 0, 20]) < log.index(["mod", 0, "oid", 0])
+    assert not any(m[0] == "setvalue" for m in log)          # nothing to write back
+
+
+def test_offset_modulation_needs_engine_1_7(tcp_bridge, song, monkeypatch):
+    monkeypatch.setattr(engine, "devices", lambda *a, **k: [
+        {"role": "master", "track": "Main", "version": "1.6.2", "modulations": [],
+         "host": "127.0.0.1", "port": 9, "token": "x"}])
+    app = create_app(BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0))
+    answer = call_tool(app, "live_engine_modulate", {
+        "track": "Bass", "device": "Operator", "parameter": "Filter Freq", "mode": "offset"})
+    assert answer["type"] == "unsupported" and "1.7" in answer["error"]
 
 
 def test_live_modulation_end_to_end(engines, tcp_bridge, song):

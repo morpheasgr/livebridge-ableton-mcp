@@ -50,7 +50,7 @@ try {
 }
 
 const NAME = "LiveBridge Engine";
-const VERSION = "1.6.2";
+const VERSION = "1.7.0";
 const PROTOCOL = 1;
 // The 18 values of a frame, in the order of the gen~ outlets (mean squares are linear power,
 // smoothed over ~100 ms; msk over ~400 ms; peaks decay over ~300 ms).
@@ -283,7 +283,7 @@ function describeMod(mod) {
   return {
     slot: mod.slot, path: mod.path, name: mod.name, shape: mod.shape, beats: mod.beats,
     hz: mod.hz, low: mod.low, high: mod.high, phase: mod.phase, min: mod.min, max: mod.max,
-    original: mod.original, started: mod.started,
+    original: mod.original, started: mod.started, mode: mod.mode, depth: mod.depth,
   };
 }
 
@@ -335,9 +335,15 @@ function shapeAt(mod, cycles) {
   }
 }
 
+// "replace" (live.remote~): the parameter's value, between low and high shares of its range.
+// "offset" (live.modulate~): -1..1 around the parameter's own value (1 = its whole range), the
+// shape swinging depth/2 to each side; the knob stays the user's.
 function modValue(mod, now) {
   const cycles = (mod.hz ? (now - mod.started) / 1000 * mod.hz
     : beatsFor(mod, now) / mod.beats) + mod.phase;
+  if (mod.mode === "offset") {
+    return mod.depth * (shapeAt(mod, cycles) - 0.5);
+  }
   const amount = mod.low + (mod.high - mod.low) * shapeAt(mod, cycles);
   return mod.min + (mod.max - mod.min) * amount;
 }
@@ -355,9 +361,11 @@ function tick() {
   }
   for (const mod of state.mods.values()) {
     const value = modValue(mod, now);
-    if (mod.last === null || Math.abs(value - mod.last) > (mod.max - mod.min) * 1e-5) {
+    const span = mod.mode === "offset" ? 1 : mod.max - mod.min;
+    if (mod.last === null || Math.abs(value - mod.last) > span * 1e-5) {
       mod.last = value;
-      maxApi.outlet("mod", mod.slot, "value", value, MOD_TICK_MS);   // line~ glides there
+      maxApi.outlet("mod", mod.slot, mod.mode === "offset" ? "offset" : "value", value,
+        MOD_TICK_MS);                                                 // line~ glides there
     }
   }
 }
@@ -384,6 +392,16 @@ function release(mod) {
   // (the knob is a normal parameter again by then).
   state.mods.delete(mod.slot);
   stopTickerIfIdle();
+  if (mod.mode === "offset") {
+    // live.modulate~ never took the parameter: glide the offset to 0, then let go
+    maxApi.outlet("mod", mod.slot, "offset", 0, MOD_TICK_MS);
+    setTimeout(() => {
+      if (!state.mods.has(mod.slot)) {
+        maxApi.outlet("mod", mod.slot, "oid", 0);
+      }
+    }, RELEASE_DELAY_MS + MOD_TICK_MS);
+    return;
+  }
   maxApi.outlet("mod", mod.slot, "value", mod.original);
   setTimeout(() => {
     if (!state.mods.has(mod.slot)) {
@@ -427,9 +445,17 @@ function parseModulation(args) {
       return { error: "steps: 1..64 values 0..1" };
     }
   }
+  const mode = String(args.mode || "replace");
+  if (mode !== "replace" && mode !== "offset") {
+    return { error: "mode must be 'replace' or 'offset'" };
+  }
+  const depth = Number(args.depth === undefined ? 0.5 : args.depth);
+  if (!(depth >= 0 && depth <= 2)) {
+    return { error: "depth must be 0..2" };
+  }
   return {
     shape: shape, beats: beats, hz: hz, low: low, high: high, phase: phase, steps: steps,
-    seed: Number(args.seed || 0) | 0,
+    seed: Number(args.seed || 0) | 0, mode: mode, depth: depth,
   };
 }
 
@@ -468,6 +494,11 @@ function modulate(args, reply) {
     return;
   }
   const existing = state.mods.get(slot);
+  if (existing && existing.mode !== spec.mode) {
+    reply({ type: "busy", message: "this parameter is modulated in " + existing.mode
+      + " mode: stop it first (unmodulate), then start the " + spec.mode + " one" });
+    return;
+  }
   if (existing) {
     Object.assign(existing, spec, { started: Date.now(), last: null });
     reply(null, describeMod(existing));
@@ -489,10 +520,11 @@ function modulate(args, reply) {
       max: found.max, original: found.value, started: Date.now(), last: null,
     }, spec);
     state.mods.set(slot, mod);
-    // jump line~ to the first value before live.remote~ takes the parameter over
+    // jump line~ to the first value before live.remote~ / live.modulate~ get the parameter
     mod.last = modValue(mod, Date.now());
-    maxApi.outlet("mod", slot, "value", mod.last);
-    maxApi.outlet("mod", slot, "id", mod.id);
+    const offset = mod.mode === "offset";
+    maxApi.outlet("mod", slot, offset ? "offset" : "value", mod.last);
+    maxApi.outlet("mod", slot, offset ? "oid" : "id", mod.id);
     startTicker();
     reply(null, describeMod(mod));
   });

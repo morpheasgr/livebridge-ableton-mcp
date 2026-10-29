@@ -65,6 +65,14 @@ def _name(device: dict[str, Any]) -> str:
     return "master" if device.get("role") == "master" else str(device.get("track") or "track")
 
 
+def _version(device: dict[str, Any]) -> tuple[int, ...]:
+    """A device's version as numbers ("1.7.0" -> (1, 7, 0)); () when unknown."""
+    try:
+        return tuple(int(p) for p in str(device.get("version") or "").split("."))
+    except ValueError:
+        return ()
+
+
 def register(mcp: Any, bridge: BridgeClient) -> None:
     """Register the Engine tools on the MCP app."""
 
@@ -461,6 +469,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         phase: float = 0.0,
         steps: list[float] | None = None,
         seed: int | None = None,
+        mode: str = "replace",
     ) -> Any:
         """Move a parameter continuously while the song plays — a tempo-synced LFO or step
         sequence on any device or mixer parameter (filter sweeps, tremolo, auto-pan, gated
@@ -483,18 +492,34 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             steps: For shape="steps": 1..64 values 0..1 (share of the range between low and
                 high), played evenly over `rate`.
             seed: Seed for the random shapes (same seed, same values).
+            mode: "replace" (default): the Engine takes the parameter over (live.remote~) and
+                sets its value — greyed out, automation and mouse ignored, restored at the end.
+                "offset": like Live's own LFO (live.modulate~, Engine 1.7+) — the shape swings
+                `depth` (share of the range, up to 2) around whatever value the parameter has,
+                and the user can keep turning the knob; nothing to restore. `center`, `low`
+                and `high` do not apply.
 
         Returns:
             `{modulation:{slot, parameter, path, shape, rate:{beats|hz}, low, high, phase,
-            range:{min, max}, original}, engine:{role, track}}`.
+            range:{min, max}, original, mode, depth?}, engine:{role, track}}`.
 
         Gotchas: needs the LiveBridge Engine device (any one in the set does it; 8 parameters
-        per device). While modulated the parameter is greyed out in Live and its automation
-        and your mouse are ignored. Modulations end when the Engine is removed or Live quits,
+        per device). In "replace" mode the parameter is greyed out in Live and its automation
+        and your mouse are ignored ("offset" leaves the knob to the user). An older Engine
+        (before 1.7) does not know "offset": replace it from the User Library. Modulations end when the Engine is removed or Live quits,
         and they are not saved with the set — write automation (`live_automation_*`) to keep a
         movement.
         """
         cmd = "engine.modulate"
+        if mode not in ("replace", "offset"):
+            return tool_error("mode must be 'replace' or 'offset'", cmd=cmd)
+        if mode == "offset":
+            if center is not None or low is not None or high is not None:
+                return tool_error("mode='offset' swings around the parameter's own value: "
+                                  "give depth only (no center/low/high)", cmd=cmd)
+            if not 0 <= depth <= 2:
+                return tool_error("depth must be 0..2 (a share of the parameter's range)",
+                                  cmd=cmd)
         if shape not in engine.SHAPES:
             return tool_error(f"shape must be one of {', '.join(engine.SHAPES)}", cmd=cmd)
         try:
@@ -512,8 +537,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("steps only go with shape='steps'", cmd=cmd)
         if not 0 <= phase < 1:
             return tool_error("phase must be 0..1 (exclusive)", cmd=cmd)
-        for label, value in (("depth", depth), ("center", center), ("low", low),
-                             ("high", high)):
+        for label, value in ((("depth", depth),) if mode == "replace" else ()) + (
+                ("center", center), ("low", low), ("high", high)):
             if value is not None and not 0 <= value <= 1:
                 return tool_error(f"{label} must be 0..1 (a share of the parameter's range)",
                                   cmd=cmd)
@@ -527,7 +552,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if span <= 0:
             return tool_error("this parameter has no range to modulate", type="invalid_state",
                               cmd=cmd)
-        if low is None:
+        if mode == "offset":
+            low, high = 0.0, 1.0
+        elif low is None:
             here = center if center is not None else min(1.0, max(0.0, (float(
                 info.get("value", lo_value)) - lo_value) / span))
             low, high = here - depth / 2, here + depth / 2
@@ -537,6 +564,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 low, high = max(0.0, low - (high - 1)), 1.0
         args = {"path": info["max_path"], "shape": shape, **timing, "low": round(low, 6),
                 "high": round(high, 6), "phase": phase}
+        if mode == "offset":
+            args.update(mode="offset", depth=depth)
         if steps is not None:
             args["steps"] = steps
         if seed is not None:
@@ -545,6 +574,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             found = engine.devices()
             if not found:
                 raise engine.EngineError("not_found", "no LiveBridge Engine is running")
+            if mode == "offset":
+                # an older Engine ignores "mode" and would take the parameter over instead
+                found = [d for d in found if _version(d) >= (1, 7)]
+                if not found:
+                    return tool_error("mode='offset' needs LiveBridge Engine 1.7 or newer: "
+                                      "reinstall the devices and replace the Engine in the "
+                                      "set", type="unsupported", cmd=cmd)
             # the same parameter may already run on some device: replace it there
             running = next((d for d in found for m in d.get("modulations") or []
                             if m.get("path") == info["max_path"]), None)
@@ -568,7 +604,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                       "path": info.get("path"), "shape": shape, "rate": timing,
                       "low": round(low, 3), "high": round(high, 3), "phase": phase,
                       "range": {"min": lo_value, "max": hi_value},
-                      "original": answer.get("original", info.get("value"))}
+                      "original": answer.get("original", info.get("value")), "mode": mode}
+        if mode == "offset":
+            modulation["depth"] = depth
+            for key in ("low", "high"):
+                modulation.pop(key)
         if isinstance(info.get("device"), dict):
             modulation["device"] = info["device"].get("name")
         return {"modulation": modulation, "engine": _where(chosen)}

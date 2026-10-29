@@ -88,9 +88,11 @@ class FakeEngines:
 
     def limiter(self):
         for device in self.song.master_track.devices:
-            if device.class_name == "Limiter":
-                params = {p.name: p.value for p in device.parameters}
+            params = {p.name: p.value for p in device.parameters}
+            if device.class_name == "Limiter" and "Gain" in params:
                 return params["Gain"], params["Ceiling"]
+            if device.name == "LiveBridge Master":
+                return params["Limit Gain"], params["Limit Ceiling"]
         return 0.0, 0.0
 
     def master_reading(self):
@@ -366,6 +368,33 @@ def test_master_auto_reaches_the_target(app, song, mix_set):
     for bad in ({"destination": "radio"}, {"lufs": 0}, {"ceiling": 2}, {"seconds": 1},
                 {"loud_bar": 9}, {"destination": "genre"}):
         assert call_tool(app, "live_master_auto", bad)["type"] == "bad_args", bad
+
+
+def test_master_auto_with_the_livebridge_master_device(app, song, mix_set):
+    """chain='livebridge': one Max device (Ableton's DSP) instead of EQ Eight/Glue/Limiter."""
+    assert call_tool(app, "live_master_auto", {"chain": "rack"})["type"] == "bad_args"
+    missing = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                  "chain": "livebridge"})
+    assert missing["type"] == "not_found" and "LiveBridge Master" in missing["error"]
+    factory.add_device(song.master_track, "LiveBridge Master", "MxDeviceAudioEffect", params=[
+        {"name": "EQ Low Cut", "value": 0, "min": 0, "max": 1, "is_quantized": True,
+         "value_items": ("off", "on")},
+        {"name": "Comp Ratio", "value": 2.0, "min": 1.0, "max": 10.0},
+        {"name": "Limit Gain", "value": 0.0, "min": -24.0, "max": 24.0, "unit": "dB"},
+        {"name": "Limit Ceiling", "value": -1.0, "min": -24.0, "max": 0.0, "unit": "dB"}])
+    result = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                 "chain": "livebridge"})
+    assert result["applied"] and result["inserted"] == [], result
+    assert not any(d.class_name == "Limiter" for d in song.master_track.devices)
+    gain, ceiling = mix_set.limiter()
+    assert ceiling == pytest.approx(-0.3, abs=0.05) and gain > 0
+    # Live's own Limiter next to it: refused rather than stacking two limiters
+    factory.add_device(song.master_track, "Limiter", "Limiter")
+    song.master_track._devices = [d for d in song.master_track.devices
+                                  if d.name != "LiveBridge Master"]
+    clash = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                "chain": "livebridge"})
+    assert clash["type"] == "invalid_state" and "two limiters" in clash["error"]
 
 
 def test_master_auto_trims_a_hot_mix_first(app, song, mix_set):

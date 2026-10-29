@@ -80,6 +80,10 @@ M4L_DEVICES = (
     ("LiveBridge Host Instrument", REPO_ROOT / "max_for_live" / "LiveBridge Host",
      ("Presets", "Instruments", "Max Instrument"), "lbhost.js", "host_instrument_dir",
      "-- Claude loads it with live_plugin_host_load: a VST3 synth with all its parameters"),
+    ("LiveBridge Master", REPO_ROOT / "max_for_live" / "LiveBridge Master",
+     ("Presets", "Audio Effects", "Max Audio Effect"), "LiveBridge Master.amxd", "master_dir",
+     "onto the master, before the Engine -- EQ, glue compressor, limiter and width from "
+     "Ableton's own DSP (Max 9); live_master_auto(chain='livebridge') loads it"),
 )
 
 SCRIPT_NAME = "LiveBridge"
