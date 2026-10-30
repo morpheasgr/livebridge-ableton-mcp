@@ -144,8 +144,8 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
     if isinstance(master, dict):
         short["master"] = {k: v for k, v in master.items() if k in (
             "destination", "target_lufs", "before", "after", "limiter_gain_db", "makeup_db",
-            "limiting_db", "reset", "eq", "steps", "settings", "headroom_trim_db",
-            "device_check", "stopped", "missing_gain_db", "contrast", "notes", "error",
+            "limiting_db", "peak_reduction_db", "reset", "eq", "steps", "settings",
+            "headroom_trim_db", "device_check", "stopped", "missing_gain_db", "contrast", "notes", "error",
             "type")}
     low = result.get("low_end")
     if isinstance(low, dict):
@@ -627,6 +627,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         tolerance_db: float = 3.0,
         protect: list[str] | None = None,
         section_bars: list[int] | None = None,
+        one_shots: list[str] | None = None,
     ) -> Any:
         """Balance the mix by measurement: listens to every track with a LiveBridge Engine at
         its end over the same window, gives each part its role's level (kick on top, then sub
@@ -667,6 +668,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             section_bars: `[first, last]` bar (1-based) to loop and play while measuring — the tool
                 starts the transport there and stops it again afterwards. Default: the bars
                 playing now (or the arrangement loop when it is on and the song is stopped).
+            one_shots: parts known to play only now and then in this section (left alone like
+                a part under `min_active`) — `live_mix_auto` passes the parts its own listen
+                found silent: one window missing a part and the next one catching it is a
+                one-shot, whatever the second window's share says.
 
         Returns:
             `{genre?, applied, passes, parts:[{name, role, role_from, lufs (pre-fader),
@@ -789,6 +794,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         why_left[name] = "silent in this window"
                         notes.append(f"{name} is silent in this window — fader left alone "
                                      "(live_sound_check says why).")
+                    continue
+                if first and name in (one_shots or ()):
+                    left_out.add(name)
+                    counted[name] = False
+                    why_left[name] = "one-shot: silent in part of the section"
+                    notes.append(f"{name} plays only now and then in this section (silent in "
+                                 "another window): fader left alone — set it by ear.")
                     continue
                 share = (result.get("loudness") or {}).get("active_share")
                 limit = min_active
@@ -1135,11 +1147,20 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         # (a rerun read the last run's +18 dB as the mix and could not tell it did nothing)
         drive_names = (gain_name,) if chain_kind == "native" else (gain_name, "Comp Makeup")
 
+        def db(value: float) -> Any:
+            """A dB setting for the chain: LiveBridge Master's dB dials are linear (Live's raw
+            value is the dB), so they take the number — as text Live matched it against a
+            display that rounds to whole dB above 10 (11.1 landed as 11.5, "12 dB")."""
+            return round(value, 2) if chain_kind == "livebridge" else f"{value:.1f} dB"
+
         def read_param(index: int, name: str) -> tuple[float | None, str | None]:
             got = bridge_call(bridge, "devices.get_parameter",
                               {"track": "master", "device": index, "parameter": name})
             if isinstance(got, dict) and not _is_error(got):
                 display = str(got.get("display", ""))
+                if chain_kind == "livebridge" and name not in _HZ_PARAMS and \
+                        _num(got.get("value")) is not None:
+                    return _num(got.get("value")), display
                 parsed = re.match(r"^\s*(-?\d+(?:\.\d+)?)", display)
                 return (float(parsed.group(1)) if parsed else _num(got.get("value"))), display
             return None, None
@@ -1157,7 +1178,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if reset:
                 answer = bridge_call(bridge, "devices.set_parameters", {
                     "track": "master", "device": limiter["index"],
-                    "values": {name: "0.0 dB" for name in reset}})
+                    "values": {name: db(0.0) for name in reset}})
                 if _is_error(answer):
                     return answer
                 time.sleep(_SETTLE_S)
@@ -1223,7 +1244,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 current = read_param(index, param)[0] or 0.0
                 was[param] = current
                 step = -math.copysign(min(abs(delta) / 2.0, 4.0), delta)
-                values[param] = f"{max(-6.0, min(6.0, current + step)):.1f} dB"
+                values[param] = db(max(-6.0, min(6.0, current + step)))
                 if freq is not None:
                     values["EQ Mid Freq"] = f"{freq:g} Hz"
             answer = bridge_call(bridge, "devices.set_parameters",
@@ -1252,10 +1273,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             out, _shown = read_param(index, "Output")
             out = out or 0.0
             first = _reading(measure(bar))["lufs"]
-            set_limiter({"Output": f"{out - 6.0:.1f} dB"})
+            set_limiter({"Output": db(out - 6.0)})
             time.sleep(_SETTLE_S)
             probed = _reading(measure(bar))["lufs"]
-            set_limiter({"Output": f"{out:.1f} dB"})
+            set_limiter({"Output": db(out)})
             time.sleep(_SETTLE_S)
             if first is None or probed is None:
                 check["verdict"] = "the device check could not measure the master"
@@ -1356,9 +1377,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return {gain_name: gain_part, "Comp Makeup": max(0.0, drive - gain_part)}
 
         def set_drive(drive: float) -> Any:
-            return set_limiter({k: f"{v:.1f} dB" for k, v in split(drive).items()})
+            return set_limiter({k: db(v) for k, v in split(drive).items()})
 
-        answer = set_limiter({ceiling_name: f"{ceil} dB"})
+        answer = set_limiter({ceiling_name: db(ceil)})
         if _is_error(answer):
             return answer
         result["applied"] = True
@@ -1496,18 +1517,44 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 current = measure(loud_bar)
         result["after"] = _reading(current)
         # what the device holds now, read back from Live (not what the tool meant to set)
-        result["settings"] = {name: read_param(index, name)[1] for name in (
+        held = {name: read_param(index, name) for name in (
             drive_names + (ceiling_name,) + (("EQ Low", "EQ Mid", "EQ Mid Freq", "EQ High")
                                              if chain_kind == "livebridge" else ()))}
+        result["settings"] = {name: shown for name, (_value, shown) in held.items()}
+        # the report's gain is what Live holds, not what the tool asked for
+        if held[gain_name][0] is not None:
+            result["limiter_gain_db"] = round(held[gain_name][0], 1)
+        if "Comp Makeup" in drive_names and held["Comp Makeup"][0] is not None:
+            result["makeup_db"] = round(held["Comp Makeup"][0], 1)
+            if not result["makeup_db"]:
+                del result["makeup_db"]
         before_lufs, after_lufs = result["before"]["lufs"], result["after"]["lufs"]
+        before_peak, after_peak = result["before"]["peak_db"], result["after"]["peak_db"]
         if before_lufs is not None and after_lufs is not None and "device_check" not in result:
-            # gain in minus loudness gained: about how much the limiter takes off on average
+            # drive minus loudness gained: what the limiter costs in loudness, on average
             result["limiting_db"] = round(max(0.0, drive - (after_lufs - before_lufs)), 1)
+            if before_peak is not None and after_peak is not None:
+                # what it shaves off the loudest peaks (the crest factor's loss)
+                result["peak_reduction_db"] = round(max(0.0, before_peak + drive - after_peak),
+                                                    1)
             if drive > _SQUASH_DB:
-                notes.append(f"{drive:.1f} dB of drive into the limiter (crest "
-                             f"{result['before']['crest_db']} -> {result['after']['crest_db']} "
-                             "dB): the transients are being flattened — listen to the kick "
-                             "and snare, and consider a quieter destination.")
+                notes.append(
+                    f"{drive:.1f} dB of drive into the limiter: the loudest peaks lose "
+                    f"{result.get('peak_reduction_db', '?')} dB (crest "
+                    f"{result['before']['crest_db']} -> {result['after']['crest_db']} dB) — "
+                    "the transients are being flattened. Where the gain comes from does not "
+                    "change that (faders or drive are the same gain in 32-bit float); a mix "
+                    f"with a crest of {result['before']['crest_db']} dB has to lose that much "
+                    f"to reach {target:g} LUFS. Listen to the kick and snare; for more punch "
+                    "use a quieter destination, or tame the peaks in the mix first (the "
+                    "Comp Threshold on the loud parts, shorter transients).")
+            if before_lufs < target - 20.0:
+                notes.append(
+                    f"The mix reaches the master at {before_lufs} LUFS ({target - before_lufs:.0f}"
+                    " dB under the target): harmless in itself, but it leaves little room "
+                    "on the faders and meters. Raising every fader together keeps the balance "
+                    "(live_mixer_set_many with every track) — the master "
+                    "then needs that much less drive, with the same sound.")
         if not was_playing:
             bridge_call(bridge, "transport.stop")
         if after_lufs is not None and abs(after_lufs - target) > 1.0 and "stopped" not in \
@@ -1784,7 +1831,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 result["balance"] = live_mix_balance(
                     genre=genre, tracks=None if not tracks else names,
                     roles={r["name"]: r["role"] for r in results if r.get("role")},
-                    seconds=max(3.0, seconds), protect=protect)
+                    seconds=max(3.0, seconds), protect=protect,
+                    one_shots=[r["name"] for r in results
+                               if (r.get("before") or {}).get("lufs") is None
+                               and "error" not in r] or None)
             balanced = result.get("balance")
             if isinstance(balanced, dict) and "plan" in balanced:
                 # one verdict per part: the per-track readings and the balance must agree

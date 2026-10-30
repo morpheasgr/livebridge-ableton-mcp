@@ -1600,6 +1600,7 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `tolerance_db` | float | `3.0` |
 | `protect` | list[str] \| null | `null` |
 | `section_bars` | list[int] \| null | `null` |
+| `one_shots` | list[str] \| null | `null` |
 
 Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `song.summary`, `transport.get`
 

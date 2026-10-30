@@ -474,6 +474,9 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     pushed = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                                  "chain": "livebridge", "max_gain_db": 6})
     assert pushed["limiter_gain_db"] == 6 and pushed["makeup_db"] > 0, pushed
+    assert pushed["peak_reduction_db"] >= pushed["limiting_db"] >= 0
+    last = pushed["steps"][-1]
+    assert master_params(device)["Comp Makeup"] == pytest.approx(last["Comp Makeup"], abs=0.01)
     assert pushed["after"]["lufs"] == pytest.approx(-8.0, abs=0.6)
     assert master_params(device)["Comp Makeup"] == pytest.approx(pushed["makeup_db"], abs=0.05)
 
@@ -914,3 +917,13 @@ def test_protect_keeps_the_fader_and_the_mix_level():
     # the others are centred as without protect: they are not pulled up to the hot lead
     assert {m["name"]: m["move_db"] for m in kept["moves"]} == \
         {m["name"]: m["move_db"] for m in free["moves"] if m["name"] != "Lead"}
+
+
+def test_balance_leaves_known_one_shots_alone(app, song, mix_set):
+    """live_mix_auto passes the parts its own listen found silent: same verdict everywhere."""
+    hats = fader_db(mix_set.track("Hats"))
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "one_shots": ["Hats"],
+                                                 "tolerance_db": 0})
+    assert result["left_out"] == {"Hats": "one-shot: silent in part of the section"}
+    assert fader_db(mix_set.track("Hats")) == pytest.approx(hats, abs=0.05)
+    assert "Hats" not in {m["name"] for m in result["plan"]["moves"]}
