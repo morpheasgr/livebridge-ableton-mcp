@@ -827,6 +827,18 @@ def test_mix_auto_keeps_hand_set_controls_and_holds_the_loop(app, song, mix_set,
     assert any("kept what you set by hand" in r for r in entry["reasons"])
     # LiveBridge's own settings are not "kept": its high-pass is set again, not frozen
     assert "HP Freq" not in entry["kept"] and entry["values"]["HP Freq"] == 300.0
+    # the memory is per set: another set's "Hats" with the same settings is not LiveBridge's
+    import json
+    path = tmp_path / "library" / "channel_strips.json"
+    memory = json.loads(path.read_text())
+    assert list(memory) == ["unsaved"] and "Hats" in memory["unsaved"]
+    path.write_text(json.dumps({"C:/other set.als": memory["unsaved"],
+                                "Hats": {"HP Freq": 300.0}}))        # + the old format
+    other = call_tool(app, "live_mix_auto", args)
+    entry = next(t for t in other["tracks"] if t["name"] == "Hats")
+    assert "HP Freq" in entry["kept"]                  # unknown here: treated as the user's
+    assert set(json.loads(path.read_text())) == {"C:/other set.als", "unsaved"}
+    path.write_text(json.dumps(memory))
     full = call_tool(app, "live_mix_auto", dict(args, keep_manual=False))
     assert "kept" not in next(t for t in full["tracks"] if t["name"] == "Hats")
     assert high.value == pytest.approx(0.0)
