@@ -1659,6 +1659,7 @@ Phase-align a part against the rest of the low end (bass against kick, a layered
 | `frequencies` | list[float] \| null | `null` |
 | `apply` | bool | `true` |
 | `place_devices` | bool | `true` |
+| `section_bars` | list[int] \| null | `null` |
 
 Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.list`, `devices.move`, `devices.set_parameters`, `tracks.list`, `transport.get`
 
@@ -1676,6 +1677,7 @@ Stop two parts fighting over a band — the way a side-chained dynamic EQ does i
 | `seconds` | float | `4.0` |
 | `apply` | bool | `true` |
 | `place_devices` | bool | `true` |
+| `section_bars` | list[int] \| null | `null` |
 
 Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.list`, `devices.move`, `devices.set_parameters`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`
 
