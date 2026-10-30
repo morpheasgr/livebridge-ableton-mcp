@@ -350,7 +350,9 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
 
     Returns:
         ``{anchor?, level_shift_db, moves:[{name, role, offset_lu, now_lufs, target_lufs,
-        fader_db, new_fader_db, move_db, capped?, ...}], unchanged:[name], protected:[name]}``;
+        fader_db, new_fader_db, move_db, capped?, ...}], unchanged:[name], protected:[name],
+        held?:[{name, role, off_db (+ = too loud), budget_capped?|raise_capped?|at_max?}]}``
+        — ``held`` parts are in ``unchanged`` too: off target, but a limit stops the move;
         loudness values are post-fader LUFS.
     """
     if not parts:
@@ -371,13 +373,14 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         wishes = sorted(p["post"] - p["offset"] for p in parts)
         middle = len(wishes) // 2
         level = wishes[middle] if len(wishes) % 2 else (wishes[middle - 1] + wishes[middle]) / 2
-    moves, unchanged, protected, applied = [], [], [], []
+    moves, unchanged, protected, applied, held = [], [], [], [], []
     for part in parts:
         target = level + part["offset"]
         if part["name"].lower() in keep or (chosen is not None and part is chosen):
             (protected if part["name"].lower() in keep else unchanged).append(part["name"])
             continue
         move = target - part["post"]
+        wanted = move
         flags = {}
         if abs(move) < min_move:
             unchanged.append(part["name"])
@@ -400,6 +403,9 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
             move = new_fader - float(part["fader_db"])
         if abs(move) < 0.5:
             unchanged.append(part["name"])
+            if flags:                  # off target, but a limit stops it: say so
+                held.append({"name": part["name"], "role": part.get("role"),
+                             "off_db": round(-wanted, 1), **flags})
             continue
         applied.append(move)
         moves.append({"name": part["name"], "role": part.get("role"),
@@ -408,6 +414,8 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
                       "new_fader_db": round(new_fader, 1), "move_db": round(move, 1), **flags})
     plan: dict[str, Any] = {"level_shift_db": round(sum(applied) / len(parts), 1),
                             "moves": moves, "unchanged": unchanged, "protected": protected}
+    if held:
+        plan["held"] = held
     if chosen is not None:
         plan["anchor"] = chosen["name"]
     return plan

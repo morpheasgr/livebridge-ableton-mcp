@@ -123,7 +123,7 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
         plan = balance.get("plan") or {}
         short["balance"] = {k: v for k, v in balance.items() if k in (
             "applied", "genre", "headroom_trim_db", "notes", "error", "type", "job", "status")}
-        for key in ("unchanged", "protected"):
+        for key in ("unchanged", "protected", "held"):
             if plan.get(key):
                 short["balance"][key] = plan[key]
         short["balance"]["moves"] = [
@@ -843,6 +843,16 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                          "level, so they keep their place — check them by ear where they "
                          "play (or balance a section where they do).")
         protected = set(plan.get("protected") or ())
+        for item in plan.get("held") or []:
+            why = "Live's +6 dB fader maximum" if item.get("at_max") else \
+                "the raise limit (max_raise_db)" if item.get("raise_capped") else \
+                "the move limit (max_move_db, counted over runs)"
+            fix = "lower it by hand, or rerun with a higher max_move_db" if item["off_db"] > 0 \
+                else "raise it at the source (the instrument, sample gain or the Channel's " \
+                     "Trim) — or rerun with a higher max_raise_db"
+            notes.append(f"{item['name']} is held {abs(item['off_db']):g} dB "
+                         f"{'above' if item['off_db'] > 0 else 'below'} its role's level by "
+                         f"{why}: {fix}.")
         plan = dict(plan, moves=list(total.values()),
                     unchanged=[p["name"] for p in parts
                                if p["name"] not in total and p["name"] not in protected])

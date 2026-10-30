@@ -813,6 +813,9 @@ def test_a_capped_move_is_final_until_the_fader_is_touched(app, song, mix_set):
     assert hats["move_db"] == 3.0 and hats.get("raise_capped")
     again = call_tool(app, "live_mix_balance", {"seconds": 3})
     assert all(m["name"] != "Hats" for m in again["plan"]["moves"])
+    held = next(h for h in again["plan"]["held"] if h["name"] == "Hats")   # still off: said
+    assert held["off_db"] < -3 and held.get("raise_capped") and "Hats" in again["plan"]["unchanged"]
+    assert any("Hats is held" in n and "below" in n for n in again["notes"])
     mix_set.track("Hats").mixer_device.volume.value = 0.5    # the user moves it: start over
     third = call_tool(app, "live_mix_balance", {"seconds": 3})
     assert any(m["name"] == "Hats" and m["move_db"] > 0 for m in third["plan"]["moves"])
