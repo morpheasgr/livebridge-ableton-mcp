@@ -132,8 +132,9 @@ class FakeEngines:
 
 
 @pytest.fixture
-def mix_set(song, monkeypatch):
+def mix_set(song, monkeypatch, tmp_path):
     """Kick, Sub, Pad, Hats (MIDI, each with an instrument) playing; Engines faked."""
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "mix-library"))
     for name in ("Kick", "Sub", "Pad", "Hats"):
         track = factory.add_track(song, name, "midi")
         factory.add_device(track, "Operator", "Operator", kind="instrument")
@@ -800,3 +801,30 @@ def test_bars_plays_the_section_and_stops_again(app, song, mix_set):
     assert song.is_playing is False and song.loop is False
     bad = call_tool(app, "live_mix_balance", {"seconds": 3, "section_bars": [4, 1]})
     assert bad["type"] == "bad_args"
+
+
+def test_a_capped_move_is_final_until_the_fader_is_touched(app, song, mix_set):
+    """A part that keeps reading quiet got +3 dB on every rerun (DR Tom +3, +3, ...): the raise
+    limit counts over runs while the fader stays where the balance left it."""
+    lufs, crest, share = mix_set.parts["Hats"]
+    mix_set.parts["Hats"] = (-45.0, crest, share)            # far too quiet for its role
+    first = call_tool(app, "live_mix_balance", {"seconds": 3})
+    hats = next(m for m in first["plan"]["moves"] if m["name"] == "Hats")
+    assert hats["move_db"] == 3.0 and hats.get("raise_capped")
+    again = call_tool(app, "live_mix_balance", {"seconds": 3})
+    assert all(m["name"] != "Hats" for m in again["plan"]["moves"])
+    mix_set.track("Hats").mixer_device.volume.value = 0.5    # the user moves it: start over
+    third = call_tool(app, "live_mix_balance", {"seconds": 3})
+    assert any(m["name"] == "Hats" and m["move_db"] > 0 for m in third["plan"]["moves"])
+
+
+def test_protect_keeps_the_fader_and_the_mix_level():
+    parts = [{"name": n, "role": r, "lufs": l, "fader_db": 0.0} for n, r, l in (
+        ("Kick", "kick", -16.0), ("Bass", "bass", -19.0), ("Lead", "lead", -12.0),
+        ("Pad", "pad", -26.0), ("Hats", "hats", -27.0))]
+    free = mix.balance_plan([dict(p) for p in parts], min_move=0.0)
+    kept = mix.balance_plan([dict(p) for p in parts], min_move=0.0, protect=["Lead"])
+    assert kept["protected"] == ["Lead"]
+    # the others are centred as without protect: they are not pulled up to the hot lead
+    assert {m["name"]: m["move_db"] for m in kept["moves"]} == \
+        {m["name"]: m["move_db"] for m in free["moves"] if m["name"] != "Lead"}

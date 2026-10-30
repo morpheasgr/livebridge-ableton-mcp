@@ -664,7 +664,7 @@ Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
    undo step per pass), checks again, and trims everything together for 6 dB of master
    headroom — unless a chain sits before the master's Engine (a limiter's output says nothing
    about headroom: `live_master_auto` sets it in front of its chain). Parts within 3 dB
-   (`tolerance_db`) of their role stay; outliers move to just inside it, so a rerun is a no-op. Unclear roles: pass `roles={"Audio 3": "hats"}`. Start with `apply=false` on the
+   (`tolerance_db`) of their role stay; outliers move to just inside it, so a rerun is a no-op. The raise/move limits count over runs while a fader stays where the balance left it (a capped part is final until the user moves it). Unclear roles: pass `roles={"Audio 3": "hats"}`. Start with `apply=false` on the
    user's own mix and show the plan. Then listen together — targets are a starting point.
 3. **Spectral fixes where they belong**: `bands` in the result says per band whether the
    excess is shared by 3+ tracks (one master/bus EQ move keeps phase coherent) or owned by 1-2

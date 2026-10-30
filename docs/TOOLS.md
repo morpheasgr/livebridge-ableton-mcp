@@ -1601,7 +1601,7 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `protect` | list[str] \| null | `null` |
 | `section_bars` | list[int] \| null | `null` |
 
-Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `transport.get`
+Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `song.summary`, `transport.get`
 
 #### `live_master_auto`
 
@@ -1644,7 +1644,7 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `detail` | str | `"summary"` |
 | `section_bars` | list[int] \| null | `null` |
 
-Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -3689,7 +3689,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `simpler.get` |  | track=null, device=null, max_slices=64 | `live_simpler_get` | Simpler: sample file, length, markers, warp, slices, modes |
 | `simpler.set` | M | track=null, device=null, playback_mode=null, slicing_playback_mode=null, voices=null, retrigger=null, pad_slicing=null, warping=null, warp_mode=null, slicing_style=null, slicing_sensitivity=null, slicing_beat_division=null, slicing_region_count=null, start_marker=null, end_marker=null, gain=null | `live_simpler_set` | Simpler: playback/slicing modes, voices, sample warp/slicing settings |
 | `song.snapshot` |  | detail="summary", include_clips=true, include_devices=true, include_returns=true, include_scenes=true, offset=0, limit=null | `live_set_snapshot` | The whole set in one compact payload (call this first) |
-| `song.summary` |  | detail="summary" | `live_memory_note`, `live_memory_recall`, `live_set_snapshot` | Song-level overview: tempo, signature, transport, counts |
+| `song.summary` |  | detail="summary" | `live_memory_note`, `live_memory_recall`, `live_mix_auto`, `live_mix_balance`, `live_set_snapshot` | Song-level overview: tempo, signature, transport, counts |
 | `system.batch` | M | commands, stop_on_error=true | `live_command_batch` | Run several commands in one round trip, on one main-thread pass, as one undo step |
 | `system.commands` |  | namespace=null, include_doc=true | `live_commands` | List every registered command with its docs |
 | `system.dialog` |  |  | `live_dialog_get` | Read Live's open modal dialog: message and button count |
