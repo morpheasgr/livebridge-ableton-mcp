@@ -620,6 +620,8 @@ def _phase_device(track):
 
 
 def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkeypatch):
+    # a Phase that sits after the Channel (an earlier version loaded it there) moves in front
+    factory.add_device(mix_set.track("Sub"), "LiveBridge Channel", "MxDeviceAudioEffect")
     phase = _phase_device(mix_set.track("Sub"))
     plain = mix_set.master_reading
 
@@ -638,6 +640,9 @@ def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkey
                                                     "low_db": result["best"]["low_db"]}
     assert result["gain_db"] == pytest.approx(3.0, abs=0.3)
     assert len(result["tried"]) == 2 + 2 * 7
+    names = [d.name for d in mix_set.track("Sub").devices]
+    assert names.index("LiveBridge Phase") < names.index("LiveBridge Channel")
+    assert any("in front of" in n for n in result["notes"])
     p = {q.name: q.value for q in phase.parameters}
     assert p["Invert"] == 1 and p["Phase Stages"] == 1
     assert p["Phase Freq"] == pytest.approx(70.0, rel=0.01)

@@ -207,6 +207,20 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
     def listen_all(devices: list[dict[str, Any]], seconds: float) -> list[Any]:
         return engine.each(devices, lambda d: engine.listen(d, seconds))
 
+    def before_meter(track: str, index: int) -> int | Any:
+        """Move the device at ``index`` in front of the track's meter (its LiveBridge Channel
+        or Engine), so the meter and the Channel's strip hear what it does; the new index."""
+        listing = bridge_call(bridge, "devices.list", {"track": track})
+        meter_at = next((d.get("index") for d in (listing.get("devices") or [])
+                         if "livebridge channel" in str(d.get("name", "")).lower()
+                         or "livebridge engine" in str(d.get("name", "")).lower()), None) \
+            if isinstance(listing, dict) else None
+        if meter_at is None or meter_at > index:
+            return index
+        moved = bridge_call(bridge, "devices.move", {"track": track, "device": index,
+                                                     "position": meter_at})
+        return moved if _is_error(moved) else meter_at
+
     def load_device(device_name: str, track: str) -> Any:
         """``browser.load`` a LiveBridge device onto ``track``; a "not found" is retried once
         with a cleared browser cache (a device installed after the cache was built)."""
@@ -1950,6 +1964,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 return tool_error("LiveBridge Phase did not appear on the track",
                                   type="timeout", cmd=cmd)
             notes.append(f"Loaded LiveBridge Phase on {track}.")
+        # in front of the Channel: its compressor, saturation and meter work on the
+        # phase-corrected part (one loaded after the Channel by an earlier version moves too)
+        moved = before_meter(track, index)
+        if _is_error(moved):
+            return moved
+        if moved != index:
+            notes.append(f"LiveBridge Phase moved in front of {track}'s Channel.")
+            index = phase_index()
 
         def setting(invert: int, frequency: float | None) -> Any:
             values: dict[str, Any] = {"Invert": float(invert), "Delay": 0.0,
@@ -2146,17 +2168,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 return tool_error("LiveBridge Unmask did not appear on the track",
                                   type="timeout", cmd=cmd)
             # in front of the track's meter (Channel / Engine), so the meter hears the cut
-            listing = bridge_call(bridge, "devices.list", {"track": track})
-            meter_at = next((d.get("index") for d in (listing.get("devices") or [])
-                             if "livebridge channel" in str(d.get("name", "")).lower()
-                             or "livebridge engine" in str(d.get("name", "")).lower()), None) \
-                if isinstance(listing, dict) else None
-            if meter_at is not None and meter_at < index:
-                moved = bridge_call(bridge, "devices.move", {"track": track, "device": index,
-                                                             "position": meter_at})
-                if _is_error(moved):
-                    return moved
-                index = unmask_index()
+            moved = before_meter(track, index)
+            if _is_error(moved):
+                return moved
+            index = unmask_index()
             notes.append(f"Loaded LiveBridge Unmask on {track}.")
         answer = bridge_call(bridge, "devices.set_parameters", {
             "track": track, "device": index, "values": _for_live({
