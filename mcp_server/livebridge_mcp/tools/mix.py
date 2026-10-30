@@ -204,6 +204,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 before.append(name)
         return []
 
+    def current_set() -> str:
+        """The open set's key for per-set memories: its path, else its name, else "unsaved"."""
+        summary = bridge_call(bridge, "song.summary", {"detail": "minimal"})
+        if isinstance(summary, dict) and not _is_error(summary):
+            return str(summary.get("set_path") or summary.get("set_name") or "unsaved")
+        return "unsaved"
+
     #: the loop a run holds (its start in beats), set by ``looped`` for the outermost run
     held_loop: dict[str, float | None] = {"start": None, "bar_beats": 4.0}
 
@@ -803,10 +810,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         raised: dict[str, float] = {}
         moved: dict[str, float] = {}
         # what earlier runs did to these faders (same set, fader still where they left it)
-        set_key = "unsaved"
-        summary = bridge_call(bridge, "song.summary", {"detail": "minimal"})
-        if isinstance(summary, dict) and not _is_error(summary):
-            set_key = str(summary.get("set_path") or summary.get("set_name") or "unsaved")
+        set_key = current_set()
         memory = library.read_json(library.library_dir() / _BALANCE_FILE, {})
         memory = memory if isinstance(memory, dict) else {}
         earlier: dict[str, dict[str, Any]] = {}
@@ -1809,8 +1813,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 notes.append("Muted with no mute automation (never plays), strip left as it "
                              "is: " + ", ".join(off) + ".")
                 pairs = [(d, n) for d, n in pairs if n not in off]
-        remembered = library.read_json(library.library_dir() / _STRIPS_FILE, {})
-        remembered = remembered if isinstance(remembered, dict) else {}
+        # per set, like the balance's memory: a "Kick" in another set is another track
+        strips_file = library.read_json(library.library_dir() / _STRIPS_FILE, {})
+        # an entry holding Channel controls is the old memory without sets: unknown set, dropped
+        strips_file = {k: v for k, v in strips_file.items() if isinstance(v, dict) and not (
+            set(v) & set(mix.CHANNEL_NEUTRAL))} if isinstance(strips_file, dict) else {}
+        strip_set = current_set()
+        remembered = dict(strips_file.get(strip_set) or {})
         kept: dict[str, dict[str, str]] = {}
         #: each strip's controls before this run, for the before -> after report
         was: dict[str, dict[str, float | None]] = {}
@@ -1883,7 +1892,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         result: dict[str, Any] = {"applied": bool(apply), "tracks": results, "notes": notes}
         if apply:
             try:
-                library.write_json(library.library_dir() / _STRIPS_FILE, remembered)
+                strips_file[strip_set] = remembered
+                library.write_json(library.library_dir() / _STRIPS_FILE, strips_file)
             except OSError as exc:
                 notes.append(f"could not remember the strip settings ({exc}): a rerun treats "
                              "them as set by hand.")
