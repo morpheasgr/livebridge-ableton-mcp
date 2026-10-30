@@ -633,8 +633,10 @@ at the end of each sounding track, an Engine on the master, LiveBridge Master be
 don't ask the user to drag anything in; Max for Live is needed (Max 9 for Channel/Master).
 Mixing first, mastering second; most "weak" masters are mix problems.
 
-**All in one**: loop the fullest section, start playback, `live_mix_auto(genre="techno",
-master="streaming")` — strips, kick/bass phase and unmasking, balance and master in one call.
+**All in one**: `live_mix_auto(genre="techno", master="streaming", section_bars=[first, last])` with
+the fullest section's bars (the tool loops and plays them, then stops; or start playback there
+yourself and leave `section_bars` out) — strips, balance and master in one call (kick/bass phase and
+unmasking with `low_end=true`).
 The steps below are the same work one tool at a time (to stop between steps, or to redo one).
 Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
 `live_mix_job(job=..., wait_seconds=30)` for the report; don't start a second run meanwhile.
@@ -660,7 +662,9 @@ Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
    genre: kick on top, sub -1, bass -3, snare -3, vocal -2, lead -6, keys -8, percussion -9,
    pads -10, hats -11, fx -13 LU). It measures every part pre-fader, sets the faders in dB (one
    undo step per pass), checks again, and trims everything together for 6 dB of master
-   headroom. Unclear roles: pass `roles={"Audio 3": "hats"}`. Start with `apply=false` on the
+   headroom — unless a chain sits before the master's Engine (a limiter's output says nothing
+   about headroom: `live_master_auto` sets it in front of its chain). Parts within 3 dB
+   (`tolerance_db`) of their role stay; outliers move to just inside it, so a rerun is a no-op. Unclear roles: pass `roles={"Audio 3": "hats"}`. Start with `apply=false` on the
    user's own mix and show the plan. Then listen together — targets are a starting point.
 3. **Spectral fixes where they belong**: `bands` in the result says per band whether the
    excess is shared by 3+ tracks (one master/bus EQ move keeps phase coherent) or owned by 1-2

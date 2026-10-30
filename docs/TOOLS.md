@@ -1597,10 +1597,11 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `max_move_db` | float | `6.0` |
 | `min_active` | float | `0.35` |
 | `max_raise_db` | float | `3.0` |
-| `tolerance_db` | float | `2.0` |
+| `tolerance_db` | float | `3.0` |
 | `protect` | list[str] \| null | `null` |
+| `section_bars` | list[int] \| null | `null` |
 
-Bridge: `mixer.get`, `mixer.set_many`, `transport.get`
+Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `transport.get`
 
 #### `live_master_auto`
 
@@ -1641,8 +1642,9 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `keep_manual` | bool | `true` |
 | `protect` | list[str] \| null | `null` |
 | `detail` | str | `"summary"` |
+| `section_bars` | list[int] \| null | `null` |
 
-Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -3559,7 +3561,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `automation.record` | M | parameter=null, track=null, device=null, points=null, shape=null, start=null, end=null, low=0.0, high=1.0, normalized=null, period=null, cycles=null, phase=0.0, duty=0.5, curve=1.0, seed=null, mode="linear", preroll=1.0, action="start", tempo=null, writer="live", lanes=null | `live_automation_record` | Record ARRANGEMENT track automation: play the song through a range while moving a parameter (Arrangement Record + Automation Arm) |
 | `automation.record_status` |  |  | `live_automation_record` | Progress / result of the running or last automation.record pass |
 | `automation.shape` | M | parameter, shape="sine", track=null, slot=null, clip=null, device=null, start=null, end=null, low=0.0, high=1.0, normalized=true, period=null, cycles=null, phase=0.0, step=null, duty=0.5, curve=1.0, seed=null, clear=false, mode="step", slots=null, extend_clip=false | `live_automation_shape` | Write a shape (ramp, sine/triangle/saw LFO, square, seeded random) into a clip envelope, or one continuous shape across several clips |
-| `automation.state` |  | track=null, parameter=null, device=null, include_all=false | `live_automation_state` | Automation state (none/playing/overridden) of a parameter, a track or the whole set |
+| `automation.state` |  | track=null, parameter=null, device=null, include_all=false | `live_automation_state`, `live_mix_auto` | Automation state (none/playing/overridden) of a parameter, a track or the whole set |
 | `automation.write` | M | parameter, points, track=null, slot=null, clip=null, device=null, mode="step", resolution=16, end=null, normalized=false, clear=false, extend_clip=false | `live_automation_write` | Write a clip envelope from points [{time, value}] as steps or linear ramps |
 | `browser.browse` |  | path=null, uri=null, name=null, offset=0, limit=100, filter=null, kind=null, detail="summary" | `live_browser_browse` | List a browser folder's children by path, uri or name (paged) |
 | `browser.cache` |  | action="info" | `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask` | Browser search cache: info or clear |
@@ -3600,7 +3602,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `devices.get` |  | track=null, device=null, detail="summary", max_parameters=64 | `live_device_get` | One device: summary, state, rack/plugin/Simpler extras |
 | `devices.get_parameter` |  | parameter, track=null, device=null | `live_device_get_parameter`, `live_engine_modulate`, `live_engine_unmodulate`, `live_master_auto`, `live_mix_auto` | One parameter in full detail |
 | `devices.insert` | M | name, track=null, chain=null, index=-1, select=false | `live_audio_align`, `live_device_insert`, `live_master_auto`, `live_mix_auto` | Insert a Live device by name (native via insert_device, Max devices via the browser) |
-| `devices.list` |  | track=null, tree=false, detail="minimal", max_depth=4 | `live_device_list`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_host_bank`, `live_plugin_host_expose`, `live_theory_analyze` | List the devices of a track (flat, or as a tree through racks) |
+| `devices.list` |  | track=null, tree=false, detail="minimal", max_depth=4 | `live_device_list`, `live_master_auto`, `live_mix_auto`, `live_mix_balance`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_host_bank`, `live_plugin_host_expose`, `live_theory_analyze` | List the devices of a track (flat, or as a tree through racks) |
 | `devices.modulation` | M | op="get", track=null, device=null, target=null, source=null, amount=null, parameter=null | `live_device_modulation` | Wavetable modulation matrix: read, set an amount, add a parameter as target |
 | `devices.move` | M | track=null, device=null, target_track=null, target_chain=null, position=-1 | `live_device_move`, `live_master_auto`, `live_mix_auto`, `live_mix_unmask` | Move a device to another position/track/chain |
 | `devices.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, only_changed=false, detail="summary" | `live_audio_align`, `live_device_parameters`, `live_mix_auto`, `live_sound_check`, `live_sound_load`, `live_sound_save` | List a device's parameters (paged, filterable, with display values) |
