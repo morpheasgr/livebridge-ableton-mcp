@@ -19,7 +19,7 @@ from .config import load_config, save_config
 from .discovery import discover
 from .errors import BridgeError, error_payload, friendly_error
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "BridgeClient",

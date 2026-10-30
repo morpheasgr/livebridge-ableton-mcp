@@ -1165,6 +1165,7 @@ def test_live_status_reports_the_mcp_version(app_online: Any) -> None:
 
     _text, data = call_tool(app_online, "live_status")
     assert data["mcp_host"]["version"] == __version__
+    assert len(data["mcp_host"]["build"]) == 12
 
 
 def test_batch_and_dialog_tools(app_online: Any, fake: FakeBridge) -> None:

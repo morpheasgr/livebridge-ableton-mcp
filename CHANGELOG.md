@@ -3,6 +3,10 @@
 LiveBridge's version is the Remote Script's (`VERSION` in `remote_script/LiveBridge/LiveBridge.py`);
 the MCP server package and the installer have their own version numbers. `live_status` shows both.
 
+## 0.3.0 (MCP server) / 1.1.0 (Remote Script)
+
+- `live_status` shows `mcp_host.build`, a fingerprint of the server's code as loaded at start; `python installers/build_id.py` prints the checkout's, so a restart that did not pick up a pull shows (the version alone stayed 0.2.0 over several changes). The level-neutral balance below shipped as 0.2.0 without a bump; 0.3.0 is the first version that is sure to have it.
+
 ## 0.2.0 (MCP server) / 1.1.0 (Remote Script)
 
 - The balance is level-neutral: moves are centred so the mix keeps its level and only parts more than `tolerance_db` (2) off their role move — anchoring on the kick and lowering everything when one quiet part could not reach its target took a 23-track mix down 10-14 dB; a fader that would need more than +6 dB stops there; `max_move_db` is a budget per call; `protect` keeps parts in place; the headroom trim moves every track fader; unmeasured parts are named. Runs listen over exactly one loop so before/after hear the same bars. `live_mix_auto`: kick/bass fixes opt-in (`low_end`), a Phase device that changed nothing is removed, the measured compressor effect per part (`measured`), a summary report (`detail="full"` for all), the genre list, unknown genres refused. `live_master_auto`: the contrast check reports both sections' LUFS and warns when the quiet bar is louder; at the gain cap it says how much level is missing (`missing_gain_db`).
