@@ -227,8 +227,9 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
   - *Mix and master* — **one call, no devices to place**: start playback on the fullest section
     (loop the drop) and run `live_mix_auto(genre=..., master="streaming")` (or "club",
     "apple" ...). It puts a LiveBridge Channel at the end of every track that makes sound (it
-    replaces an Engine there) and an Engine on the master, sets each part's strip by role, fixes
-    kick vs bass (phase + side-chained band cut), balances the faders, then masters through the
+    replaces an Engine there) and an Engine on the master, sets each part's strip by role,
+    balances the faders (level-neutral: only outliers move, the mix keeps its level; protect
+    the lead with `protect=[...]`), then masters through the
     LiveBridge Master device before the master's Engine. Needs Max for Live (Max 9 for the
     Channel and Master). On the user's own mix: `apply=false` first (it then places nothing and
     only plans from the Channels already there) and show the plan; report the `reasons` after.
@@ -241,6 +242,9 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     gives the loop back after — start it where the fullest section plays. Strip controls the
     user set by hand are kept on a rerun (`kept`); `keep_manual=false` resets them too. Muted
     tracks (mute automation) still get strips — their meter hears the part before the mute.
+    Kick vs bass fixes are opt-in (`low_end=true`: Phase + Unmask devices on the bass). The
+    report is a summary; `detail="full"` has every reading. A track's `measured` says what the
+    compressor really did; the master's `missing_gain_db` says how much level the mix lacks.
   - *Sound check, balance, master step by step* (each tool places the meters it needs):
     `live_sound_check()` -> silent or strangled parts and filters shut below their role's
     floor, before you build on them; `live_mix_balance(genre=...)` sets the faders to role
