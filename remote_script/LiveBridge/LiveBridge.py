@@ -55,7 +55,7 @@ from . import server as server_module
 from .registry import BridgeError
 
 #: LiveBridge version (also reported by ``system.hello`` and the beacon).
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 #: Most commands executed in one drain before yielding back to Live's UI.
 MAX_DRAIN_JOBS = 32

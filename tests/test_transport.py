@@ -209,6 +209,15 @@ def test_play_stop_continue_toggle(bridge, song):
     assert fail(bridge, "transport.play", mode="backwards")["type"] == "bad_args"
 
 
+def test_stop_while_stopped_keeps_the_start_marker(bridge, song):
+    """Live's second Stop sends playhead and start marker to 1.1.1: only on request."""
+    run(bridge, "transport.set_position", position="9.1.1")
+    answer = run(bridge, "transport.stop")
+    assert answer["already_stopped"] is True and song.start_time == 32.0
+    home = run(bridge, "transport.stop", to_start=True)
+    assert "already_stopped" not in home and song.start_time == 0.0
+
+
 def test_stop_with_clips(bridge, song):
     song.tracks[0].clip_slots[0].fire()
     run(bridge, "transport.play")
