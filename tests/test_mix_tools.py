@@ -72,6 +72,7 @@ class FakeEngines:
         self.master = master
         self.requests = []
         self.quiet_from = None                # beats: from here on only the pad plays
+        self.broken = False                   # a master device whose DSP does not run
 
     def devices(self, timeout=1.5, clean=True, kind="engine"):
         if kind != "engine":
@@ -92,8 +93,18 @@ class FakeEngines:
             if device.class_name == "Limiter" and "Gain" in params:
                 return params["Gain"], params["Ceiling"]
             if device.name == "LiveBridge Master":
-                return params["Limit Gain"], params["Limit Ceiling"]
+                if self.broken:
+                    return 0.0, 0.0
+                # the compressor's makeup drives the limiter like its own gain
+                return params["Limit Gain"] + params.get("Comp Makeup", 0.0), \
+                    params["Limit Ceiling"]
         return 0.0, 0.0
+
+    def output(self):
+        for device in self.song.master_track.devices:
+            if device.name == "LiveBridge Master" and not self.broken:
+                return {p.name: p.value for p in device.parameters}.get("Output", 0.0)
+        return 0.0
 
     def master_reading(self):
         power = 0.0
@@ -118,6 +129,7 @@ class FakeEngines:
         squash = max(0.0, peak - ceiling)           # what the limiter shaves off the peaks
         lufs += gain - 0.6 * squash
         crest = min(peak, ceiling) - lufs
+        lufs += self.output()
         return lufs, crest, {b: v / power for b, v in band_power.items()}
 
     def request(self, device, cmd, args=None, timeout=5.0):
@@ -416,11 +428,80 @@ def test_master_auto_with_the_livebridge_master_device(app, song, mix_set):
     assert clash["type"] == "invalid_state" and "two limiters" in clash["error"]
 
 
+def add_master_device(song, limit_gain=0.0):
+    """The LiveBridge Master device with the controls live_master_auto drives."""
+    def db(name, value, low, high):
+        return {"name": name, "value": value, "min": low, "max": high, "unit": "dB"}
+    factory.add_device(song.master_track, "LiveBridge Master", "MxDeviceAudioEffect", params=[
+        {"name": "EQ Low Cut", "value": 0, "min": 0, "max": 1, "is_quantized": True,
+         "value_items": ("Off", "On")},
+        db("EQ Low", 0.0, -15.0, 15.0), db("EQ Mid", 0.0, -12.0, 12.0),
+        {"name": "EQ Mid Freq", "value": 1000.0, "min": 120.0, "max": 7500.0, "unit": "Hz"},
+        db("EQ High", 0.0, -15.0, 15.0),
+        {"name": "Comp Ratio", "value": 2.0, "min": 1.0, "max": 10.0},
+        db("Comp Makeup", 0.0, -12.0, 24.0), db("Limit Gain", limit_gain, -24.0, 24.0),
+        db("Limit Ceiling", -1.0, -24.0, 0.0), db("Output", 0.0, -24.0, 12.0)])
+    return next(d for d in song.master_track.devices if d.name == "LiveBridge Master")
+
+
+def master_params(device):
+    return {p.name: p.value for p in device.parameters}
+
+
+def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_set):
+    """A rerun: the last run's +18 dB is set back to 0 for 'before'; the shared band excess
+    goes on the device's EQ; past Limit Gain's limit the compressor's makeup drives on."""
+    device = add_master_device(song, limit_gain=18.0)
+    result = call_tool(app, "live_master_auto", {
+        "destination": "club", "seconds": 3, "chain": "livebridge",
+        "eq_bands": {"mid": 7.0, "air": 0.4}})
+    assert result["reset"] == {"Limit Gain": 18.0}, result
+    assert result["before"]["lufs"] < result["after"]["lufs"] - 6
+    params = master_params(device)
+    assert params["EQ Mid"] == pytest.approx(-3.5) and params["EQ Mid Freq"] == pytest.approx(700)
+    assert result["eq"]["EQ Mid"].startswith("0 -> -3.5") and result["steps"][0] == \
+        {"eq": result["eq"]}
+    assert "EQ High" not in result["eq"]                      # 0.4 dB: left alone
+    assert result["settings"]["Limit Gain"].startswith(f"{params['Limit Gain']:.1f}")
+    assert not result.get("headroom_trim_db")                 # no fader moves
+    assert result["after"]["lufs"] == pytest.approx(-8.0, abs=0.6) or "stopped" in result
+    # the EQ adds up over runs (a second run still hearing too much mid cuts again)
+    again = call_tool(app, "live_master_auto", {
+        "destination": "club", "seconds": 3, "chain": "livebridge", "eq_bands": {"mid": 4.0}})
+    assert master_params(device)["EQ Mid"] == pytest.approx(-5.5)
+    assert set(again["reset"]) <= {"Limit Gain", "Comp Makeup"} and again["reset"]
+    # Limit Gain capped at 6 dB: the compressor's makeup drives on to the target
+    pushed = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                 "chain": "livebridge", "max_gain_db": 6})
+    assert pushed["limiter_gain_db"] == 6 and pushed["makeup_db"] > 0, pushed
+    assert pushed["after"]["lufs"] == pytest.approx(-8.0, abs=0.6)
+    assert master_params(device)["Comp Makeup"] == pytest.approx(pushed["makeup_db"], abs=0.05)
+
+
+def test_master_auto_finds_a_device_that_does_not_process(app, song, mix_set):
+    device = add_master_device(song)
+    mix_set.broken = True
+    result = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                 "chain": "livebridge"})
+    check = result["device_check"]
+    assert "passes the sound untouched" in result["stopped"] and check["heard_lu"] == 0
+    assert check["output_probe_lu"] == 0 and "limiting_db" not in result
+    params = master_params(device)
+    assert params["Limit Gain"] == 0 and params["Output"] == 0       # nothing left changed
+    # switched off (Device On): refused before anything is touched
+    mix_set.broken = False
+    device.parameters[0].value = 0
+    off = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                              "chain": "livebridge"})
+    assert off["type"] == "invalid_state" and "switched off" in off["error"]
+
+
 def test_master_auto_trims_a_hot_mix_first(app, song, mix_set):
     for track in song.tracks:
         track.mixer_device.volume.value = 0.85              # 0 dB: peaks near full scale
     result = call_tool(app, "live_master_auto", {"destination": "streaming", "seconds": 3})
     assert result["headroom_trim_db"] < -3 and fader_db(mix_set.track("Kick")) < -3
+    assert result["steps"][0]["faders_db"] == result["headroom_trim_db"]   # listed
     assert result["after"]["lufs"] == pytest.approx(-14.0, abs=0.6)
 
 
@@ -513,6 +594,8 @@ def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
     strip = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
     assert {p.name: p.value for p in strip.parameters}["HP Freq"] == pytest.approx(300, rel=0.01)
     assert "parts" in result["balance"] or "plan" in result["balance"]
+    # every part carries the balance's verdict, so the per-track section and it agree
+    assert all(t.get("balance") for t in result["tracks"]), result["tracks"]
     for bad in ({"seconds": 1}, {"master_chain": "rack"}, {"roles": {"Kick": "tuba"}}):
         assert call_tool(app, "live_mix_auto", bad)["type"] == "bad_args", bad
 

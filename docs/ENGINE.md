@@ -201,7 +201,13 @@ Gain/Ceiling/Mode/Lookahead/Auto Release, Width, Bass Mono, Bass Mono Freq, Outp
 `live_device_*`, automation and `live_master_auto(chain="livebridge")` drive it like any
 device. The reference pages document these objects' parameters but not their inlets and
 outlets; the patch assumes stereo in/out on the left inlets/outlets (Channel EQ is wired
-once per side, which works whether it is mono or stereo).
+once per side, which works whether it is mono or stereo). Switches are Off/On `live.menu`s (a
+`live.text` toggle showed Live "val1"/"val2"). The frequency dials have an exponent: Live's raw
+value is the dial's position mapped linearly onto the range (EQ Mid Freq 1 kHz reads 3752.44,
+Bass Mono Freq 120 Hz reads 292.01) while the DSP receives the displayed Hz — set them as
+"<n> Hz" text, never as a raw number. `live_master_auto` checks that the device processes: a
+gain step it cannot hear makes it turn Output down 6 dB for one listen and report which stage
+does not run (`device_check`).
 
 ## Max facts the devices rely on
 

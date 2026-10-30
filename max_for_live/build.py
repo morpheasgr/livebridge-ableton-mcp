@@ -497,10 +497,10 @@ def _master_param_box(i: int, spec: tuple, prefix: str = "p", left: float = 10.0
     valueof: dict = {"parameter_longname": name, "parameter_shortname": name,
                      "parameter_initial_enable": 1, "parameter_initial": [initial]}
     if kind == "toggle":
-        maxclass, outlets = "live.text", ["", ""]
-        valueof.update(parameter_type=2, parameter_mmax=1, parameter_enum=["off", "on"])
-        extra = {"mode": 1, "text": name, "texton": name}      # mode 1 = toggle
-    elif kind == "menu":
+        # an Off/On menu: a live.text toggle showed Live "val1"/"val2" (its own enum won over
+        # parameter_enum); live.menu keeps the names, like Limit Mode's
+        kind, unit = "menu", ("Off", "On")
+    if kind == "menu":
         maxclass, outlets = "live.menu", ["", "", "float"]
         valueof.update(parameter_type=2, parameter_mmax=len(unit) - 1,
                        parameter_enum=list(unit))

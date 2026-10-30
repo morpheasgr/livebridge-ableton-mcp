@@ -1620,6 +1620,7 @@ Master the song to a loudness target by measurement: uses (or builds) EQ Eight -
 | `max_gain_db` | float | `18.0` |
 | `chain` | str | `"native"` |
 | `place_devices` | bool | `true` |
+| `eq_bands` | object \| null | `null` |
 
 Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
