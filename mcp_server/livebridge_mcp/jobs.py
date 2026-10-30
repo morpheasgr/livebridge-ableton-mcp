@@ -52,6 +52,20 @@ def in_job() -> bool:
     return getattr(_local, "job", None) is not None
 
 
+def nested() -> bool:
+    """True when a job's tool calls another one (mix_auto -> balance): the inner call keeps
+    the outer call's window."""
+    return getattr(_local, "depth", 0) > 1
+
+
+def enter() -> None:
+    _local.depth = getattr(_local, "depth", 0) + 1
+
+
+def leave() -> None:
+    _local.depth = max(0, getattr(_local, "depth", 0) - 1)
+
+
 def note(phase: str) -> None:
     """Say what the current job is doing (shown by ``live_mix_job`` while it runs)."""
     job = getattr(_local, "job", None)

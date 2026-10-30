@@ -189,17 +189,32 @@ def test_balance_plan_follows_role_offsets():
     parts = [{"name": "Kick", "role": "kick", "lufs": -14.0, "fader_db": 0.0},
              {"name": "Pad", "role": "pad", "lufs": -10.0, "fader_db": 0.0},
              {"name": "Hats", "role": "hats", "lufs": -16.0, "fader_db": -3.0}]
-    plan = mix.balance_plan(parts)
+    plan = mix.balance_plan(parts, anchor="Kick", min_move=0.5)
     moves = {m["name"]: m for m in plan["moves"]}
     assert plan["anchor"] == "Kick" and "Kick" in plan["unchanged"]
     assert moves["Pad"]["target_lufs"] == -24.0 and moves["Pad"]["new_fader_db"] == -14.0
     assert moves["Hats"]["target_lufs"] == -25.0
-    # a quiet anchor would push faders above +6 dB: everything comes down together
+    # a part that would need its fader above +6 dB stops there — nothing else comes down
     loud = mix.balance_plan([{"name": "Kick", "role": "kick", "lufs": -30.0, "fader_db": 0.0},
                              {"name": "Bass", "role": "bass", "lufs": -45.0,
-                              "fader_db": 0.0}])
-    assert loud["lowered_for_headroom_db"] > 0
-    assert max(m["new_fader_db"] for m in loud["moves"]) <= 6.0
+                              "fader_db": 0.0}], anchor="Kick")
+    bass = loud["moves"][0]
+    assert bass["new_fader_db"] == 6.0 and bass["at_max"] and "Kick" in loud["unchanged"]
+
+
+def test_balance_plan_is_level_neutral_and_idempotent():
+    """No anchor: the moves are centred, so the mix keeps its level; only outliers move."""
+    parts = [{"name": n, "role": r, "lufs": l, "fader_db": 0.0} for n, r, l in (
+        ("Kick", "kick", -12.0), ("Bass", "bass", -15.0), ("Lead", "lead", -17.5),
+        ("Pad", "pad", -22.5), ("Hats", "hats", -12.0))]            # the hats are 11 LU hot
+    plan = mix.balance_plan(parts, genre=None)
+    moves = {m["name"]: m["move_db"] for m in plan["moves"]}
+    assert set(moves) == {"Hats"} and moves["Hats"] < -5             # only the outlier
+    assert {"Kick", "Bass", "Lead", "Pad"} <= set(plan["unchanged"])   # the rest stays
+    again = [dict(p, fader_db=moves.get(p["name"], 0.0)) for p in parts]
+    assert mix.balance_plan(again)["moves"] == []                     # a second run: nothing
+    kept = mix.balance_plan(parts, protect=["Hats"])
+    assert "Hats" in kept["protected"] and all(m["name"] != "Hats" for m in kept["moves"])
 
 
 def test_band_decisions_master_or_tracks():
@@ -312,7 +327,8 @@ def test_sound_check(app, song, mix_set):
 
 
 def test_mix_balance_sets_faders_and_keeps_headroom(app, song, mix_set):
-    result = call_tool(app, "live_mix_balance", {"max_move_db": 24,
+    result = call_tool(app, "live_mix_balance", {"max_move_db": 24, "anchor": "Kick",
+                                                  "tolerance_db": 0, "max_raise_db": 12,
                                                   "tracks": ["Kick", "Sub", "Pad", "Hats"],
                                                  "seconds": 3})
     assert result["applied"] and result["plan"]["anchor"] == "Kick"
@@ -336,7 +352,7 @@ def test_mix_balance_sets_faders_and_keeps_headroom(app, song, mix_set):
 
 
 def test_mix_balance_genre_and_roles(app, song, mix_set):
-    result = call_tool(app, "live_mix_balance", {"genre": "dubstep", "apply": False,
+    result = call_tool(app, "live_mix_balance", {"genre": "dubstep", "apply": False, "anchor": "Kick", "tolerance_db": 0,
                                                  "roles": {"Pad": "fx"}, "seconds": 3})
     roles = {p["name"]: p["role"] for p in result["parts"]}
     assert roles["Pad"] == "fx" and result["genre"] == "dubstep"
@@ -488,7 +504,7 @@ def test_mix_auto_sets_the_channel_strips(app, song, mix_set, monkeypatch):
     plan = call_tool(app, "live_mix_auto", {"apply": False, "seconds": 3, "place_devices": False})
     assert plan["applied"] is False and {t["name"] for t in plan["tracks"]} == {
         "Kick", "Sub", "Pad", "Hats"}
-    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": True, "place_devices": False})
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": True, "place_devices": False, "detail": "full"})
     assert result["applied"]
     by_name = {t["name"]: t for t in result["tracks"]}
     assert by_name["Hats"]["role"] == "hats" and by_name["Hats"]["values"]["HP Freq"] == 300.0
@@ -694,7 +710,7 @@ def test_mix_auto_keeps_hand_set_controls_and_holds_the_loop(app, song, mix_set,
     monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
     _strips(mix_set, monkeypatch)
     song.loop = False
-    args = {"seconds": 3, "balance": False, "low_end": False, "place_devices": False}
+    args = {"seconds": 3, "balance": False, "place_devices": False, "detail": "full"}
     first = call_tool(app, "live_mix_auto", args)
     assert any("Looped bars" in n for n in first["notes"]) and song.loop is False
     hats = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")

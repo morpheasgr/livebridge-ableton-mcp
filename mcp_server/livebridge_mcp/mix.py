@@ -319,73 +319,93 @@ def genre_balance(bands_db: dict[str, float], genre: str, tolerance: float = 4.0
 # ----------------------------------------------------------------------------- balance
 
 def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
-                 anchor: str | None = None, max_db: float = 6.0, min_move: float = 0.5,
+                 anchor: str | None = None, max_db: float = 6.0, min_move: float = 2.0,
                  max_move: float | None = None,
-                 raise_left: dict[str, float] | None = None) -> dict[str, Any]:
-    """Fader moves that put every part at its role's level.
+                 raise_left: dict[str, float] | None = None,
+                 move_left: dict[str, float] | None = None,
+                 protect: Iterable[str] = ()) -> dict[str, Any]:
+    """Fader moves that bring the parts toward their roles' levels WITHOUT moving the mix as a
+    whole: the moves are centred (median 0) so the overall level stays where the user had it —
+    only the parts that stand out move. (Anchoring on the kick and lowering everything when one
+    quiet part could not reach its target took a whole 23-track mix down 10-14 dB.)
 
     Args:
         parts: ``[{name, role, lufs (pre-fader), fader_db}]`` — parts without lufs are left
             out by the caller.
         genre: a GENRES key for the role offsets.
-        anchor: the part that keeps its level (default: the kick or the loudest role).
-        max_db: highest fader value allowed (Live's +6 dB).
-        min_move: smaller moves are left out.
-        max_move: cap one move to this many dB (the rest waits for the next pass, measured
-            again) — a wrong role or a sparse part cannot throw a fader 15 dB at once.
-        raise_left: per part, how many dB it may still go UP (a quiet reading is more often a
-            bad reading than a quiet part): raises beyond it are cut back (``raise_capped``).
+        anchor: a part that keeps its level, the others placed around it (default: none — the
+            level-neutral centring).
+        max_db: highest fader value (Live's +6 dB): a part that would need more stops there
+            (``at_max``) — the others do not come down for it.
+        min_move: tolerance — a part within this many dB of its target is left alone (a
+            second run changes nothing).
+        max_move: cap one move to this many dB.
+        raise_left: per part, how many dB it may still go UP in this run (``raise_capped``).
+        move_left: per part, how many dB it may still move in this run, either way
+            (``budget_capped``).
+        protect: parts that never move (the lead, the vocal).
 
     Returns:
-        ``{anchor, moves:[{name, role, offset_lu, now_db, target_db, fader_db, new_fader_db,
-        move_db}], unchanged:[name]}``; loudness values are post-fader LUFS.
+        ``{anchor?, level_shift_db, moves:[{name, role, offset_lu, now_lufs, target_lufs,
+        fader_db, new_fader_db, move_db, capped?, ...}], unchanged:[name], protected:[name]}``;
+        loudness values are post-fader LUFS.
     """
     if not parts:
-        return {"anchor": None, "moves": [], "unchanged": []}
+        return {"anchor": None, "level_shift_db": 0.0, "moves": [], "unchanged": [],
+                "protected": []}
+    keep = {str(n).lower() for n in protect}
     for part in parts:
         part["offset"] = role_offset(part.get("role"), genre)
         part["post"] = float(part["lufs"]) + float(part["fader_db"])
     chosen = None
     if anchor:
         chosen = next((p for p in parts if p["name"].lower() == anchor.lower()), None)
-    if chosen is None:
-        chosen = next((p for p in parts if p.get("role") == "kick"), None)
-    if chosen is None:
-        chosen = max(parts, key=lambda p: (p["offset"], p["post"]))
-    level = chosen["post"] - chosen["offset"]          # loudness of offset 0
-    # never ask a fader above max_db: lower everything together instead
-    over = max(level + p["offset"] - p["lufs"] - max_db for p in parts)
-    if over > 0:
-        level -= over
-    moves, unchanged = [], []
+    fixed = [p for p in parts if p["name"].lower() in keep]
+    if chosen is not None:
+        level = chosen["post"] - chosen["offset"]           # loudness of offset 0
+    elif fixed:
+        level = sorted(p["post"] - p["offset"] for p in fixed)[len(fixed) // 2]
+    else:
+        wishes = sorted(p["post"] - p["offset"] for p in parts)
+        middle = len(wishes) // 2
+        level = wishes[middle] if len(wishes) % 2 else (wishes[middle - 1] + wishes[middle]) / 2
+    moves, unchanged, protected, applied = [], [], [], []
     for part in parts:
         target = level + part["offset"]
-        new_fader = target - part["lufs"]
-        move = new_fader - part["fader_db"]
-        capped = max_move is not None and abs(move) > max_move
-        if capped:
-            move = math.copysign(max_move, move)
-            new_fader = part["fader_db"] + move
-        raise_capped = False
+        if part["name"].lower() in keep or (chosen is not None and part is chosen):
+            (protected if part["name"].lower() in keep else unchanged).append(part["name"])
+            continue
+        move = target - part["post"]
+        flags = {}
+        if abs(move) < min_move:
+            unchanged.append(part["name"])
+            continue
+        if max_move is not None and abs(move) > max_move:
+            move, flags["capped"] = math.copysign(max_move, move), True
+        if move_left is not None and abs(move) > max(0.0, move_left.get(part["name"], abs(move))):
+            move = math.copysign(max(0.0, move_left[part["name"]]), move)
+            flags["budget_capped"] = True
         if raise_left is not None and move > 0:
             left = max(0.0, raise_left.get(part["name"], move))
             if move > left:
-                move, raise_capped = left, True
-                new_fader = part["fader_db"] + move
-        entry = {"name": part["name"], "role": part.get("role"), "offset_lu": part["offset"],
-                 "now_lufs": round(part["post"], 1), "target_lufs": round(target, 1),
-                 "fader_db": round(part["fader_db"], 1), "new_fader_db": round(new_fader, 1),
-                 "move_db": round(move, 1)}
-        if capped:
-            entry["capped"] = True
-        if raise_capped:
-            entry["raise_capped"] = True
-        if abs(move) < min_move:
+                move, flags["raise_capped"] = left, True
+        new_fader = float(part["fader_db"]) + move
+        if new_fader > max_db:
+            new_fader, flags["at_max"] = max_db, True
+            move = new_fader - float(part["fader_db"])
+        if abs(move) < 0.5:
             unchanged.append(part["name"])
-        else:
-            moves.append(entry)
-    return {"anchor": chosen["name"], "lowered_for_headroom_db": round(max(over, 0.0), 1),
-            "moves": moves, "unchanged": unchanged}
+            continue
+        applied.append(move)
+        moves.append({"name": part["name"], "role": part.get("role"),
+                      "offset_lu": part["offset"], "now_lufs": round(part["post"], 1),
+                      "target_lufs": round(target, 1), "fader_db": round(part["fader_db"], 1),
+                      "new_fader_db": round(new_fader, 1), "move_db": round(move, 1), **flags})
+    plan: dict[str, Any] = {"level_shift_db": round(sum(applied) / len(parts), 1),
+                            "moves": moves, "unchanged": unchanged, "protected": protected}
+    if chosen is not None:
+        plan["anchor"] = chosen["name"]
+    return plan
 
 
 def band_decisions(master_bands: dict[str, float], tracks: list[dict[str, Any]],

@@ -99,6 +99,34 @@ def _same(a: float | None, b: float | None) -> bool:
     return abs(a - b) <= max(0.05, abs(b) * 0.01)
 
 
+def _summary(result: dict[str, Any]) -> dict[str, Any]:
+    """live_mix_auto's report without the bulk (every reading and reason): per part what moved
+    and what was measured, the balance moves, the master outcome — detail="full" keeps all."""
+    short = {k: v for k, v in result.items() if k not in ("tracks", "balance", "master",
+                                                           "low_end")}
+    short["tracks"] = [{k: v for k, v in t.items() if k in (
+        "name", "role", "values", "kept", "measured", "error")} for t in result.get("tracks", [])]
+    balance = result.get("balance")
+    if isinstance(balance, dict):
+        plan = balance.get("plan") or {}
+        short["balance"] = {k: v for k, v in balance.items() if k in (
+            "applied", "genre", "headroom_trim_db", "notes", "error", "type", "job", "status")}
+        short["balance"]["moves"] = [{"name": m["name"], "move_db": m["move_db"]}
+                                     for m in plan.get("moves") or []]
+    master = result.get("master")
+    if isinstance(master, dict):
+        short["master"] = {k: v for k, v in master.items() if k in (
+            "destination", "target_lufs", "after", "limiter_gain_db", "stopped",
+            "missing_gain_db", "contrast", "notes", "error", "type")}
+    low = result.get("low_end")
+    if isinstance(low, dict):
+        short["low_end"] = {name: {k: v for k, v in (part or {}).items() if k in (
+            "applied", "gain_db", "band", "depth_db", "notes", "error")}
+            for name, part in low.items()}
+    short["detail"] = "summary — detail='full' for every reading and reason"
+    return short
+
+
 def _background(tool: str):
     """Run a long mix/master tool as a job (:mod:`livebridge_mcp.jobs`): its report as usual
     when it ends within ~40 s, else ``{job, status: "running"}`` and ``live_mix_job`` later."""
@@ -154,12 +182,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if _is_error(state) or not isinstance(state, dict) or not state.get("is_playing"):
             return None
         loop = state.get("loop") or {}
-        if loop.get("on"):
-            return None
+        tempo = float(state.get("tempo") or 120.0)
+        if loop.get("on"):                        # the user's own loop: keep it, listen to it
+            return {"own": True,
+                    "loop_seconds": float(loop.get("length") or 0.0) * 60.0 / tempo}
         match = re.match(r"^(\d+)/(\d+)$", str(state.get("signature", "")))
         per_bar = int(match.group(1)) * 4.0 / int(match.group(2)) if match and \
             int(match.group(2)) else 4.0
-        tempo = float(state.get("tempo") or 120.0)
         position = float(((state.get("position") or {}).get("beats")) or 0.0)
         bars = max(4, int(math.ceil((seconds + 2.0) * tempo / 60.0 / per_bar / 4.0)) * 4)
         start = math.floor(position / per_bar) * per_bar
@@ -168,34 +197,53 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if _is_error(held):
             return None
         return {"start": loop.get("start"), "length": loop.get("length"),
-                "held": f"bars {int(start / per_bar) + 1}-{int(start / per_bar) + bars}"}
+                "held": f"bars {int(start / per_bar) + 1}-{int(start / per_bar) + bars}",
+                "loop_seconds": bars * per_bar * 60.0 / tempo}
 
     def release_loop(saved: dict[str, Any] | None) -> None:
-        if saved is None:
+        if saved is None or saved.get("own"):
             return
         args: dict[str, Any] = {"enabled": False}
         if saved.get("start") is not None and saved.get("length"):
             args.update(start=saved["start"], length=saved["length"])
         bridge_call(bridge, "transport.set_loop", args)
 
+    #: the listening windows a tool accepts: a loop that fits is listened to exactly once
+    #: per window, so every measurement (before/after, each pass) hears the same bars
+    window_limits = {"live_mix_auto": (3.0, 20.0), "live_mix_balance": (3.0, 30.0),
+                     "live_mix_unmask": (2.0, 15.0)}
+
     def looped(fn):
         """Hold the playing bars in a loop for the whole run (outermost run only: inside a run
         the loop is already on), then give the user's loop back."""
         signature = inspect.signature(fn)
+        limits = window_limits.get(fn.__name__)
 
         @functools.wraps(fn)
         def run(*args: Any, **kwargs: Any) -> Any:
+            jobs.enter()
+            try:
+                return looped_run(*args, **kwargs)
+            finally:
+                jobs.leave()
+
+        def looped_run(*args: Any, **kwargs: Any) -> Any:
             bound = signature.bind_partial(*args, **kwargs)
             bound.apply_defaults()
             if bound.arguments.get("loud_bar") is not None:
                 return fn(*args, **kwargs)        # it jumps between sections itself
             seconds = float(bound.arguments.get("seconds") or 6.0)
             saved = hold_loop(seconds)
+            loop_seconds = (saved or {}).get("loop_seconds") or 0.0
+            if limits and limits[0] <= loop_seconds <= limits[1] and \
+                    limits[0] <= seconds <= limits[1] and not jobs.nested():
+                bound.arguments["seconds"] = round(loop_seconds, 2)   # one full loop
             try:
-                result = fn(*args, **kwargs)
+                result = fn(*bound.args, **bound.kwargs)
             finally:
                 release_loop(saved)
-            if saved and isinstance(result, dict) and isinstance(result.get("notes"), list):
+            if saved and not saved.get("own") and isinstance(result, dict) and \
+                    isinstance(result.get("notes"), list):
                 result["notes"].append(f"Looped {saved['held']} while measuring (the playhead "
                                        "would have moved on to another section); your loop "
                                        "setting is back.")
@@ -471,6 +519,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         max_move_db: float = 6.0,
         min_active: float = 0.35,
         max_raise_db: float = 3.0,
+        tolerance_db: float = 2.0,
+        protect: list[str] | None = None,
     ) -> Any:
         """Balance the mix by measurement: listens to every track with a LiveBridge Engine at
         its end over the same window, gives each part its role's level (kick on top, then sub
@@ -493,13 +543,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             apply: false = only report the plan.
             passes: measure/adjust rounds (1..4).
             headroom_db: wanted master peak below 0 dBFS (0..12; needs an Engine on the master).
-            max_move_db: the most one pass moves a fader (1..24 dB; the rest is measured again
-                next pass) — keeps a wrong role or an odd reading from throwing a fader.
+            max_move_db: the most this call moves any fader, all passes together (1..24 dB) —
+                keeps a wrong role or an odd reading from throwing a fader.
             min_active: parts that play less than this share of the window (0..1; one-shots,
                 fills, a tom twice in 10 s) read too quiet on average: their faders are left
                 alone and listed in the notes.
-            max_raise_db: the most a fader goes UP in this run (0..12; down is not capped this
-                way) — a part reading quiet is more often a bad window than a quiet part.
+            max_raise_db: the most a fader goes UP in this run (0..12) — a part reading quiet
+                is more often a bad window than a quiet part.
+            tolerance_db: parts within this many dB of their role's level stay put (0..6): only
+                the outliers move, and a second run changes nothing.
+            protect: parts that never move (the lead, the vocal); the others are placed
+                around them.
 
         Returns:
             `{genre?, applied, passes, parts:[{name, role, role_from, lufs (pre-fader),
@@ -525,6 +579,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("min_active must be 0..1", cmd=cmd)
         if not 0 <= max_raise_db <= 12:
             return tool_error("max_raise_db must be 0..12", cmd=cmd)
+        if not 0 <= tolerance_db <= 6:
+            return tool_error("tolerance_db must be 0..6", cmd=cmd)
         key = None
         if genre is not None:
             key = mix.genre_key(genre)
@@ -570,7 +626,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         done = 0
         readings: dict[str, dict[str, Any]] = {}
         raised: dict[str, float] = {}
+        moved: dict[str, float] = {}
         for _round in range(passes):
+            jobs.note(f"balancing the faders: pass {_round + 1} of {passes}")
             done += 1
             results = listen_all([d for d, _n in active], seconds)
             state = faders([n for _d, n in active])
@@ -600,14 +658,16 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               "role_from": "you" if (roles or {}).get(name) else guess["from"],
                               "lufs": float(lufs),
                               "fader_db": state.get(name, {}).get("volume") or 0.0})
-            plan = mix.balance_plan([dict(p) for p in parts], key, anchor,
-                                    max_move=max_move_db,
-                                    raise_left={p["name"]: max_raise_db - raised.get(p["name"], 0.0)
-                                                for p in parts})
+            plan = mix.balance_plan(
+                [dict(p) for p in parts], key, anchor, min_move=tolerance_db,
+                raise_left={p["name"]: max_raise_db - raised.get(p["name"], 0.0)
+                            for p in parts},
+                move_left={p["name"]: max_move_db - moved.get(p["name"], 0.0) for p in parts},
+                protect=protect or ())
             for move in plan["moves"]:
+                moved[move["name"]] = moved.get(move["name"], 0.0) + abs(move["move_db"])
                 if move["move_db"] > 0:
                     raised[move["name"]] = raised.get(move["name"], 0.0) + move["move_db"]
-            plan["moves"] = [m for m in plan["moves"] if abs(m["move_db"]) >= 0.5]
             if not plan["moves"] or not apply:
                 break
             answer = bridge_call(bridge, "mixer.set_many", {"settings": [
@@ -624,6 +684,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if unknown:
             notes.append(f"Role unknown for {', '.join(unknown)} (balanced as a mid-level part): "
                          "pass roles={...} to place them.")
+        measured = {p["name"] for p in parts}
+        unmeasured = [n for _d, n in active if n not in measured]
+        if unmeasured:
+            notes.append("Not measured in this window, faders left where they were: "
+                         + ", ".join(unmeasured) + ". The balance keeps the mix's overall "
+                         "level, so they keep their place — check them by ear where they "
+                         "play (or balance a section where they do).")
         answer: dict[str, Any] = {"applied": bool(apply), "passes": done,
                                   "parts": result_parts, "plan": plan, "notes": notes}
         if key:
@@ -642,16 +709,22 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 if excess > 0.5:
                     answer["headroom_trim_db"] = round(-excess, 1)
                     if apply:
-                        current = faders([n for _d, n in active])
-                        settings = [{"track": n, "volume":
-                                     f"{current[n]['volume'] - excess:.1f} dB"}
-                                    for _d, n in active
-                                    if current.get(n, {}).get("volume") is not None]
+                        # every track, measured or not: the balance between them stays
+                        listing = bridge_call(bridge, "mixer.get", {"detail": "minimal"})
+                        settings = []
+                        for entry in (listing.get("tracks") or []) \
+                                if isinstance(listing, dict) else []:
+                            volume = _num(entry.get("volume")) \
+                                if isinstance(entry, dict) else None
+                            if volume is not None and (entry.get("path") or entry.get("name")):
+                                settings.append({"track": entry.get("path") or entry["name"],
+                                                 "volume": f"{max(volume - excess, -70.0):.1f}"
+                                                           " dB"})
                         trimmed = bridge_call(bridge, "mixer.set_many", {"settings": settings})
                         if _is_error(trimmed):
                             notes.append(f"headroom trim failed: {trimmed.get('error')}")
                         else:
-                            notes.append(f"Master peaked at {peak} dB: every balanced fader "
+                            notes.append(f"Master peaked at {peak} dB: every track fader "
                                          f"went down {excess:.1f} dB for {headroom_db:g} dB "
                                          "headroom (the balance is kept).")
                     else:
@@ -792,11 +865,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 time.sleep(_SETTLE_S)
             return engine.listen(device, seconds, kind="mix")
 
+        sections: dict[str, dict[str, Any]] = {}
+
         def contrast() -> float | None:
             if loud_bar is None or quiet_bar is None:
                 return None
             loud = _reading(measure(loud_bar))["lufs"]
             quiet = _reading(measure(quiet_bar))["lufs"]
+            sections["before" if "before" not in sections else "after"] = {
+                "loud_lufs": loud, "quiet_lufs": quiet}
             if loud is None or quiet is None:
                 return None
             return round(loud - quiet, 1)
@@ -987,8 +1064,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 break
             new_gain = max(0.0, min(max_gain_db, gain + max(-6.0, min(6.0, delta))))
             if abs(new_gain - gain) < 0.1:
-                stopped = (f"limiter gain at its limit ({max_gain_db:g} dB) — the mix needs "
-                           "more level before the master" if delta > 0 else
+                if delta > 0:
+                    result["missing_gain_db"] = round(delta, 1)
+                stopped = (f"limiter gain at its limit ({max_gain_db:g} dB) and still "
+                           f"{delta:.1f} dB under the target — raise the mix about "
+                           f"{delta:.1f} dB before the master (all faders together, or a "
+                           "Utility on the master in front of the limiter)" if delta > 0 else
                            "already louder than the target with the limiter at 0 dB gain: "
                            "turn the mix down")
                 break
@@ -1024,7 +1105,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         result["steps"] = steps
         if before_contrast is not None:
             after_contrast = contrast()
-            result["contrast"] = {"before_lu": before_contrast, "after_lu": after_contrast}
+            result["contrast"] = {"before_lu": before_contrast, "after_lu": after_contrast,
+                                  **{f"{when}_{k}": v for when, levels in sections.items()
+                                     for k, v in levels.items()}}
+            if before_contrast <= 0:
+                notes.append(f"The 'quiet' bar ({quiet_bar:g}) is as loud as or louder than the "
+                             f"'loud' bar ({loud_bar:g}) — before mastering: a mix problem "
+                             "(or the bars are swapped). Fix it in the mix first.")
             if after_contrast is not None and after_contrast < before_contrast - 2.0:
                 shrink = before_contrast - after_contrast
                 back = max(0.0, gain - shrink)
@@ -1060,8 +1147,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         master: str | None = None,
         master_chain: str = "livebridge",
         place_devices: bool = True,
-        low_end: bool = True,
+        low_end: bool = False,
         keep_manual: bool = True,
+        protect: list[str] | None = None,
+        detail: str = "summary",
     ) -> Any:
         """Mix (and master) the song by measurement in one call — the devices it needs are put
         in place by the tool itself. On each track with a LiveBridge Channel (a channel
@@ -1075,8 +1164,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         (`live_master_auto`).
 
         Args:
-            genre: for the balance and master steps (techno, house, pop ... see
-                live_mix_balance).
+            genre: for the balance and master steps: techno, house, melodic_house (leads, pads
+                and keys close to the kick), trance, dnb, dubstep, hip_hop, trap, pop, rnb, lo_fi,
+                ambient, breaks, funk, jazz, metal, country, reggaeton, classical, balanced
+                (aliases: tech/deep/afro house, melodic/progressive/organic, ...). Unknown
+                genres are refused.
             tracks: only these tracks (default: every track with a Channel).
             roles: correct a guessed role: `{"Audio 3": "hats"}` (kick, snare, hats, perc,
                 drums, sub, bass, pad, lead, keys, vocal, guitar, fx).
@@ -1093,9 +1185,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             keep_manual: keep strip controls set by hand (default): LiveBridge remembers what
                 it set on each Channel; a control that differs from that and from rest is the
                 user's and stays as it is (`kept` in the report). false = reset every control.
-            low_end: when there is a kick and a bass/sub, align the bass's phase against it
-                (`live_mix_phase`) and cut the bass's clashing band while the kick plays
-                (`live_mix_unmask`).
+            low_end: opt-in: when there is a kick and a bass/sub, align the bass's phase
+                against it (`live_mix_phase`) and put a LiveBridge Unmask on the bass that cuts
+                its clashing band while the kick plays (`live_mix_unmask`) — both devices end up
+                on the bass track (a Phase device that changed nothing is removed again).
+            protect: parts the balance never moves (the lead, the vocal).
+            detail: "summary" (default: per part the moves and the measured change, the
+                balance moves, the master result) or "full" (every reading and reason).
 
         Returns:
             `{applied, placed?:{placed, replaced, skipped}, tracks:[{name, role, role_from,
@@ -1112,6 +1208,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Needs Max 9 (Ableton DSP objects).
         """
         cmd = "mix.auto"
+        if detail not in ("summary", "full"):
+            return tool_error("detail must be 'summary' or 'full'", cmd=cmd)
+        if genre is not None and mix.genre_key(genre) is None:
+            return tool_error("unknown genre; use one of " + ", ".join(mix.GENRES), cmd=cmd)
         if not 3 <= seconds <= 20:
             return tool_error("seconds must be 3..20", cmd=cmd)
         if master_chain not in ("native", "livebridge"):
@@ -1243,8 +1343,18 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             for (_device, name), reading in zip(live, listen_all([d for d, _n in live],
                                                                    seconds)):
                 if not isinstance(reading, engine.EngineError):
-                    next(r for r in results if r.get("name") == name)["after"] = \
-                        _reading(reading)
+                    entry = next(r for r in results if r.get("name") == name)
+                    entry["after"] = _reading(reading)
+                    crest_before = (entry.get("before") or {}).get("crest_db")
+                    crest_after = entry["after"].get("crest_db")
+                    if "Comp Ratio" in (entry.get("values") or {}) and \
+                            crest_before is not None and crest_after is not None:
+                        change = round(crest_before - crest_after, 1)
+                        entry["measured"] = (f"crest {crest_before} -> {crest_after} dB "
+                                             f"({change:+g} dB off the peaks)")
+                        if change < 0.5:
+                            entry["measured"] += (" — the compressor barely acts here: its "
+                                                  "threshold may sit above the peaks it hears")
             kicks = [r["name"] for r in results if r.get("role") == "kick" and "error" not in r]
             basses = [r["name"] for r in results if r.get("role") in ("bass", "sub")
                       and "error" not in r]
@@ -1259,13 +1369,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 result["balance"] = live_mix_balance(
                     genre=genre, tracks=None if not tracks else names,
                     roles={r["name"]: r["role"] for r in results if r.get("role")},
-                    seconds=max(3.0, seconds))
+                    seconds=max(3.0, seconds), protect=protect)
             if master:
                 jobs.note(f"mastering for {master}")
                 result["master"] = live_master_auto(destination=master, genre=genre,
                                                     seconds=max(3.0, seconds),
                                                     chain=master_chain)
-        return result
+        jobs.note("done")
+        return result if detail == "full" else _summary(result)
 
     # ------------------------------------------------------------------ phase
     @mcp.tool()
@@ -1332,6 +1443,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         notes: list[str] = []
         index = phase_index()
+        loaded_here = index is None
         if index is None:
             loaded = bridge_call(bridge, "browser.load", {
                 "query": _PHASE_DEVICE, "category": "audio_effect", "track": track},
@@ -1407,6 +1519,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             notes.append(f"No setting beat the untouched sound by more than the noise "
                          f"({gain:+g} dB vs ±{noise:g} dB): left neutral. The parts were not "
                          "fighting in phase — look at levels or EQ instead.")
+        if not keep and loaded_here and phase_index() is not None:
+            gone = bridge_call(bridge, "devices.delete", {"track": track,
+                                                          "device": phase_index()})
+            if not _is_error(gone):
+                notes.append(f"Removed the LiveBridge Phase it had loaded on {track} (nothing "
+                             "to keep).")
         return {"track": track, "best": best, "baseline_low_db": baseline, "gain_db": gain,
                 "noise_db": round(noise, 2), "applied": bool(keep), "tried": tried,
                 "notes": notes}
