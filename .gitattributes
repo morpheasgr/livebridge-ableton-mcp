@@ -1,0 +1,5 @@
+# Windows launchers need CRLF, macOS ones LF, whatever the checkout machine uses
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf
