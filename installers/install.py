@@ -49,6 +49,7 @@ import socket
 import stat
 import subprocess
 import sys
+import textwrap
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -69,34 +70,32 @@ MIDI_NAME = "LiveBridge MIDI"
 #: .amxd that marks it as ours, manifest key, what Claude gets).
 M4L_DEVICES = (
     (ENGINE_NAME, ENGINE_SOURCE, ENGINE_PRESETS, "engine.js", "engine_dir",
-     "onto the master track -- real-time listening, modulation and follow actions "
-     "(live_engine_*)"),
+     "master track: listening, modulation, follow actions"),
     (MIDI_NAME, REPO_ROOT / "max_for_live" / MIDI_NAME,
      ("Presets", "MIDI Effects", "Max MIDI Effect"), "lbmidi.js", "midi_dir",
-     "onto a MIDI track, before its instrument -- what you play and live notes (live_midi_*)"),
+     "MIDI track, before the instrument: played/live notes"),
     ("LiveBridge Host Effect", REPO_ROOT / "max_for_live" / "LiveBridge Host",
      ("Presets", "Audio Effects", "Max Audio Effect"), "lbhost.js", "host_effect_dir",
-     "-- Claude loads it with live_plugin_host_load: a VST3 effect with all its parameters"),
+     "hosts a VST3 effect, all parameters exposed"),
     ("LiveBridge Host Instrument", REPO_ROOT / "max_for_live" / "LiveBridge Host",
      ("Presets", "Instruments", "Max Instrument"), "lbhost.js", "host_instrument_dir",
-     "-- Claude loads it with live_plugin_host_load: a VST3 synth with all its parameters"),
+     "hosts a VST3 synth, all parameters exposed"),
     ("LiveBridge Channel", REPO_ROOT / "max_for_live" / "LiveBridge Channel",
      ("Presets", "Audio Effects", "Max Audio Effect"), "lbchannel.js", "channel_dir",
-     "at the end of each track (instead of the Engine there) -- a channel strip from "
-     "Ableton's DSP plus the Engine's meters (Max 9); live_mix_auto sets it per part"),
+     "end of each track: channel strip, meters (Max 9)"),
     ("LiveBridge Unmask", REPO_ROOT / "max_for_live" / "LiveBridge Unmask",
      ("Presets", "Audio Effects", "Max Audio Effect"), "lb_unmask.gendsp", "unmask_dir",
-     "on the part that gives way -- a side-chained dynamic EQ (Live 12); live_mix_unmask "
-     "loads it, routes the side-chain and sets the band"),
+     "on the part that gives way: side-chained dynamic EQ"),
     ("LiveBridge Phase", REPO_ROOT / "max_for_live" / "LiveBridge Phase",
      ("Presets", "Audio Effects", "Max Audio Effect"), "lb_phase.gendsp", "phase_dir",
-     "on a bass (or any part) -- polarity, delay and all-pass phase rotation; "
-     "live_mix_phase loads it and finds the setting that cancels least"),
+     "on a bass: polarity, delay, phase rotation"),
     ("LiveBridge Master", REPO_ROOT / "max_for_live" / "LiveBridge Master",
      ("Presets", "Audio Effects", "Max Audio Effect"), "LiveBridge Master.amxd", "master_dir",
-     "onto the master, before the Engine -- EQ, glue compressor, limiter and width from "
-     "Ableton's own DSP (Max 9); live_master_auto(chain='livebridge') loads it"),
+     "master, before Engine: EQ, glue, limiter (Max 9)"),
 )
+
+#: the next-steps checklist wraps at this width (a default terminal is 80 wide)
+CHECKLIST_WIDTH = 78
 
 SCRIPT_NAME = "LiveBridge"
 MCP_NAME = "livebridge"
@@ -648,7 +647,7 @@ def _arrow() -> str:
 
 def control_surface_hint(arrow: str = "->") -> str:
     """The exact Live menu path the user must click."""
-    return ("Live {a} Preferences {a} Link, Tempo & MIDI {a} Control Surface {a} LiveBridge "
+    return ("Live {a} Preferences {a} Link, Tempo & MIDI {a} Control Surface:\nLiveBridge "
             "(Input/Output: None)").format(a=arrow)
 
 
@@ -684,6 +683,8 @@ class Ops(object):
         self.out = out or (lambda line: print(line, flush=True))
         self.warnings: List[str] = []
         self.manual: List[str] = []
+        #: installed Max for Live devices for the checklist: (name, browser folders, use)
+        self.devices: List[Tuple[str, Tuple[str, ...], str]] = []
         self.arrow = _arrow() if out is None else "->"
 
     # -- output ------------------------------------------------------------
@@ -1165,11 +1166,7 @@ class Installer(Ops):
                                   % (name, dest, error))
                         continue
             self.manifest[key] = str(dest)
-            self.manual.append(
-                "Optional, needs Max for Live: {name} is in Live's browser under User Library "
-                "{a} {path} -- Claude loads it when needed, or drag it {use}.".format(
-                    name=name, a=self.arrow, path=" {} ".format(self.arrow).join(presets),
-                    use=use))
+            self.devices.append((name, tuple(presets), use))
 
     # -- MCP side config -----------------------------------------------------
     def write_user_config(self) -> None:
@@ -1468,14 +1465,13 @@ class Installer(Ops):
             updated["mcpServers"] = servers
             self.write_json(path, updated, backup=True)
             self.manifest["desktop_configs"].append(str(path))
-        self.manual.append("Quit Claude Desktop completely (tray/menu bar icon {a} Quit) and start "
-                           "it again so it loads LiveBridge.".format(a=self.arrow))
+        self.manual.append("Quit Claude Desktop fully (tray/menu-bar icon {a} Quit), then start "
+                           "it again.".format(a=self.arrow))
 
     def splice_desktop_entry(self) -> Optional[Dict[str, Any]]:
         """Claude Desktop entry bridging the remote Splice MCP through ``npx mcp-remote``."""
         connector = ("Splice in Claude Desktop: Settings {a} Connectors {a} Add custom connector "
-                     "{a} URL %s, then sign in with your Splice account." % SPLICE_URL
-                     ).format(a=self.arrow)
+                     "{a} URL %s, then sign in." % SPLICE_URL).format(a=self.arrow)
         npx = self.host.which("npx")
         if not npx:
             self.info("npx (Node.js) not found -- Splice is not added to the JSON config.")
@@ -1582,10 +1578,9 @@ class Installer(Ops):
         self.write_bytes(zip_path, zip_bytes(source_files, SKILL_NAME))
         self.manifest["skill_zip"] = str(zip_path)
         self.manual.append(
-            "Claude Desktop skill (optional, recommended): Settings {a} Capabilities {a} Skills "
-            "{a} Upload skill {a} {zip} (Skills need 'Code execution and file creation' turned "
-            "on). Claude Code already has it in {dest}.".format(
-                a=self.arrow, zip=zip_path, dest=claude_skills_dir(self.host) / SKILL_NAME))
+            "Claude Desktop skill (recommended): Settings {a} Capabilities {a} Skills {a} "
+            "Upload skill:\n{zip}\n(needs 'Code execution and file creation' on). Claude "
+            "Code already has it.".format(a=self.arrow, zip=zip_path))
 
     # -- bookkeeping ---------------------------------------------------------
     def write_manifest(self) -> None:
@@ -1615,6 +1610,20 @@ class Installer(Ops):
         data["installed_at"] = datetime.datetime.now().isoformat(timespec="seconds")
         self.write_json(path, data)
 
+    def wrapped(self, text: str, first: str, rest: str) -> None:
+        """Print ``text`` wrapped at CHECKLIST_WIDTH (paths are never broken)."""
+        for line in textwrap.wrap(text, width=CHECKLIST_WIDTH, initial_indent=first,
+                                  subsequent_indent=rest, break_long_words=False,
+                                  break_on_hyphens=False) or [first.rstrip()]:
+            self.out(line)
+
+    def item(self, number: int, text: str) -> None:
+        """One numbered checklist step; ``\n`` starts a new line under it."""
+        prefix = " %d. " % number
+        indent = " " * len(prefix)
+        for n, part in enumerate(text.split("\n")):
+            self.wrapped(part, prefix if n == 0 else indent, indent)
+
     def checklist(self) -> None:
         args = self.args
         settings = self.settings
@@ -1626,21 +1635,30 @@ class Installer(Ops):
         self.out(line)
         number = 1
         if self.script_dir is not None:
-            self.out(" %d. Start (or restart) Ableton Live 12 -- it only scans Remote Scripts at "
-                     "startup." % number)
+            self.item(number, "Start (or restart) Ableton Live 12: it reads Remote Scripts at "
+                              "startup.")
             number += 1
-            self.out(" %d. %s" % (number, control_surface_hint(a)))
-            self.out("    The status bar then shows \"LiveBridge ... ready on port %d\"."
-                     % settings["port"])
+            self.item(number, "%s.\nThe status bar shows \"LiveBridge ... ready on port %d\"."
+                      % (control_surface_hint(a), settings["port"]))
+            number += 1
+        if self.devices:
+            self.item(number, "Max for Live devices (optional): Claude loads them itself. To "
+                              "add one by hand, Live's browser {a} User Library {a} Presets:"
+                      .format(a=a))
+            folders: Dict[Tuple[str, ...], List[Tuple[str, str]]] = {}
+            for name, presets, use in self.devices:
+                folders.setdefault(tuple(presets[1:]), []).append((name, use))
+            for folder, devices in folders.items():
+                self.out("    " + " {} ".format(a).join(folder) + ":")
+                for name, use in devices:
+                    self.wrapped("- %s: %s" % (name, use), "      ", "        ")
             number += 1
         for item in self.manual:
-            self.out(" %d. %s" % (number, item))
+            self.item(number, item)
             number += 1
-        self.out(" %d. Verify: ask Claude to \"run live_status\" (expect connected: true), or run"
-                 % number)
-        self.out("    %s" % self.host.quote(
-            [Path(sys.executable).name if not self.host.is_windows else "py",
-             str(REPO_ROOT / "tests" / "integration_check.py")]))
+        self.item(number, "Check: ask Claude to \"run live_status\" (connected: true), or run\n"
+                  + self.host.quote([Path(sys.executable).name if not self.host.is_windows
+                                     else "py", str(REPO_ROOT / "tests" / "integration_check.py")]))
         self.out("")
         self.out(" Token: %s   (%s)" % (self.token, self.token_source))
         if self.script_dir is not None:
