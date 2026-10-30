@@ -216,6 +216,7 @@ def test_stop_while_stopped_keeps_the_start_marker(bridge, song):
     assert answer["already_stopped"] is True and song.start_time == 32.0
     home = run(bridge, "transport.stop", to_start=True)
     assert "already_stopped" not in home and song.start_time == 0.0
+    assert home["position"]["beats"] == 0.0 and home["start_time"]["beats"] == 0.0
 
 
 def test_stop_with_clips(bridge, song):

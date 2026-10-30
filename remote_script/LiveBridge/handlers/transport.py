@@ -953,7 +953,8 @@ def transport_stop(ctx, stop_clips=False, quantized=False, to_start=False):
 
     Returns:
         {is_playing: false, position, start_time, seconds_at_current_tempo,
-        already_stopped?}
+        already_stopped?} — ``already_stopped`` only when nothing changed (a
+        ``to_start`` stop moves the playhead and the marker: position 1.1.1).
 
     Gotchas:
         The playhead stays where playback stopped (Live applies the stop on
@@ -963,13 +964,19 @@ def transport_stop(ctx, stop_clips=False, quantized=False, to_start=False):
     stop_clips = _bool(stop_clips, "stop_clips")
     quantized = _bool(quantized, "quantized")
     to_start = _bool(to_start, "to_start")
-    if not compat.safe_getattr(song, "is_playing", False) and not to_start:
+    stopped = not compat.safe_getattr(song, "is_playing", False)
+    if stopped and not to_start:
         if stop_clips:
             _live("stop_all_clips", song.stop_all_clips, quantized)
         data = position_state(song, False)
         data["already_stopped"] = True
         return data
     _live("stop_playing", song.stop_playing)
+    if stopped:
+        # Live moves the playhead on its next tick: report where it goes, not where it was
+        if stop_clips:
+            _live("stop_all_clips", song.stop_all_clips, quantized)
+        return position_state(song, False, 0.0)
     if stop_clips:
         _live("stop_all_clips", song.stop_all_clips, quantized)
     return position_state(song, False)
