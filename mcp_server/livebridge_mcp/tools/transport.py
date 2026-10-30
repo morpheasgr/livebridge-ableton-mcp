@@ -175,6 +175,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{is_playing: false, position:{beats,bbs}, start_time:{...}, already_stopped?}`
+            (already_stopped only when nothing changed; to_start reports position 1.1.1)
         """
         args: dict[str, Any] = {"stop_clips": stop_clips, "quantized": quantized}
         if to_start:
