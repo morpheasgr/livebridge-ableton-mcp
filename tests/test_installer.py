@@ -1051,7 +1051,7 @@ def test_skill_is_installed_for_claude_code_and_zipped_for_claude_desktop(tmp_pa
     with zipfile.ZipFile(str(zip_path)) as archive:
         assert "livebridge/SKILL.md" in archive.namelist()
         assert archive.read("livebridge/SKILL.md") == source.read_bytes()
-    assert "Capabilities -> Skills" in out and str(zip_path) in out
+    assert "Capabilities -> Skills" in " ".join(out.split()) and str(zip_path) in out
     manifest = read(host.home / ".livebridge" / "install.json")
     assert manifest["skill_dir"] == str(skill) and manifest["skill_zip"] == str(zip_path)
     before = zip_path.read_bytes()
@@ -1636,3 +1636,16 @@ def test_gitignore_keeps_the_remote_script_token_out_of_git():
     """install.py writes the token-bearing config.json into the repo in the symlink setup."""
     ignore = (REPO / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert "remote_script/LiveBridge/config.json" in [line.strip() for line in ignore]
+
+
+def test_checklist_says_whether_the_skill_needs_uploading_again(tmp_path):
+    host = mac_host(tmp_path)
+    args = ["--no-desktop", "--no-claude-code"]
+    def checklist():
+        code, out, _ = run_install(host, args)
+        assert code == 0, out
+        return " ".join(out.split("next steps")[1].split())     # wrapping does not matter
+    assert "Claude Desktop skill (recommended): upload it" in checklist()
+    assert "Skill unchanged since the last install" in checklist()
+    (host.home / ".livebridge" / "livebridge-skill.zip").write_bytes(b"older skill")
+    assert "The skill was UPDATED" in checklist()
