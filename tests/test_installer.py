@@ -303,6 +303,21 @@ def test_desktop_config_candidates_include_the_msix_install(tmp_path):
     assert install.desktop_config_candidates(mac_host(tmp_path / "mac")) == []
 
 
+def test_desktop_config_candidates_include_the_claude_data_profiles(tmp_path):
+    """Recent Claude Desktop keeps its config per account in %LOCALAPPDATA%\\Claude-Data."""
+    host = win_host(tmp_path)
+    data = host.localappdata() / "Claude-Data"
+    (data / "claude_1a2b3c").mkdir(parents=True)
+    (data / "logs").mkdir()
+    paths = install.desktop_config_candidates(host)
+    assert paths == [data / "claude_1a2b3c" / "claude_desktop_config.json"]
+    # an old folder without a config is ignored once a real config exists elsewhere
+    (host.appdata() / "Claude").mkdir(parents=True)
+    (data / "claude_1a2b3c" / "claude_desktop_config.json").write_text("{}")
+    assert install.desktop_config_candidates(host) == [
+        data / "claude_1a2b3c" / "claude_desktop_config.json"]
+
+
 def test_user_config_path_honours_livebridge_config(tmp_path):
     host = mac_host(tmp_path)
     assert install.user_config_path(host) == host.home / ".livebridge" / "config.json"
@@ -425,7 +440,9 @@ def test_full_install_on_windows(tmp_path):
     venv = host.home / ".livebridge" / "venv"
     assert runner.commands("pip install")[0][0] == str(venv / "Scripts" / "python.exe")
     exe = str(venv / "Scripts" / "livebridge-mcp.exe")
-    for path in (desktop, msix / "claude_desktop_config.json"):
+    # the Store folder has no config while %APPDATA%\\Claude has one: left alone
+    assert not (msix / "claude_desktop_config.json").exists()
+    for path in (desktop,):
         servers = read(path)["mcpServers"]
         assert servers["livebridge"]["command"] == exe
         assert servers["splice"] == {"command": "cmd", "args": ["/c", "npx", "-y", "mcp-remote",
