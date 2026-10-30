@@ -751,8 +751,11 @@ def test_mix_auto_places_the_devices_itself(app, song, mix_set, monkeypatch):
                 device["strip"] = any(d.name == "LiveBridge Channel" for d in track.devices)
         return found
     monkeypatch.setattr(engine, "devices", with_strips)
+    # a plan on a fresh set: the meters go in place first (it has nothing to listen with
+    # otherwise), the strips stay at rest
     result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": False,
-                                              "low_end": False})
+                                              "low_end": False, "apply": False})
+    assert result["applied"] is False, result
     placed = result["placed"]
     assert set(placed["placed"]) >= {"Kick", "Sub", "Pad", "Hats"}   # + the set's others
     assert placed["replaced"] == ["Pad"] and old not in mix_set.track("Pad").devices
