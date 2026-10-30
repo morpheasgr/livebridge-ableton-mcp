@@ -21,6 +21,9 @@
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File installers\install.ps1 --uninstall --dry-run
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File installers\install.ps1 --update   # runs update.py
 #>
 
 # No param() block on purpose: every argument (--network, --pair ...) lands in $args untouched.
@@ -31,6 +34,9 @@ $target = Join-Path $scriptDir 'install.py'
 $passArgs = @($args)
 if ($passArgs.Count -gt 0 -and $passArgs[0] -eq '--uninstall') {
     $target = Join-Path $scriptDir 'uninstall.py'
+    $passArgs = @($passArgs | Select-Object -Skip 1)
+} elseif ($passArgs.Count -gt 0 -and $passArgs[0] -eq '--update') {
+    $target = Join-Path $scriptDir 'update.py'
     $passArgs = @($passArgs | Select-Object -Skip 1)
 }
 

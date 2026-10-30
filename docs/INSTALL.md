@@ -349,10 +349,29 @@ restart it. Everything on one Mac (localhost mode) needs no permission.
 
 ## Update
 
+Quit Claude Desktop first (also from the tray / menu-bar icon: its MCP server runs from this
+folder), then double-click **`Update LiveBridge.bat`** (Windows) or **`Update LiveBridge.command`**
+(macOS), or run:
+
 ```bash
-git pull                         # or unzip a new bundle over the folder (see above)
-./installers/install.sh          # Windows: installers\install.ps1
+./installers/install.sh --update     # Windows: installers\install.ps1 --update
+python installers/update.py --check  # only say whether there is a newer version
 ```
+
+The updater (`installers/update.py`, standard library only):
+
+- **git checkout**: `git pull --ff-only` (refused over local changes), then the installer.
+- **downloaded folder**: asks GitHub for the branch's newest commit
+  (`installers/update_source.json`, or `--repo owner/name --branch name`), downloads it, checks
+  it is LiveBridge, and copies it over the folder. Unchanged files are not rewritten; files you
+  added (API dumps, notes) stay — only files an earlier update put there that the new version
+  no longer has are removed (`.livebridge-update.json` lists them). Then it runs the installer;
+  options after `--` go to it (`... --update -- --network`).
+- A failed download or check changes nothing. A file Windows keeps locked (Claude Desktop still
+  running) is listed and the installer is not run: quit Claude Desktop and update again.
+
+By hand: `git pull` (or unzip a new bundle over the folder), then `./installers/install.sh`
+(Windows: `installers\install.ps1`).
 
 No flags needed: the token, LAN mode, port, `allow_eval`, beacon and paired host are kept (the
 *Settings* step lists them). On Windows quit Claude Desktop first (tray icon → Quit) — a running

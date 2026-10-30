@@ -10,6 +10,7 @@
 #   ./installers/install.sh --pair 192.168.1.20 --token TOKEN
 #   ./installers/install.sh --dry-run
 #   ./installers/install.sh --uninstall [--dry-run]   # runs installers/uninstall.py instead
+#   ./installers/install.sh --update                  # runs installers/update.py instead
 #
 # Set LIVEBRIDGE_PYTHON=/path/to/python3 to force an interpreter.
 # Compatible with the bash 3.2 that ships with macOS.
@@ -21,6 +22,9 @@ TARGET="$SCRIPT_DIR/install.py"
 if [ "${1:-}" = "--uninstall" ]; then
     shift
     TARGET="$SCRIPT_DIR/uninstall.py"
+elif [ "${1:-}" = "--update" ]; then
+    shift
+    TARGET="$SCRIPT_DIR/update.py"
 fi
 
 # Prints "major minor" for a python executable, or nothing if it does not run.

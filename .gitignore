@@ -10,3 +10,5 @@ config.local.json
 .livebridge_work/
 # token-bearing config written by install.py in the developer (symlink) setup
 remote_script/LiveBridge/config.json
+# what the updater (installers/update.py) put in a downloaded folder
+.livebridge-update.json

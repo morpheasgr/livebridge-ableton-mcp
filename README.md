@@ -180,6 +180,14 @@ git clone https://github.com/morpheasgr/livebridge-ableton-mcp.git LiveBridge; c
 powershell -ExecutionPolicy Bypass -File installers\install.ps1   # or: py installers\install.py
 ```
 
+### Without git (download)
+
+Download the repository as a zip (GitHub: **Code → Download ZIP**), unzip it into a folder you
+keep (the MCP server runs from it) and double-click **`Install LiveBridge.bat`** (Windows) or
+**`Install LiveBridge.command`** (macOS; the first time right-click → Open). Later, quit Claude
+Desktop and double-click **`Update LiveBridge.bat` / `.command`**: it downloads the newest version
+over the folder (files you added there stay), then runs the installer again.
+
 ### Then, on both
 
 1. Start (or restart) Live.
@@ -192,7 +200,8 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1   # or: py insta
 Try: *"Make a 4-bar house beat at 124 BPM with a 909 kit, a sub bass following Am–F–C–G and a
 pad on the chords, then loop it."*
 
-The installer is idempotent — run it again after `git pull` to update; it keeps the token and
+The installer is idempotent — run it again after `git pull` (or use the Update launcher) to
+update; it keeps the token and
 every setting you do not pass again (LAN mode, port, `allow_eval`, paired host). `--dry-run` shows
 every action without writing anything. Details, flags and manual setup:
 [docs/INSTALL.md](docs/INSTALL.md).
