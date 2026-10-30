@@ -341,6 +341,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return
         if started.get("stop"):
             bridge_call(bridge, "transport.stop")
+            # Live applies the stop on its next tick: a marker written before that is lost
+            end = time.time() + 3.0
+            while time.time() < end:
+                state = bridge_call(bridge, "transport.get")
+                if not isinstance(state, dict) or _is_error(state) or \
+                        not state.get("is_playing"):
+                    break
+                time.sleep(0.1)
             if started.get("marker") is not None:
                 bridge_call(bridge, "transport.set_position",
                             {"position": started["marker"], "set_start_marker": True})
@@ -1708,9 +1716,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 ... see live_master_auto; needs an Engine on the master). None = skip.
             master_chain: "livebridge" (default: the LiveBridge Master device before the
                 master's Engine) or "native" (EQ Eight -> Glue Compressor -> Limiter).
-            place_devices: put the devices in place first (default): a LiveBridge Channel at the end of
-                every track that makes sound (it replaces a LiveBridge Engine there) and an
-                Engine on the master. false = only the Channels already there.
+            place_devices: put the devices in place first (default, also with apply=false: the
+                plan needs the meters; at rest they do not change the sound): a LiveBridge
+                Channel at the end of every track that makes sound (it replaces a LiveBridge
+                Engine there) and an Engine on the master. false = only the Channels already
+                there.
             keep_manual: keep strip controls set by hand (default): LiveBridge remembers what
                 it set on each Channel; a control that differs from that and from rest is the
                 user's and stays as it is (`kept` in the report). false = reset every control.
@@ -1755,9 +1765,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error(f"unknown role(s) {bad}; use one of {', '.join(mix.ROLES)}",
                               cmd=cmd)
         placed = None
-        if place_devices and apply:
+        # the plan needs the meters too (apply=false included): a Channel at rest and an Engine
+        # do not change the sound, and the report lists what was placed
+        if place_devices:
             jobs.note("placing LiveBridge Channels and the master's Engine")
-            placed = place_meters(tracks, master=bool(master))
+            placed = place_meters(tracks, master=bool(master) or balance)
             if placed.get("error"):
                 return placed["error"]
         try:
@@ -1771,9 +1783,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if not channels:
             return tool_error(
                 "no LiveBridge Channel on " + ("these tracks" if tracks else "any track")
-                + ": live_browser_load(query=\"LiveBridge Channel\", category=\"audio_effect\", "
-                "track=<name>) on each part (it ends the chain; remove a LiveBridge Engine "
-                "there — the Channel has the meters). Needs Max 9.", type="not_found", cmd=cmd)
+                + (": run with place_devices=true (the default) to put one at the end of every "
+                   "track that makes sound" if not place_devices else
+                   ": none could be placed (see the tracks' devices; is the LiveBridge Channel "
+                   "installed in the User Library and Max 9 available?)"),
+                type="not_found", cmd=cmd)
         if playing() is False:
             return tool_error("the transport is stopped: pass section_bars=[first, last] of the "
                               "fullest section (the tool plays it), or loop it and start "
