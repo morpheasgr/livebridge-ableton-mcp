@@ -847,9 +847,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             why = "Live's +6 dB fader maximum" if item.get("at_max") else \
                 "the raise limit (max_raise_db)" if item.get("raise_capped") else \
                 "the move limit (max_move_db, counted over runs)"
-            fix = "lower it by hand, or rerun with a higher max_move_db" if item["off_db"] > 0 \
-                else "raise it at the source (the instrument, sample gain or the Channel's " \
-                     "Trim) — or rerun with a higher max_raise_db"
+            fix = (f"lower it by hand, or live_mix_balance(max_move_db=...) higher than "
+                   f"{max_move_db:g}") if item["off_db"] > 0 else \
+                ("raise it at the source (the instrument, sample gain or the Channel's Trim), "
+                 f"or live_mix_balance(max_raise_db=...) higher than {max_raise_db:g}")
             notes.append(f"{item['name']} is held {abs(item['off_db']):g} dB "
                          f"{'above' if item['off_db'] > 0 else 'below'} its role's level by "
                          f"{why}: {fix}.")
