@@ -474,6 +474,9 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     pushed = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                                  "chain": "livebridge", "max_gain_db": 6})
     assert pushed["limiter_gain_db"] == 6 and pushed["makeup_db"] > 0, pushed
+    assert pushed["peak_reduction_db"] >= pushed["limiting_db"] >= 0
+    last = pushed["steps"][-1]
+    assert master_params(device)["Comp Makeup"] == pytest.approx(last["Comp Makeup"], abs=0.01)
     assert pushed["after"]["lufs"] == pytest.approx(-8.0, abs=0.6)
     assert master_params(device)["Comp Makeup"] == pytest.approx(pushed["makeup_db"], abs=0.05)
 
@@ -617,6 +620,8 @@ def _phase_device(track):
 
 
 def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkeypatch):
+    # a Phase that sits after the Channel (an earlier version loaded it there) moves in front
+    factory.add_device(mix_set.track("Sub"), "LiveBridge Channel", "MxDeviceAudioEffect")
     phase = _phase_device(mix_set.track("Sub"))
     plain = mix_set.master_reading
 
@@ -635,6 +640,9 @@ def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkey
                                                     "low_db": result["best"]["low_db"]}
     assert result["gain_db"] == pytest.approx(3.0, abs=0.3)
     assert len(result["tried"]) == 2 + 2 * 7
+    names = [d.name for d in mix_set.track("Sub").devices]
+    assert names.index("LiveBridge Phase") < names.index("LiveBridge Channel")
+    assert any("in front of" in n for n in result["notes"])
     p = {q.name: q.value for q in phase.parameters}
     assert p["Invert"] == 1 and p["Phase Stages"] == 1
     assert p["Phase Freq"] == pytest.approx(70.0, rel=0.01)
@@ -914,3 +922,13 @@ def test_protect_keeps_the_fader_and_the_mix_level():
     # the others are centred as without protect: they are not pulled up to the hot lead
     assert {m["name"]: m["move_db"] for m in kept["moves"]} == \
         {m["name"]: m["move_db"] for m in free["moves"] if m["name"] != "Lead"}
+
+
+def test_balance_leaves_known_one_shots_alone(app, song, mix_set):
+    """live_mix_auto passes the parts its own listen found silent: same verdict everywhere."""
+    hats = fader_db(mix_set.track("Hats"))
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "one_shots": ["Hats"],
+                                                 "tolerance_db": 0})
+    assert result["left_out"] == {"Hats": "one-shot: silent in part of the section"}
+    assert fader_db(mix_set.track("Hats")) == pytest.approx(hats, abs=0.05)
+    assert "Hats" not in {m["name"] for m in result["plan"]["moves"]}
