@@ -470,6 +470,7 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     again = call_tool(app, "live_master_auto", {
         "destination": "club", "seconds": 3, "chain": "livebridge", "eq_bands": {"mid": 6.2}})
     assert master_params(device)["EQ Mid"] == pytest.approx(-3.5) and "eq" not in again
+    assert any("EQ Mid kept at -3.5 dB" in n for n in again["notes"]), again["notes"]
     assert set(again["reset"]) <= {"Limit Gain", "Comp Makeup"} and again["reset"]
     call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                         "chain": "livebridge", "eq_bands": {"mid": 9.0}})
@@ -659,6 +660,11 @@ def test_mix_phase_keeps_the_least_cancelling_setting(app, song, mix_set, monkey
                                              "frequencies": [60, 120]})
     assert flat["applied"] is False and any("neutral" in n for n in flat["notes"])
     assert {q.name: q.value for q in phase.parameters}["Phase Stages"] == 0
+    # a stopped song with section_bars: the tool plays the bars itself and stops again
+    song.is_playing = False
+    played = call_tool(app, "live_mix_phase", {"track": "Sub", "seconds": 1,
+                                               "frequencies": [60], "section_bars": [1, 1]})
+    assert "error" not in played and song.is_playing is False, played
     for bad in ({"track": "Sub", "seconds": 9}, {"track": "Sub", "frequencies": [5]}):
         assert call_tool(app, "live_mix_phase", bad)["type"] == "bad_args"
 

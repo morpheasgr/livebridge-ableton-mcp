@@ -1055,7 +1055,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             loud_bar, quiet_bar: bars of the loudest and quietest sections (1-based): the
                 tool plays each before and after, and backs the limiter off when their
                 difference shrinks by more than 2 LU.
-            max_gain_db: the most limiter gain it may use (0..24).
+            max_gain_db: the most Limit Gain / Live Limiter gain it may use (0..24). With
+                `chain="livebridge"` the device's Comp Makeup (in front of the limiter) can add
+                up to 12 dB more on top, so the drive reaches max_gain_db + 12 (`makeup_db`).
             chain: "native" (EQ Eight, Glue Compressor, Limiter) or "livebridge": one
                 LiveBridge Master device (Ableton's Channel EQ, Compressor, Limiter and Utility
                 DSP in a single Max device, Max 9 / Live 12.2+: EQ Low Cut, Comp Ratio/Attack,
@@ -1070,9 +1072,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 in `manual`.
 
         Returns:
-            `{destination, target_lufs, ceiling_db, applied, chain, inserted, before:{lufs,
-            peak_db, crest_db}, after:{...}, limiter_gain_db, steps:[{gain_db, lufs, peak_db,
-            crest_db}], contrast?:{before_lu, after_lu}, stopped?, notes, manual}`.
+            `{destination, target_lufs, ceiling_db, applied, chain, inserted, reset?,
+            before:{lufs, peak_db, crest_db}, after:{...}, limiter_gain_db, makeup_db?,
+            limiting_db, peak_reduction_db, eq?, settings, steps:[{gain_db (the drive),
+            lufs, peak_db, crest_db} | {eq} | {faders_db}], device_check?, contrast?:{before_lu,
+            after_lu}, stopped?, notes, manual}`. crest_db is peak minus the unweighted RMS,
+            not minus the K-weighted LUFS (so it reads ~3-4 dB above peak - LUFS on a mix);
+            limiting_db is the drive minus the loudness gained, peak_reduction_db the drive
+            minus the peak gained — the crest drop is about their difference, not exactly.
 
         Gotchas: needs an Engine on the master (it measures after the limiter) and the song
         playing (or loud_bar to start it). One master can't serve both worlds: a club master
@@ -1309,6 +1316,20 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 # unchanged mix's mid to the -6 dB cap); the opposite reading backs it off
                 if current and math.copysign(1.0, current) == math.copysign(1.0, setting):
                     if abs(setting) <= abs(current) + 0.05:
+                        if abs(current) >= 5.9:
+                            notes.append(
+                                f"{param} already at {current:+.1f} dB and the master still "
+                                f"reads {delta:+.1f} dB in that band: more master EQ would "
+                                "thin the whole mix — the rest is in the parts (the balance's "
+                                "`bands` names the tracks that carry it), fix it there.")
+                        else:
+                            notes.append(
+                                f"{param} kept at {current:+.1f} dB: the band still reads "
+                                f"{delta:+.1f} dB with it in place, and a run deepens a cut "
+                                f"only when half the reading ({abs(setting):.1f} dB) is more "
+                                "than the cut there — a bell cut moves a wide band little, so "
+                                "adding up runs would walk it to the -6 dB limit. The "
+                                "balance's band advice does not know about this cut.")
                         continue
                 elif current:
                     setting = current + setting
@@ -1943,6 +1964,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         frequencies: list[float] | None = None,
         apply: bool = True,
         place_devices: bool = True,
+        section_bars: list[int] | None = None,
     ) -> Any:
         """Phase-align a part against the rest of the low end (bass against kick, a layered
         kick against its partner) by measurement, like a phase-rotation plug-in's "analyze":
@@ -1959,6 +1981,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 220; each with normal and flipped polarity).
             apply: false = measure every setting, then put the device back to neutral.
             place_devices: put a LiveBridge Engine on the master first when there is none (default).
+            section_bars: `[first, last]` bar (1-based) to loop and play while it listens — the
+                tool starts the transport there and stops it again afterwards (default: the
+                bars playing now). A bar or two where both parts play is enough.
 
         Returns:
             `{track, best:{invert, frequency?, low_db}, baseline_low_db, gain_db, noise_db,
@@ -1986,8 +2011,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("no LiveBridge Engine on the master track. " + _HOW_TO_ADD,
                               type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: loop a bar where both parts play and "
-                              "start playback", type="invalid_state", cmd=cmd)
+            return tool_error("the transport is stopped: pass section_bars=[first, last] (a "
+                              "bar where both parts play), or loop one and start playback",
+                              type="invalid_state", cmd=cmd)
 
         def phase_index() -> int | None:
             listing = bridge_call(bridge, "devices.list", {"track": track})
@@ -2079,9 +2105,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                             if best.get("frequency") else "")
                          + f": +{gain:g} dB of low end on the master.")
         elif gain <= max(1.0, 2 * noise):
-            notes.append(f"No setting beat the untouched sound by more than the noise "
-                         f"({gain:+g} dB vs ±{noise:g} dB): left neutral. The parts were not "
-                         "fighting in phase — look at levels or EQ instead.")
+            notes.append(f"No setting gained enough to keep: the best was {gain:+g} dB of low "
+                         f"end, the bar is {max(1.0, 2 * noise):g} dB (1 dB, or twice the "
+                         f"measuring noise of ±{noise:g} dB when that is more): left neutral. "
+                         "The parts were not fighting in phase — look at levels or EQ "
+                         "instead.")
         if not keep and loaded_here and phase_index() is not None:
             gone = bridge_call(bridge, "devices.delete", {"track": track,
                                                           "device": phase_index()})
@@ -2106,6 +2134,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         seconds: float = 4.0,
         apply: bool = True,
         place_devices: bool = True,
+        section_bars: list[int] | None = None,
     ) -> Any:
         """Stop two parts fighting over a band — the way a side-chained dynamic EQ does it: puts
         a LiveBridge Unmask device on `track` (the part that gives way: the bass against the
@@ -2123,6 +2152,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             apply: false = measure and report the band only.
             place_devices: put a LiveBridge Channel on both tracks first when they have no meter
                 (default).
+            section_bars: `[first, last]` bar (1-based) to loop and play while it listens — the
+                tool starts the transport there and stops it again afterwards (default: the
+                bars playing now). A bar or two where both parts play is enough.
 
         Returns:
             `{track, against, band:{band, hz, q, track_db, against_db}, threshold_db,
@@ -2160,7 +2192,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               + " (it measures the parts). " + _HOW_TO_ADD,
                               type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: loop a section where both parts play",
+            return tool_error("the transport is stopped: pass section_bars=[first, last] "
+                              "where both parts play, or loop it and start playback",
                               type="invalid_state", cmd=cmd)
         pair = [meters[track.strip().lower()], meters[against.strip().lower()]]
         mine, theirs = listen_all(pair, seconds)
