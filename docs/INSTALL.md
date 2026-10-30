@@ -145,7 +145,8 @@ uninstaller instead.
 
 The installer adds this to `claude_desktop_config.json`
 (macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\` and, for the Microsoft
-Store version, `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\`):
+Store version, `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\`; recent versions keep
+it per account in `%LOCALAPPDATA%\Claude-Data\claude_<id>\` — every one found gets the entry):
 
 ```json
 {

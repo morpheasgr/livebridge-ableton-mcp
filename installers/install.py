@@ -476,8 +476,10 @@ def desktop_config_candidates(host: Host) -> List[Path]:
     """``claude_desktop_config.json`` paths of every Claude Desktop install that exists.
 
     macOS ``~/Library/Application Support/Claude``; Windows ``%APPDATA%\\Claude`` and the
-    Microsoft Store (MSIX) copy under ``%LOCALAPPDATA%\\Packages\\Claude_*\\LocalCache\\Roaming\\Claude``;
-    Linux ``~/.config/Claude``. Folders that do not exist (Claude Desktop never started) are skipped.
+    Microsoft Store (MSIX) copy under ``%LOCALAPPDATA%\\Packages\\Claude_*\\LocalCache\\Roaming\\Claude``
+    and the per-account folders of recent versions, ``%LOCALAPPDATA%\\Claude-Data\\claude_<id>``
+    (each gets the entry: the installer cannot tell which account is in use); Linux
+    ``~/.config/Claude``. Folders that do not exist (Claude Desktop never started) are skipped.
     """
     folders: List[Path] = []
     if host.is_mac:
@@ -492,9 +494,21 @@ def desktop_config_candidates(host: Host) -> List[Path]:
                         folders.append(package / "LocalCache" / "Roaming" / "Claude")
             except OSError:
                 pass
+        data = host.localappdata() / "Claude-Data"
+        if data.is_dir():
+            try:
+                folders += [d for d in sorted(data.iterdir())
+                            if d.is_dir() and d.name.lower().startswith("claude_")]
+            except OSError:
+                pass
     else:
         folders.append(host.home / ".config" / "Claude")
-    return [folder / "claude_desktop_config.json" for folder in folders if folder.is_dir()]
+    paths = [folder / "claude_desktop_config.json" for folder in folders if folder.is_dir()]
+    # a folder an older version left behind has no config: when any install has one, only
+    # those are the real ones (writing a new file elsewhere left a config holding nothing
+    # but LiveBridge in an unused folder)
+    existing = [path for path in paths if path.is_file()]
+    return existing or paths
 
 
 # ---------------------------------------------------------------------------
