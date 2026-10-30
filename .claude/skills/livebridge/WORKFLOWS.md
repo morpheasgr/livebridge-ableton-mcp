@@ -674,9 +674,15 @@ Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
 4. **Master**: loop the loudest section, `live_master_auto(destination="streaming")` (or
    `"club"`, `"apple"`, `"soundcloud"`, `"demo"`, `lufs=-9`). It reuses the chain or builds EQ
    Eight -> Glue Compressor -> Limiter before the master's Engine (never a second limiter after
-   a plug-in one), sets the ceiling, trims the faders if the mix is too hot, then raises the
-   limiter gain step by step until the integrated loudness is on target. It stops early when the
-   crest factor collapses (the punch goes) — then fix the mix instead (kick/bass balance, fewer
+   a plug-in one), sets the ceiling, measures "before" with its gain at 0 dB (a rerun resets
+   the last run's gain: `reset`), then raises the limiter gain step by step until the
+   integrated loudness is on target. With `chain="livebridge"` it never touches the faders:
+   master band fixes (`eq_bands`, which `live_mix_auto` passes from the balance) go on the
+   device's EQ, and past `max_gain_db` its Comp Makeup drives on (up to 12 dB more); Live's
+   chain trims the faders only when the mix is already louder than the target (listed in
+   `steps`). A gain step it cannot hear stops the run with `device_check` (the device's DSP is
+   not running, or only its limiter is) — fix the device, the numbers are meaningless until
+   then. It stops early when the crest factor collapses (the punch goes) — then fix the mix instead (kick/bass balance, fewer
    layers in the drop). With `loud_bar=` and `quiet_bar=` it also checks that the drop and the
    breakdown stay apart and backs off if limiting squashed them together.
 5. **Glue threshold** is the user's step (its gain-reduction meter is not readable): 1-3 dB on
