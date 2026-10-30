@@ -225,8 +225,8 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     `before` of null means LiveBridge never read that value. Native plug-ins (after a
     handover) are not watched: use `live_device_parameters` on the rack instead.
   - *Mix and master* — **one call, no devices to place**: run `live_mix_auto(genre=...,
-    master="streaming", bars=[113, 128])` (or "club", "apple" ...) with `bars` the fullest
-    section (the drop) — the tool loops it, plays it and stops again (without `bars` the song
+    master="streaming", section_bars=[113, 128])` (or "club", "apple" ...) with `bars` the fullest
+    section (the drop) — the tool loops it, plays it and stops again (without `section_bars` the song
     must already play there). It puts a LiveBridge Channel at the end of every track that makes sound (it
     replaces an Engine there) and an Engine on the master, sets each part's strip by role,
     balances the faders (level-neutral: only parts more than 3 dB off their role move, to just

@@ -243,7 +243,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if bars is not None:
             if not (isinstance(bars, (list, tuple)) and len(bars) == 2 and all(
                     isinstance(b, (int, float)) and b >= 1 for b in bars) and bars[1] >= bars[0]):
-                return tool_error("bars must be [first, last] (1-based, last >= first)",
+                return tool_error("section_bars must be [first, last] (1-based, last >= first)",
                                   cmd="mix.section")
             first, last = int(bars[0]), int(bars[1])
             held = bridge_call(bridge, "transport.set_loop", {
@@ -302,8 +302,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if bound.arguments.get("loud_bar") is not None:
                 return fn(*args, **kwargs)        # it jumps between sections itself
             started = None
-            if not jobs.nested() and "bars" in bound.arguments:
-                started = start_section(bound.arguments.get("bars"))
+            if not jobs.nested() and "section_bars" in bound.arguments:
+                started = start_section(bound.arguments.get("section_bars"))
                 if isinstance(started, dict) and "error" in started:
                     return started
             try:
@@ -605,7 +605,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         max_raise_db: float = 3.0,
         tolerance_db: float = 3.0,
         protect: list[str] | None = None,
-        bars: list[int] | None = None,
+        section_bars: list[int] | None = None,
     ) -> Any:
         """Balance the mix by measurement: listens to every track with a LiveBridge Engine at
         its end over the same window, gives each part its role's level (kick on top, then sub
@@ -640,7 +640,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 the role's level), so a second run changes nothing.
             protect: parts that never move (the lead, the vocal); the others are placed
                 around them.
-            bars: `[first, last]` bar (1-based) to loop and play while measuring — the tool
+            section_bars: `[first, last]` bar (1-based) to loop and play while measuring — the tool
                 starts the transport there and stops it again afterwards. Default: the bars
                 playing now (or the arrangement loop when it is on and the song is stopped).
 
@@ -690,7 +690,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("balancing needs LiveBridge Engine devices at the end of at "
                               "least 2 tracks. " + _HOW_TO_ADD, type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: pass bars=[first, last] of the "
+            return tool_error("the transport is stopped: pass section_bars=[first, last] of the "
                               "fullest section (the tool plays it), or loop it and start "
                               "playback (live_transport_play)", type="invalid_state", cmd=cmd)
         notes: list[str] = []
@@ -1276,7 +1276,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         keep_manual: bool = True,
         protect: list[str] | None = None,
         detail: str = "summary",
-        bars: list[int] | None = None,
+        section_bars: list[int] | None = None,
     ) -> Any:
         """Mix (and master) the song by measurement in one call — the devices it needs are put
         in place by the tool itself. On each track with a LiveBridge Channel (a channel
@@ -1318,7 +1318,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             protect: parts the balance never moves (the lead, the vocal).
             detail: "summary" (default: per part the moves and the measured change, the
                 balance moves, the master result) or "full" (every reading and reason).
-            bars: `[first, last]` bar (1-based) of the section to mix on (the drop, e.g.
+            section_bars: `[first, last]` bar (1-based) of the section to mix on (the drop, e.g.
                 `[113, 128]`): the tool loops it, starts playback there and stops again at
                 the end, giving your loop back. Default: the bars playing now, or the
                 arrangement loop when it is on and the song is stopped.
@@ -1329,7 +1329,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             changes:{parameter: "before -> after"} (only what this run changed: a rerun on
             a mixed song shows few or none), reasons:[...]}], low_end?:{phase, unmask}, balance?, master?, notes}`.
 
-        Gotchas: the song must play the fullest section — or pass `bars` and the tool plays it
+        Gotchas: the song must play the fullest section — or pass `section_bars` and the tool plays it
         (and stops after); a run started on a playing song keeps it playing. A big set takes minutes: past ~40 s the call answers `{job, status:
         "running"}` and the run goes on — `live_mix_job(job=..., wait_seconds=30)` returns the full
         report. Placing ~20 devices takes a while (each one loads and starts). The Channel replaces the Engine on a track (it has
@@ -1372,7 +1372,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 "track=<name>) on each part (it ends the chain; remove a LiveBridge Engine "
                 "there — the Channel has the meters). Needs Max 9.", type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: pass bars=[first, last] of the "
+            return tool_error("the transport is stopped: pass section_bars=[first, last] of the "
                               "fullest section (the tool plays it), or loop it and start "
                               "playback (live_transport_play)", type="invalid_state", cmd=cmd)
         notes: list[str] = []

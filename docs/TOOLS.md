@@ -1599,7 +1599,7 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `max_raise_db` | float | `3.0` |
 | `tolerance_db` | float | `3.0` |
 | `protect` | list[str] \| null | `null` |
-| `bars` | list[int] \| null | `null` |
+| `section_bars` | list[int] \| null | `null` |
 
 Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `transport.get`
 
@@ -1642,7 +1642,7 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `keep_manual` | bool | `true` |
 | `protect` | list[str] \| null | `null` |
 | `detail` | str | `"summary"` |
-| `bars` | list[int] \| null | `null` |
+| `section_bars` | list[int] \| null | `null` |
 
 Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 

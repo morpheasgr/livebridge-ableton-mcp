@@ -794,9 +794,9 @@ def test_bars_plays_the_section_and_stops_again(app, song, mix_set):
     song.is_playing = False
     song.loop = False
     result = call_tool(app, "live_mix_balance", {"seconds": 3, "apply": False,
-                                                  "bars": [1, 4]})
+                                                  "section_bars": [1, 4]})
     assert "error" not in result, result
     assert any("Played bars 1-4" in n and "stopped again" in n for n in result["notes"])
     assert song.is_playing is False and song.loop is False
-    bad = call_tool(app, "live_mix_balance", {"seconds": 3, "bars": [4, 1]})
+    bad = call_tool(app, "live_mix_balance", {"seconds": 3, "section_bars": [4, 1]})
     assert bad["type"] == "bad_args"

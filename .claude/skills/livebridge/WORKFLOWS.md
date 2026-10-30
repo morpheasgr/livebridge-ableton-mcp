@@ -633,9 +633,9 @@ at the end of each sounding track, an Engine on the master, LiveBridge Master be
 don't ask the user to drag anything in; Max for Live is needed (Max 9 for Channel/Master).
 Mixing first, mastering second; most "weak" masters are mix problems.
 
-**All in one**: `live_mix_auto(genre="techno", master="streaming", bars=[first, last])` with
+**All in one**: `live_mix_auto(genre="techno", master="streaming", section_bars=[first, last])` with
 the fullest section's bars (the tool loops and plays them, then stops; or start playback there
-yourself and leave `bars` out) — strips, balance and master in one call (kick/bass phase and
+yourself and leave `section_bars` out) — strips, balance and master in one call (kick/bass phase and
 unmasking with `low_end=true`).
 The steps below are the same work one tool at a time (to stop between steps, or to redo one).
 Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
