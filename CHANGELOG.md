@@ -5,6 +5,7 @@ the MCP server package and the installer have their own version numbers. `live_s
 
 ## 0.3.0 (MCP server) / 1.1.0 (Remote Script)
 
+- The installer's checklist says whether the Claude Desktop skill needs uploading again: first install, UPDATED (remove the old one, upload the new one), or unchanged.
 - The installer (and uninstaller) also finds Claude Desktop's config in recent versions' per-account folders, `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude_desktop_config.json`, and no longer creates a config in a folder an older version left behind when a real config exists elsewhere (it wrote one holding only LiveBridge into the unused Microsoft Store folder).
 - The installer's next-steps list is shorter and wraps at 78 columns: the Max for Live devices are one step, grouped by browser folder with one line each.
 - Updater and double-click launchers: `Install LiveBridge.bat` / `.command` and `Update LiveBridge.bat` / `.command` in the folder; `installers/update.py` (also `install.ps1/install.sh --update`) pulls a git checkout or downloads the branch's newest commit over a downloaded folder — files you added stay, unchanged files are not rewritten, a failed download changes nothing, locked files stop it before the installer — then runs the installer.

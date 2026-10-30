@@ -1589,12 +1589,21 @@ class Installer(Ops):
             if dest is not None:
                 self.manifest["skill_dir"] = str(dest)
         zip_path = skill_zip_path(self.host)
-        self.write_bytes(zip_path, zip_bytes(source_files, SKILL_NAME))
+        first = not zip_path.is_file()
+        changed = self.write_bytes(zip_path, zip_bytes(source_files, SKILL_NAME))
         self.manifest["skill_zip"] = str(zip_path)
+        if changed and not first:
+            what = "The skill was UPDATED: in Claude Desktop remove the old one, then upload"
+        elif changed:
+            what = "Claude Desktop skill (recommended): upload"
+        else:
+            what = ("Skill unchanged since the last install: nothing to upload if Claude "
+                    "Desktop has it (otherwise upload")
         self.manual.append(
-            "Claude Desktop skill (recommended): Settings {a} Capabilities {a} Skills {a} "
-            "Upload skill:\n{zip}\n(needs 'Code execution and file creation' on). Claude "
-            "Code already has it.".format(a=self.arrow, zip=zip_path))
+            "{what} it in Settings {a} Capabilities {a} Skills {a} Upload skill:\n{zip}\n"
+            "(needs 'Code execution and file creation' on){close}. Claude Code already has "
+            "it.".format(what=what, a=self.arrow, zip=zip_path,
+                         close=")" if not changed else ""))
 
     # -- bookkeeping ---------------------------------------------------------
     def write_manifest(self) -> None:
