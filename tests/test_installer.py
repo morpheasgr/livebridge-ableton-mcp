@@ -406,7 +406,8 @@ def test_full_install_on_macos(tmp_path):
     assert manifest["venv"] == str(venv) and manifest["venv_created"] is True
     assert manifest["desktop_configs"] == [str(desktop)]
     assert manifest["claude_code"] is True and manifest["splice_claude_code"] is True
-    assert "Preferences -> Link, Tempo & MIDI -> Control Surface -> LiveBridge (Input/Output: None)" in out
+    assert "Preferences -> Link, Tempo & MIDI -> Control Surface:\n" in out
+    assert "    LiveBridge (Input/Output: None)." in out
     assert config["token"] in out and "live_status" in out
 
 
@@ -1166,13 +1167,17 @@ def test_engine_device_is_copied_into_the_user_library(tmp_path):
     assert (dest / "LiveBridge Engine.amxd").read_bytes() == \
         (source / "LiveBridge Engine.amxd").read_bytes()
     assert read(host.home / ".livebridge" / "install.json")["engine_dir"] == str(dest)
-    assert "Max Audio Effect -- Claude loads it" in out and "(live_engine_*)" in out
+    assert "Audio Effects -> Max Audio Effect:" in out and "- LiveBridge Engine: master" in out
+    assert max(len(line) for line in out.split("next steps")[1].splitlines()
+               if "Token:" not in line and "integration_check" not in line
+               and "config" not in line
+               and "livebridge-skill.zip" not in line) <= 78
     midi = (remote_dir_mac(host).parent.parent / "Presets" / "MIDI Effects" / "Max MIDI Effect"
             / "LiveBridge MIDI")
     assert sorted(p.name for p in midi.iterdir()) == ["LiveBridge MIDI.amxd", "lbmidi.js",
                                                       "lbmidi_context.js"]
     assert read(host.home / ".livebridge" / "install.json")["midi_dir"] == str(midi)
-    assert "Max MIDI Effect" in out and "(live_midi_*)" in out
+    assert "Max MIDI Effect" in out and "- LiveBridge MIDI: MIDI track" in out
     code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
     assert "unchanged: " + str(dest) in out and "unchanged: " + str(midi) in out
     code, out, _ = run_uninstall(host)
