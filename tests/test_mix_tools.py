@@ -189,7 +189,7 @@ def test_balance_plan_follows_role_offsets():
     parts = [{"name": "Kick", "role": "kick", "lufs": -14.0, "fader_db": 0.0},
              {"name": "Pad", "role": "pad", "lufs": -10.0, "fader_db": 0.0},
              {"name": "Hats", "role": "hats", "lufs": -16.0, "fader_db": -3.0}]
-    plan = mix.balance_plan(parts, anchor="Kick", min_move=0.5)
+    plan = mix.balance_plan(parts, anchor="Kick", min_move=0.0)
     moves = {m["name"]: m for m in plan["moves"]}
     assert plan["anchor"] == "Kick" and "Kick" in plan["unchanged"]
     assert moves["Pad"]["target_lufs"] == -24.0 and moves["Pad"]["new_fader_db"] == -14.0
@@ -666,7 +666,7 @@ def test_mix_auto_places_the_devices_itself(app, song, mix_set, monkeypatch):
 def test_balance_caps_each_move_and_skips_sparse_parts(app, song, mix_set, monkeypatch):
     plan = mix.balance_plan([{"name": "Kick", "role": "kick", "lufs": -10.0, "fader_db": 0.0},
                              {"name": "Pad", "role": "pad", "lufs": -6.0, "fader_db": 0.0}],
-                            max_move=6.0)
+                            max_move=6.0, min_move=0.0)
     pad = next(m for m in plan["moves"] if m["name"] == "Pad")
     assert pad["move_db"] == -6.0 and pad["capped"] is True        # wanted -14, capped
     # a one-shot that plays in 2 frames of 20: left alone, said in the notes
@@ -733,3 +733,70 @@ def test_balance_never_raises_more_than_the_cap():
     plan = mix.balance_plan(parts, max_move=6.0, raise_left={"Kick": 3.0, "Tom": 3.0})
     tom = next(m for m in plan["moves"] if m["name"] == "Tom")
     assert tom["move_db"] == 3.0 and tom["raise_capped"] is True
+
+
+def test_balance_reports_the_moves_of_every_pass(app, song, mix_set):
+    """The second pass finds nothing left to do: the report still lists the first pass's
+    moves (it showed moves=[] while 6 faders had moved)."""
+    result = call_tool(app, "live_mix_balance", {"anchor": "Kick", "tolerance_db": 0,
+                                                  "max_move_db": 24, "max_raise_db": 12,
+                                                  "passes": 2, "seconds": 3})
+    moves = {m["name"]: m for m in result["plan"]["moves"]}
+    assert result["passes"] == 2 and set(moves) == {"Sub", "Pad", "Hats"}
+    assert moves["Pad"]["fader_db"] == -10.0 and moves["Pad"]["passes"] == 1
+    assert moves["Pad"]["move_db"] == pytest.approx(moves["Pad"]["new_fader_db"] + 10.0, abs=0.1)
+
+
+def test_balance_twice_moves_nothing_the_second_time(app, song, mix_set):
+    args = {"max_move_db": 24, "max_raise_db": 12, "seconds": 3}
+    first = call_tool(app, "live_mix_balance", args)
+    assert first["plan"]["moves"]
+    before = {n: fader_db(mix_set.track(n)) for n in mix_set.parts}
+    again = call_tool(app, "live_mix_balance", args)
+    assert again["plan"]["moves"] == []
+    assert all(fader_db(mix_set.track(n)) == pytest.approx(v, abs=0.05)
+               for n, v in before.items())
+
+
+def test_balance_leaves_the_headroom_behind_a_master_chain_alone(app, song, mix_set):
+    factory.add_device(song.master_track, "Limiter", "Limiter")
+    factory.add_device(song.master_track, "LiveBridge Engine", "MxDeviceAudioEffect")
+    for track in song.tracks:
+        track.mixer_device.volume.value = 0.85              # 0 dB: the master peaks hot
+    result = call_tool(app, "live_mix_balance", {"seconds": 3,
+                                                  "protect": list(mix_set.parts)})
+    assert "headroom_trim_db" not in result
+    assert any("after Limiter" in n for n in result["notes"])
+    assert all(fader_db(t) == pytest.approx(0.0, abs=0.05) for t in song.tracks)
+
+
+def test_sub_named_with_break_is_a_sub():
+    assert mix.guess_role("BS Break Subbass")["role"] == "sub"
+    assert mix.guess_role("Break Loop")["role"] == "drums"
+
+
+def test_mix_auto_skips_muted_strips_and_reports_changes(app, song, mix_set, monkeypatch,
+                                                          tmp_path):
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    _strips(mix_set, monkeypatch)
+    mix_set.track("Hats").mute = True                  # muted, no mute automation
+    args = {"seconds": 3, "balance": False, "place_devices": False}
+    first = call_tool(app, "live_mix_auto", args)
+    assert "Hats" not in [t["name"] for t in first["tracks"]]
+    assert any("Muted with no mute automation" in n and "Hats" in n for n in first["notes"])
+    kick = next(t for t in first["tracks"] if t["name"] == "Kick")
+    assert kick["changes"] and all(" -> " in v for v in kick["changes"].values())
+    again = call_tool(app, "live_mix_auto", args)       # the same strips: nothing changes
+    assert all(t["changes"] == {} for t in again["tracks"])
+
+
+def test_bars_plays_the_section_and_stops_again(app, song, mix_set):
+    song.is_playing = False
+    song.loop = False
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "apply": False,
+                                                  "bars": [1, 4]})
+    assert "error" not in result, result
+    assert any("Played bars 1-4" in n and "stopped again" in n for n in result["notes"])
+    assert song.is_playing is False and song.loop is False
+    bad = call_tool(app, "live_mix_balance", {"seconds": 3, "bars": [4, 1]})
+    assert bad["type"] == "bad_args"

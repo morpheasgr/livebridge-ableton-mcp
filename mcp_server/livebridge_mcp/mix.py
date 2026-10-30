@@ -44,9 +44,10 @@ _ROLE_WORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("snare", ("snare", "clap", "rim", "snr")),
     ("hats", ("hat", "hh", "cymbal", "ride", "crash", "shaker")),
     ("perc", ("perc", "tom", "conga", "bongo", "tamb", "cowbell")),
-    ("drums", ("drum", "beat", "break", "kit", "groove")),
+    # sub and bass before drums: "BS Break Subbass" is a sub, not a breakbeat
     ("sub", ("sub", "808")),
     ("bass", ("bass", "reese", "wobble")),
+    ("drums", ("drum", "beat", "break", "kit", "groove")),
     ("vocal", ("vocal", "vox", "voice", "acapella", "chop", "choir")),
     ("pad", ("pad", "string", "atmo", "drone", "texture", "ambience")),
     ("keys", ("key", "piano", "rhodes", "organ", "chord", "stab")),
@@ -111,7 +112,7 @@ GENRES: dict[str, dict[str, Any]] = {
                       "bands": (-1.0, -3.0, -6.0, -7.0, -7.0, -10.0),
                       # the melody carries the track: leads, pads and keys sit close to the
                       # kick instead of 6-10 LU under it
-                      "roles": {"kick": 0.0, "sub": -2.0, "bass": -3.0, "lead": -3.0,
+                      "roles": {"kick": 0.0, "sub": -2.0, "bass": -3.0, "lead": -2.0,
                                 "pad": -5.0, "keys": -4.0, "vocal": -2.0, "guitar": -4.0,
                                 "perc": -9.0, "hats": -10.0, "snare": -6.0, "fx": -10.0}},
     "jazz": {"label": "Jazz / Acoustic", "lufs": -16.0,
@@ -337,8 +338,9 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
             level-neutral centring).
         max_db: highest fader value (Live's +6 dB): a part that would need more stops there
             (``at_max``) — the others do not come down for it.
-        min_move: tolerance — a part within this many dB of its target is left alone (a
-            second run changes nothing).
+        min_move: tolerance — a part within this many dB of its target is left alone, and a
+            part outside it moves only to just inside it (``margin`` dB in), not to the
+            target: a second run then finds it within the tolerance and changes nothing.
         max_move: cap one move to this many dB.
         raise_left: per part, how many dB it may still go UP in this run (``raise_capped``).
         move_left: per part, how many dB it may still move in this run, either way
@@ -380,6 +382,9 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         if abs(move) < min_move:
             unchanged.append(part["name"])
             continue
+        if min_move > 0:                    # to just inside the tolerance, not the target
+            margin = min(1.5, min_move / 2.0)
+            move = math.copysign(abs(move) - (min_move - margin), move)
         if max_move is not None and abs(move) > max_move:
             move, flags["capped"] = math.copysign(max_move, move), True
         if move_left is not None and abs(move) > max(0.0, move_left.get(part["name"], abs(move))):

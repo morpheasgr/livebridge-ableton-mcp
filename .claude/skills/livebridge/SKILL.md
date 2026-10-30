@@ -224,12 +224,15 @@ a failure stay; next-tick state such as the playhead reads stale inside the batc
     re-announcing a whole state) — mention one only if it explains a changed sound. A
     `before` of null means LiveBridge never read that value. Native plug-ins (after a
     handover) are not watched: use `live_device_parameters` on the rack instead.
-  - *Mix and master* — **one call, no devices to place**: start playback on the fullest section
-    (loop the drop) and run `live_mix_auto(genre=..., master="streaming")` (or "club",
-    "apple" ...). It puts a LiveBridge Channel at the end of every track that makes sound (it
+  - *Mix and master* — **one call, no devices to place**: run `live_mix_auto(genre=...,
+    master="streaming", bars=[113, 128])` (or "club", "apple" ...) with `bars` the fullest
+    section (the drop) — the tool loops it, plays it and stops again (without `bars` the song
+    must already play there). It puts a LiveBridge Channel at the end of every track that makes sound (it
     replaces an Engine there) and an Engine on the master, sets each part's strip by role,
-    balances the faders (level-neutral: only outliers move, the mix keeps its level; protect
-    the lead with `protect=[...]`), then masters through the
+    balances the faders (level-neutral: only parts more than 3 dB off their role move, to just
+    inside that, so a second run changes nothing; protect the lead with `protect=[...]`; the
+    report lists every fader move with from/to, and per strip only the controls it changed,
+    `before -> after`), then masters through the
     LiveBridge Master device before the master's Engine. Needs Max for Live (Max 9 for the
     Channel and Master). On the user's own mix: `apply=false` first (it then places nothing and
     only plans from the Channels already there) and show the plan; report the `reasons` after.
