@@ -345,7 +345,8 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         raise_left: per part, how many dB it may still go UP in this run (``raise_capped``).
         move_left: per part, how many dB it may still move in this run, either way
             (``budget_capped``).
-        protect: parts that never move (the lead, the vocal).
+        protect: parts that never move (the lead, the vocal); they still count in the
+            centring.
 
     Returns:
         ``{anchor?, level_shift_db, moves:[{name, role, offset_lu, now_lufs, target_lufs,
@@ -362,11 +363,10 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
     chosen = None
     if anchor:
         chosen = next((p for p in parts if p["name"].lower() == anchor.lower()), None)
-    fixed = [p for p in parts if p["name"].lower() in keep]
+    # protected parts count in the centring like any other (they just do not move): the mix
+    # keeps its level around them — anchoring on them pulled everything else up to the lead
     if chosen is not None:
         level = chosen["post"] - chosen["offset"]           # loudness of offset 0
-    elif fixed:
-        level = sorted(p["post"] - p["offset"] for p in fixed)[len(fixed) // 2]
     else:
         wishes = sorted(p["post"] - p["offset"] for p in parts)
         middle = len(wishes) // 2

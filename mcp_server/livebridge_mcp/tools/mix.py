@@ -79,6 +79,13 @@ def _chain_devices(kind: str) -> tuple[tuple[str, str], ...]:
 #: What live_mix_auto last set on each Channel (track name -> parameter -> value): a value that
 #: differs from both this and the rest value was set by hand and is kept on the next run.
 _STRIPS_FILE = "channel_strips.json"
+#: per set and track what the balance did to a fader (where it left it, how far it raised and
+#: moved it in all, whether it counted the part): limits and the one-shot check carry over
+#: from run to run while the fader stays there
+_BALANCE_FILE = "balance_state.json"
+#: the one-shot check's hysteresis: a part the last run counted is skipped only below
+#: min_active - this, one it skipped is counted only above min_active + this
+_ACTIVE_MARGIN = 0.1
 _NUMBER_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*(k?)", re.I)
 
 
@@ -116,6 +123,9 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
         plan = balance.get("plan") or {}
         short["balance"] = {k: v for k, v in balance.items() if k in (
             "applied", "genre", "headroom_trim_db", "notes", "error", "type", "job", "status")}
+        for key in ("unchanged", "protected"):
+            if plan.get(key):
+                short["balance"][key] = plan[key]
         short["balance"]["moves"] = [
             {k: v for k, v in m.items() if k in ("name", "fader_db", "new_fader_db", "move_db",
                                                  "capped", "budget_capped", "raise_capped",
@@ -628,18 +638,21 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             apply: false = only report the plan.
             passes: measure/adjust rounds (1..4).
             headroom_db: wanted master peak below 0 dBFS (0..12; needs an Engine on the master).
-            max_move_db: the most this call moves any fader, all passes together (1..24 dB) —
-                keeps a wrong role or an odd reading from throwing a fader.
+            max_move_db: the most the balance moves any fader (1..24 dB), all passes and runs
+                together while the fader stays where LiveBridge left it (moving it by hand
+                starts over) — keeps a wrong role or an odd reading from throwing a fader, and
+                a capped part from moving again on every rerun.
             min_active: parts that play less than this share of the window (0..1; one-shots,
                 fills, a tom twice in 10 s) read too quiet on average: their faders are left
                 alone and listed in the notes.
-            max_raise_db: the most a fader goes UP in this run (0..12) — a part reading quiet
-                is more often a bad window than a quiet part.
+            max_raise_db: the most a fader goes UP (0..12), counted over runs like
+                `max_move_db` — a part reading quiet is more often a bad window than a quiet
+                part.
             tolerance_db: parts within this many dB of their role's level stay put (0..6): only
                 the outliers move, and only to just inside the tolerance (not all the way to
                 the role's level), so a second run changes nothing.
-            protect: parts that never move (the lead, the vocal); the others are placed
-                around them.
+            protect: parts whose faders never move (the lead, the vocal); the others are
+                centred as usual, so the mix as a whole keeps its level around them.
             section_bars: `[first, last]` bar (1-based) to loop and play while measuring — the tool
                 starts the transport there and stops it again afterwards. Default: the bars
                 playing now (or the arrangement loop when it is on and the song is stopped).
@@ -716,6 +729,23 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         readings: dict[str, dict[str, Any]] = {}
         raised: dict[str, float] = {}
         moved: dict[str, float] = {}
+        # what earlier runs did to these faders (same set, fader still where they left it)
+        set_key = "unsaved"
+        summary = bridge_call(bridge, "song.summary", {"detail": "minimal"})
+        if isinstance(summary, dict) and not _is_error(summary):
+            set_key = str(summary.get("set_path") or summary.get("set_name") or "unsaved")
+        memory = library.read_json(library.library_dir() / _BALANCE_FILE, {})
+        memory = memory if isinstance(memory, dict) else {}
+        earlier: dict[str, dict[str, Any]] = {}
+        for name, entry in ((memory.get(set_key) or {}) if isinstance(
+                memory.get(set_key), dict) else {}).items():
+            now = (state.get(name) or {}).get("volume")
+            if isinstance(entry, dict) and now is not None and \
+                    abs(float(entry.get("fader_db", 999.0)) - now) <= 0.15:
+                earlier[name] = entry
+        raised.update({n: float(e.get("raised_db") or 0.0) for n, e in earlier.items()})
+        moved.update({n: float(e.get("moved_db") or 0.0) for n, e in earlier.items()})
+        counted: dict[str, bool] = {}
         # every move of the run, per part: the report shows the whole run, not the last pass
         total: dict[str, dict[str, Any]] = {}
         # parts left alone in the first pass stay alone: a later pass hearing a one-shot a
@@ -747,7 +777,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                      "(live_sound_check says why).")
                     continue
                 share = (result.get("loudness") or {}).get("active_share")
-                if share is not None and share < min_active:
+                limit = min_active
+                if first and name in earlier and "used" in earlier[name]:
+                    # the last run's answer holds unless the reading is clearly different
+                    limit += -_ACTIVE_MARGIN if earlier[name]["used"] else _ACTIVE_MARGIN
+                if first:
+                    counted[name] = not (share is not None and share < limit)
+                if share is not None and share < limit:
                     if first:
                         left_out.add(name)
                         notes.append(f"{name} plays only {round(share * 100)} % of the window "
@@ -865,6 +901,22 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         else:
             notes.append("No Engine on the master: headroom and the track-or-master band check "
                          "were skipped.")
+        if apply and counted:
+            now = faders(list(counted))
+            kept = dict(memory.get(set_key) or {}) if isinstance(memory.get(set_key), dict) \
+                else {}
+            for name, used in counted.items():
+                volume = (now.get(name) or {}).get("volume")
+                if volume is not None:
+                    kept[name] = {"fader_db": round(volume, 2), "used": used,
+                                  "raised_db": round(raised.get(name, 0.0), 2),
+                                  "moved_db": round(moved.get(name, 0.0), 2)}
+            memory[set_key] = kept
+            try:
+                library.write_json(library.library_dir() / _BALANCE_FILE, memory)
+            except OSError as exc:
+                notes.append(f"could not remember this balance ({exc}): a rerun may move "
+                             "capped parts again.")
         return answer
 
     # ------------------------------------------------------------------ master
