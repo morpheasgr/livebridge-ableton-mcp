@@ -465,11 +465,18 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     assert result["settings"]["Limit Gain"].startswith(f"{params['Limit Gain']:.1f}")
     assert not result.get("headroom_trim_db")                 # no fader moves
     assert result["after"]["lufs"] == pytest.approx(-8.0, abs=0.6) or "stopped" in result
-    # the EQ adds up over runs (a second run still hearing too much mid cuts again)
+    # the bands are measured after the EQ: a rerun hearing less excess than the cut in
+    # place keeps it (no creeping to the cap), a bigger excess deepens it, a lack backs it off
     again = call_tool(app, "live_master_auto", {
-        "destination": "club", "seconds": 3, "chain": "livebridge", "eq_bands": {"mid": 4.0}})
-    assert master_params(device)["EQ Mid"] == pytest.approx(-5.5)
+        "destination": "club", "seconds": 3, "chain": "livebridge", "eq_bands": {"mid": 6.2}})
+    assert master_params(device)["EQ Mid"] == pytest.approx(-3.5) and "eq" not in again
     assert set(again["reset"]) <= {"Limit Gain", "Comp Makeup"} and again["reset"]
+    call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                        "chain": "livebridge", "eq_bands": {"mid": 9.0}})
+    assert master_params(device)["EQ Mid"] == pytest.approx(-4.0)
+    call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                        "chain": "livebridge", "eq_bands": {"mid": -3.0}})
+    assert master_params(device)["EQ Mid"] == pytest.approx(-2.5)
     # Limit Gain capped at 6 dB: the compressor's makeup drives on to the target
     pushed = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                                  "chain": "livebridge", "max_gain_db": 6})
@@ -932,3 +939,23 @@ def test_balance_leaves_known_one_shots_alone(app, song, mix_set):
     assert result["left_out"] == {"Hats": "one-shot: silent in part of the section"}
     assert fader_db(mix_set.track("Hats")) == pytest.approx(hats, abs=0.05)
     assert "Hats" not in {m["name"] for m in result["plan"]["moves"]}
+
+
+def test_section_runs_restart_the_loop_and_put_the_start_marker_back(app, song, mix_set,
+                                                                     monkeypatch):
+    """Every listen starts at the section's first bar (a 6 s window in a 31 s loop heard
+    different bars each time); a run that started the song puts the start marker back."""
+    song.is_playing = False
+    song.start_time = 4.0                                           # bar 2
+    heard = []
+    real = mix_set.request
+
+    def request(device, cmd, args=None, timeout=5.0):
+        heard.append(song.current_song_time)
+        return real(device, cmd, args, timeout)
+    monkeypatch.setattr(engine, "request", request)
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "section_bars": [3, 4],
+                                                 "apply": False})
+    assert "error" not in result, result
+    assert heard and all(t == 8.0 for t in heard)                  # bar 3 every time
+    assert song.is_playing is False and song.start_time == 4.0

@@ -204,7 +204,32 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 before.append(name)
         return []
 
+    #: the loop a run holds (its start in beats), set by ``looped`` for the outermost run
+    held_loop: dict[str, float | None] = {"start": None, "bar_beats": 4.0}
+
+    def rewind() -> None:
+        """Restart the held loop from its first bar before a listen: a window shorter than the
+        loop (16 bars at 124 BPM are 31 s) otherwise hears whatever bars play then, and
+        before/after or two passes compare different music (a master 'before' read 6 dB hot)."""
+        start = held_loop["start"]
+        if start is None:
+            return
+        answer = bridge_call(bridge, "transport.play", {"position": start})
+        if _is_error(answer):
+            return
+        # Live quantizes the jump (to the next bar): wait until the playhead is there
+        end = time.time() + 4.0
+        while time.time() < end:
+            state = bridge_call(bridge, "transport.get")
+            beats = _num(((state.get("position") or {}).get("beats"))) \
+                if isinstance(state, dict) else None
+            if beats is None or start <= beats < start + held_loop["bar_beats"]:
+                break
+            time.sleep(0.1)
+        time.sleep(_SETTLE_S)
+
     def listen_all(devices: list[dict[str, Any]], seconds: float) -> list[Any]:
+        rewind()
         return engine.each(devices, lambda d: engine.listen(d, seconds))
 
     def before_meter(track: str, index: int) -> int | Any:
@@ -275,6 +300,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return None
         loop = state.get("loop") or {}
         was_playing = bool(state.get("is_playing"))
+        # starting at a bar moves Live's start marker: it goes back afterwards
+        marker = _num((state.get("start_time") or {}).get("beats")) \
+            if isinstance(state.get("start_time"), dict) else None
         if bars is not None:
             if not (isinstance(bars, (list, tuple)) and len(bars) == 2 and all(
                     isinstance(b, (int, float)) and b >= 1 for b in bars) and bars[1] >= bars[0]):
@@ -291,20 +319,24 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             time.sleep(1.0)                    # let the section sound before listening
             return {"stop": not was_playing, "loop": {
                 "start": loop.get("start"), "length": loop.get("length"),
-                "on": bool(loop.get("on"))}, "bars": f"bars {first}-{last}"}
+                "on": bool(loop.get("on"))}, "bars": f"bars {first}-{last}",
+                "marker": marker}
         if was_playing or not loop.get("on"):
             return None
         played = bridge_call(bridge, "transport.play", {"position": loop.get("start") or 0.0})
         if _is_error(played):
             return None
         time.sleep(1.0)
-        return {"stop": True, "bars": "the arrangement loop"}
+        return {"stop": True, "bars": "the arrangement loop", "marker": marker}
 
     def stop_section(started: dict[str, Any] | None) -> None:
         if not started or "error" in started:
             return
         if started.get("stop"):
             bridge_call(bridge, "transport.stop")
+            if started.get("marker") is not None:
+                bridge_call(bridge, "transport.set_position",
+                            {"position": started["marker"], "set_start_marker": True})
         old = started.get("loop")
         if old is not None:
             args: dict[str, Any] = {"enabled": old["on"]}
@@ -349,6 +381,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         def held_run(bound: inspect.BoundArguments, started: dict[str, Any] | None) -> Any:
             seconds = float(bound.arguments.get("seconds") or 6.0)
             saved = hold_loop(seconds)
+            outermost = held_loop["start"] is None
+            if outermost:
+                state = bridge_call(bridge, "transport.get")
+                loop = (state.get("loop") or {}) if isinstance(state, dict) else {}
+                if isinstance(state, dict) and state.get("is_playing") and loop.get("on"):
+                    held_loop["start"] = _num(loop.get("start"))
+                    match = re.match(r"^(\d+)/(\d+)$", str(state.get("signature", "")))
+                    held_loop["bar_beats"] = int(match.group(1)) * 4.0 / int(match.group(2)) \
+                        if match and int(match.group(2)) else 4.0
             loop_seconds = (saved or {}).get("loop_seconds") or 0.0
             if limits and limits[0] <= loop_seconds <= limits[1] and \
                     limits[0] <= seconds <= limits[1] and not jobs.nested():
@@ -356,6 +397,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             try:
                 result = fn(*bound.args, **bound.kwargs)
             finally:
+                if outermost:
+                    held_loop["start"] = None
                 release_loop(saved)
             if saved and not saved.get("own") and isinstance(result, dict) and \
                     isinstance(result.get("notes"), list):
@@ -1020,9 +1063,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             place_devices: put a LiveBridge Engine on the master first when there is none (default).
             eq_bands: master bands to correct, {band: dB too much (+) or too little (-)} —
                 live_mix_balance's `bands` with fix "master" (live_mix_auto passes them).
-                LiveBridge Master's EQ moves half of each (4 dB a run at most, +-6 dB in
-                all; sub/bass -> EQ Low, low_mid..high_mid -> EQ Mid at the band, high/air
-                -> EQ High); with the native chain they become advice in `manual`.
+                LiveBridge Master's EQ takes half of each (at most 4 dB; sub/bass -> EQ Low,
+                low_mid..high_mid -> EQ Mid at the band, high/air -> EQ High). The bands are
+                measured after that EQ, so a cut already as deep as the reading asks for
+                stays (a rerun does not deepen it); with the native chain they become advice
+                in `manual`.
 
         Returns:
             `{destination, target_lufs, ceiling_db, applied, chain, inserted, before:{lufs,
@@ -1100,6 +1145,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 bridge_call(bridge, "transport.play",
                             {"position": (bar - 1.0) * beats_per_bar})
                 time.sleep(_SETTLE_S)
+            else:
+                rewind()                    # every step hears the same bars as 'before'
             return engine.listen(device, seconds, kind="mix")
 
         sections: dict[str, dict[str, Any]] = {}
@@ -1233,7 +1280,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return result
 
         def master_eq(index: int | None, bands: dict[str, float]) -> dict[str, str]:
-            """Half of each shared band excess (at most 4 dB a run, 6 dB in all) on
+            """Half of each shared band excess (at most 4 dB, +-6 dB with what is there) on
             LiveBridge Master's EQ; Live's chain gets the advice instead."""
             wanted: dict[str, tuple[float, float | None]] = {}
             for band, delta in bands.items():
@@ -1256,11 +1303,21 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             was: dict[str, float] = {}
             for param, (delta, freq) in wanted.items():
                 current = read_param(index, param)[0] or 0.0
+                setting = -math.copysign(min(abs(delta) / 2.0, 4.0), delta)
+                # the bands are measured after this EQ: a cut already in place that is as
+                # deep as the excess asks for stays (adding to it on every run walked an
+                # unchanged mix's mid to the -6 dB cap); the opposite reading backs it off
+                if current and math.copysign(1.0, current) == math.copysign(1.0, setting):
+                    if abs(setting) <= abs(current) + 0.05:
+                        continue
+                elif current:
+                    setting = current + setting
                 was[param] = current
-                step = -math.copysign(min(abs(delta) / 2.0, 4.0), delta)
-                values[param] = db(max(-6.0, min(6.0, current + step)))
+                values[param] = db(max(-6.0, min(6.0, setting)))
                 if freq is not None:
                     values["EQ Mid Freq"] = f"{freq:g} Hz"
+            if not values:
+                return {}
             answer = bridge_call(bridge, "devices.set_parameters",
                                  {"track": "master", "device": index, "values": values})
             if _is_error(answer):
@@ -1902,11 +1959,6 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 220; each with normal and flipped polarity).
             apply: false = measure every setting, then put the device back to neutral.
             place_devices: put a LiveBridge Engine on the master first when there is none (default).
-            eq_bands: master bands to correct, {band: dB too much (+) or too little (-)} —
-                live_mix_balance's `bands` with fix "master" (live_mix_auto passes them).
-                LiveBridge Master's EQ moves half of each (4 dB a run at most, +-6 dB in
-                all; sub/bass -> EQ Low, low_mid..high_mid -> EQ Mid at the band, high/air
-                -> EQ High); with the native chain they become advice in `manual`.
 
         Returns:
             `{track, best:{invert, frequency?, low_db}, baseline_low_db, gain_db, noise_db,

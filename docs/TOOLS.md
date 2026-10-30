@@ -1578,7 +1578,7 @@ Pre-flight before building an arrangement on the parts (and whenever something i
 | `seconds` | float | `6.0` |
 | `roles` | object \| null | `null` |
 
-Bridge: `devices.parameters`, `mixer.meters`, `tracks.list`, `transport.get`
+Bridge: `devices.parameters`, `mixer.meters`, `tracks.list`, `transport.get`, `transport.play`
 
 #### `live_mix_balance`
 
@@ -1602,7 +1602,7 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `section_bars` | list[int] \| null | `null` |
 | `one_shots` | list[str] \| null | `null` |
 
-Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `song.summary`, `transport.get`
+Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `song.summary`, `transport.get`, `transport.play`
 
 #### `live_master_auto`
 
@@ -1677,7 +1677,7 @@ Stop two parts fighting over a band — the way a side-chained dynamic EQ does i
 | `apply` | bool | `true` |
 | `place_devices` | bool | `true` |
 
-Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.list`, `devices.move`, `devices.set_parameters`, `routing.route`, `tracks.list`, `transport.get`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.list`, `devices.move`, `devices.set_parameters`, `routing.route`, `tracks.list`, `transport.get`, `transport.play`
 
 #### `live_mix_job`
 
@@ -3715,7 +3715,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `transport.capture_midi` | M | destination="auto" | `live_record_capture_midi` (same command) | Capture recently played MIDI |
 | `transport.continue` |  |  | `live_cue_add`, `live_cue_delete`, `live_cue_layout`, `live_cue_set`, `live_transport_play` | Continue playback from the current playhead |
 | `transport.get` |  | include_scales=false | `live_audio_align`, `live_automation_record`, `live_clip_write_euclid`, `live_engine_capture`, `live_engine_follow`, `live_engine_listen`, `live_engine_masking`, `live_master_auto`, `live_memory_note`, `live_memory_recall`, `live_midi_play`, `live_midi_played`, `live_mix_auto`, `live_mix_balance`, `live_mix_phase`, `live_mix_unmask`, `live_sound_check`, `live_theory_analyze`, `live_theory_melody`, `live_transport_get` | Full transport state: play, position, tempo, loop, flags |
-| `transport.play` |  | position=null, mode="start" | `live_master_auto`, `live_mix_auto`, `live_transport_play` | Start playback (from the start marker, a position, or continue) |
+| `transport.play` |  | position=null, mode="start" | `live_master_auto`, `live_mix_auto`, `live_mix_balance`, `live_mix_unmask`, `live_sound_check`, `live_transport_play` | Start playback (from the start marker, a position, or continue) |
 | `transport.redo` |  | steps=1 | `live_transport_undo` | Redo the last N undone actions |
 | `transport.set` | M | tempo=null, signature=null, signature_numerator=null, signature_denominator=null, metronome=null, record_mode=null, session_record=null, overdub=null, arrangement_overdub=null, punch_in=null, punch_out=null, session_automation_record=null, back_to_arranger=null, loop=null, is_ableton_link_enabled=null, clip_trigger_quantization=null, midi_recording_quantization=null, groove_amount=null, swing_amount=null, scale_name=null, root_note=null, scale_mode=null | `live_transport_set` | Set several transport/song settings at once |
 | `transport.set_loop` | M | enabled=null, start=null, length=null, end=null, start_bar=null, bars=null | `live_transport_set_loop` | Arrangement loop: on/off, start, length/end, bars |
