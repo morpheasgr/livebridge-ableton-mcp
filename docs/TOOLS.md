@@ -3347,12 +3347,13 @@ Bridge: `transport.continue`, `transport.play`, `transport.toggle`
 
 #### `live_transport_stop`
 
-Stop the transport.
+Stop the transport. Already stopped, it changes nothing (unlike pressing Stop a second time in Live, which sends the playhead and the start marker back to 1.1.1).
 
 | Argument | Type | Default |
 |---|---|---|
 | `stop_clips` | bool | `false` |
 | `quantized` | bool | `false` |
+| `to_start` | bool | `false` |
 
 Bridge: `transport.stop`
 
@@ -3724,7 +3725,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `transport.set_position` |  | position=null, jump_by=null, set_start_marker=null | `live_transport_set_position` | Move the playhead (absolute or relative) |
 | `transport.set_tempo` | M | bpm | `live_transport_set` (tempo=) | Set the song tempo in BPM |
 | `transport.set_time_signature` | M | numerator=null, denominator=null, signature=null | `live_transport_set` (signature=) | Set the song time signature |
-| `transport.stop` |  | stop_clips=false, quantized=false | `live_cue_add`, `live_cue_delete`, `live_cue_layout`, `live_cue_set`, `live_master_auto`, `live_mix_auto`, `live_transport_stop` | Stop playback (optionally also stop all clips) |
+| `transport.stop` |  | stop_clips=false, quantized=false, to_start=false | `live_cue_add`, `live_cue_delete`, `live_cue_layout`, `live_cue_set`, `live_master_auto`, `live_mix_auto`, `live_transport_stop` | Stop playback (optionally also stop all clips) |
 | `transport.stop_all_clips` |  | quantized=true | `live_transport_stop_all_clips` | Stop all session clips (transport keeps running) |
 | `transport.tap_tempo` | M |  | `live_transport_tap_tempo` | One tap of Live's Tap Tempo button |
 | `transport.toggle` |  |  | `live_transport_play` | Toggle play/stop like the space bar |

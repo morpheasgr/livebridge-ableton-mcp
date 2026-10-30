@@ -161,19 +161,25 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                                   mode=None if mode == "toggle" else mode))
 
     @mcp.tool()
-    def live_transport_stop(stop_clips: bool = False, quantized: bool = False) -> Any:
-        """Stop the transport.
+    def live_transport_stop(stop_clips: bool = False, quantized: bool = False,
+                            to_start: bool = False) -> Any:
+        """Stop the transport. Already stopped, it changes nothing (unlike pressing Stop a
+        second time in Live, which sends the playhead and the start marker back to 1.1.1).
 
         Args:
             stop_clips: also stop all playing session clips (otherwise they resume on play).
             quantized: with `stop_clips`, stop clips at the next launch-quantization boundary
                 instead of immediately.
+            to_start: when already stopped, do Live's second Stop: playhead and start marker
+                back to 1.1.1.
 
         Returns:
-            `{is_playing: false, position:{beats,bbs}, start_time:{...}}`
+            `{is_playing: false, position:{beats,bbs}, start_time:{...}, already_stopped?}`
         """
-        return bridge_call(bridge, "transport.stop",
-                           {"stop_clips": stop_clips, "quantized": quantized})
+        args: dict[str, Any] = {"stop_clips": stop_clips, "quantized": quantized}
+        if to_start:
+            args["to_start"] = True       # an older Remote Script without it keeps working
+        return bridge_call(bridge, "transport.stop", args)
 
     @mcp.tool()
     def live_transport_set_position(

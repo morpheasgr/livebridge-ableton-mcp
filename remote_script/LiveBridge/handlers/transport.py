@@ -938,7 +938,7 @@ def transport_continue(ctx):
 
 
 @command("transport.stop", doc="Stop playback (optionally also stop all clips)")
-def transport_stop(ctx, stop_clips=False, quantized=False):
+def transport_stop(ctx, stop_clips=False, quantized=False, to_start=False):
     """Stop the transport.
 
     Args:
@@ -946,9 +946,14 @@ def transport_stop(ctx, stop_clips=False, quantized=False):
             does not resume them).
         quantized: with ``stop_clips``: stop clips at the next launch-quantization
             boundary instead of immediately.
+        to_start: when already stopped, do what a second press of Stop does in
+            Live: playhead AND start marker back to 1.1.1.  Default false: a
+            stop on a stopped transport changes nothing (a "just in case" stop
+            moved the user's start marker to the start).
 
     Returns:
-        {is_playing: false, position, start_time, seconds_at_current_tempo}
+        {is_playing: false, position, start_time, seconds_at_current_tempo,
+        already_stopped?}
 
     Gotchas:
         The playhead stays where playback stopped (Live applies the stop on
@@ -957,6 +962,13 @@ def transport_stop(ctx, stop_clips=False, quantized=False):
     song = ctx.song
     stop_clips = _bool(stop_clips, "stop_clips")
     quantized = _bool(quantized, "quantized")
+    to_start = _bool(to_start, "to_start")
+    if not compat.safe_getattr(song, "is_playing", False) and not to_start:
+        if stop_clips:
+            _live("stop_all_clips", song.stop_all_clips, quantized)
+        data = position_state(song, False)
+        data["already_stopped"] = True
+        return data
     _live("stop_playing", song.stop_playing)
     if stop_clips:
         _live("stop_all_clips", song.stop_all_clips, quantized)
