@@ -980,3 +980,67 @@ def test_section_runs_restart_the_loop_and_put_the_start_marker_back(app, song, 
     assert "error" not in result, result
     assert heard and all(t == 8.0 for t in heard)                  # bar 3 every time
     assert song.is_playing is False and song.start_time == 4.0
+
+
+def test_channel_plan_has_hysteresis():
+    """A rerun on the same mix changes nothing: a lead at crest 10.5-10.9 around its limit
+    gained and lost a compressor between two runs; small threshold moves were noise."""
+    def reading(crest, peak=-3.0):
+        return {"loudness": {"crest_db": crest, "peak_db": peak, "lufs": -14.0},
+                "spectrum": {"bands_db": {"sub": -30, "bass": -20, "low_mid": -12, "mud": -10,
+                                          "mid": -4, "presence": -8, "high": -15,
+                                          "air": -22}}}
+    fresh = mix.channel_plan("lead", reading(10.9))            # target 9: needs > 11.5 to start
+    assert "Comp Ratio" not in fresh["values"]
+    started = mix.channel_plan("lead", reading(12.0))["values"]
+    assert started["Comp Ratio"] == 3.0
+    previous = {**mix.CHANNEL_NEUTRAL, **started}
+    kept = mix.channel_plan("lead", reading(10.9), previous)["values"]   # > 9.5 keeps it
+    assert kept["Comp Ratio"] == 3.0
+    nudged = mix.channel_plan("lead", reading(12.2, peak=-2.9), previous)["values"]
+    assert nudged["Comp Threshold"] == started["Comp Threshold"]          # jitter: same value
+    assert "Comp Ratio" not in mix.channel_plan("lead", reading(9.2), previous)["values"]
+
+
+def test_strip_controls_compare_the_raw_value():
+    """The display rounds ("-16 dB" for -15.5): the set-by-hand check reads the value."""
+    param = {"name": "Comp Threshold", "value": -15.5, "display": "-16 dB"}
+    assert mix_tools._strip_number(param) == -15.5
+    assert mix_tools._strip_number({"name": "Mid Freq", "value": 0.42,
+                                    "display": "350 Hz"}) == 350.0
+
+
+def test_mix_auto_keeps_a_protected_parts_level_and_plans_without_applying(
+        app, song, mix_set, monkeypatch, tmp_path):
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    _strips(mix_set, monkeypatch)
+    plain = mix_set.request
+
+    def request(device, cmd, args=None, timeout=5.0):
+        answer = plain(device, cmd, args, timeout)
+        if device["role"] == "track":                 # the strip's high-pass costs 4 dB
+            strip = next(d for d in mix_set.track(device["track"]).devices
+                         if d.name == "LiveBridge Channel")
+            p = {q.name: q.value for q in strip.parameters}
+            lufs, crest, share = mix_set.parts[device["track"]]
+            lufs += (-4.0 if p["HP Freq"] > 20.5 else 0.0) + p["Trim"]
+            answer["frames"] = frames_for(lufs, crest, share)
+        return answer
+    monkeypatch.setattr(engine, "request", request)
+    # the plan: strips at rest, a balance plan and the bands, nothing moved
+    before = {n: fader_db(mix_set.track(n)) for n in ("Kick", "Sub", "Pad", "Hats")}
+    plan = call_tool(app, "live_mix_auto", {"seconds": 3, "apply": False,
+                                            "place_devices": False, "detail": "full",
+                                            "roles": {"Pad": "pad"}})
+    assert plan["balance"]["applied"] is False and "plan" in plan["balance"]
+    sources = {p["name"]: p["role_from"] for p in plan["balance"]["parts"]}
+    assert sources["Pad"] == "you" and sources["Kick"] != "you"
+    assert {n: fader_db(mix_set.track(n)) for n in before} == before
+    # applied with Pad protected: its Trim gives back what the high-pass took
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "place_devices": False,
+                                              "detail": "full", "protect": ["Pad"]})
+    pad = next(t for t in result["tracks"] if t["name"] == "Pad")
+    strip = next(d for d in mix_set.track("Pad").devices if d.name == "LiveBridge Channel")
+    assert {q.name: q.value for q in strip.parameters}["Trim"] == pytest.approx(4.0, abs=0.2)
+    assert pad["changes"]["Trim"].endswith("4") or "4" in pad["changes"]["Trim"]
+    assert any("Pad is protected: Trim" in n for n in result["notes"])

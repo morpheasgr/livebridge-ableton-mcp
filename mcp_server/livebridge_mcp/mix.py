@@ -599,14 +599,32 @@ _MUDDY_ROLES = ("pad", "lead", "keys", "vocal", "guitar", "snare", "perc", "fx")
 _AIRY_ROLES = ("vocal", "hats", "lead")
 
 
-def channel_plan(role: str | None, reading: dict[str, Any] | None) -> dict[str, Any]:
+def channel_plan(role: str | None, reading: dict[str, Any] | None,
+                 previous: dict[str, float] | None = None) -> dict[str, Any]:
     """``{values: {parameter: value}, reasons: [...]}`` for a LiveBridge Channel on a part.
 
     ``reading`` is the raw part (the Channel at rest): its bands, peak and crest decide the EQ
     and the compression; ``role`` decides the high-pass, timing and bass mono. Only parameters
-    that move from :data:`CHANNEL_NEUTRAL` are in ``values``.
+    that move from :data:`CHANNEL_NEUTRAL` are in ``values``. ``previous`` is what LiveBridge
+    set on this strip last time: each decision has hysteresis around it (a move that is on
+    stays on unless the reading clearly leaves its range, one that is off needs a clear case),
+    and a value within its jitter of the last one is kept — a rerun on the same mix changes
+    nothing (a lead at crest 10.5 vs 10.9 around a 10.5 limit gained and lost a compressor).
     """
     hp, crest_target, ratio, attack, release, mono = STRIP_ROLES.get(role, STRIP_ROLES[None])
+    last = previous or {}
+
+    def was(name: str) -> bool:
+        return name in last and last[name] != CHANNEL_NEUTRAL.get(name)
+
+    def edge(base: float, on: bool, step: float = 1.0) -> float:
+        """A threshold moved away from the last decision: easier to keep than to start."""
+        return base - step if on else base + step
+
+    def steady(name: str, value: float, jitter: float) -> float:
+        return float(last[name]) if was(name) and abs(float(last[name]) - value) < jitter \
+            else value
+
     values: dict[str, float] = {}
     reasons: list[str] = []
     label = role or "part"
@@ -619,30 +637,33 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None) -> dict[str, 
         mud = float(bands.get("mud", -90.0))
         presence = float(bands.get("presence", -90.0))
         boxy = max(float(bands.get("low_mid", -90.0)), mud)
-        if role in _MUDDY_ROLES and mud > -6.0:
-            cut = round(min(4.0, 1.5 + (mud + 6.0) * 0.6), 1)
-            values.update({"Mid Freq": 350.0, "Mid": -cut})
+        mid_at = float(last.get("Mid Freq", 0.0)) if was("Mid") else None
+        if role in _MUDDY_ROLES and mud > edge(-6.0, mid_at == 350.0):
+            cut = steady("Mid", -round(min(4.0, 1.5 + max(0.0, mud + 6.0) * 0.6), 1), 0.5)
+            values.update({"Mid Freq": 350.0, "Mid": cut})
             reasons.append(f"{-mud:.0f} dB below total in 250-500 Hz is a lot for a {label}: "
-                           f"-{cut:g} dB at 350 Hz (mud)")
-        elif role == "kick" and boxy > -8.0:
+                           f"{cut:g} dB at 350 Hz (mud)")
+        elif role == "kick" and boxy > edge(-8.0, mid_at == 300.0):
             values.update({"Mid Freq": 300.0, "Mid": -3.0})
             reasons.append("boxy kick (strong 120-500 Hz): -3 dB at 300 Hz")
-        elif role not in ("hats", "fx") and presence > -4.0:
+        elif role not in ("hats", "fx") and presence > edge(-4.0, mid_at == 3500.0):
             values.update({"Mid Freq": 3500.0, "Mid": -2.0})
             reasons.append("harsh 2-5 kHz: -2 dB at 3.5 kHz")
-        if role in _AIRY_ROLES and float(bands.get("air", -90.0)) < -25.0 and \
-                float(bands.get("high", -90.0)) < -18.0:
+        if role in _AIRY_ROLES and float(bands.get("air", -90.0)) < -edge(25.0, was("High")) \
+                and float(bands.get("high", -90.0)) < -edge(18.0, was("High")):
             values["High"] = 2.0
             reasons.append(f"dull top for a {label}: +2 dB high shelf (air)")
-        if role in ("bass", "lead") and _share(bands, "presence", "high", "air") < 0.02:
+        if role in ("bass", "lead") and _share(bands, "presence", "high", "air") < (
+                0.03 if was("Saturation") else 0.015):
             values["Saturation"] = 20.0
             reasons.append(f"almost nothing above 2 kHz: 20 % saturation so the {label} "
                            "speaks on small speakers")
     crest, peak = loud.get("crest_db"), loud.get("peak_db")
     if crest_target is not None and crest is not None and peak is not None and \
-            crest > crest_target + 1.5:
-        reduce = min(crest - crest_target, 8.0)
-        threshold = max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio)))
+            crest > crest_target + (0.5 if was("Comp Ratio") else 2.5):
+        reduce = max(0.5, min(crest - crest_target, 8.0))
+        threshold = steady("Comp Threshold",
+                           max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio))), 1.0)
         values.update({"Comp Threshold": round(threshold, 1), "Comp Ratio": ratio,
                        "Comp Attack": attack, "Comp Release": release})
         # makeup only when the attack catches the peaks: a slow attack lets the transient

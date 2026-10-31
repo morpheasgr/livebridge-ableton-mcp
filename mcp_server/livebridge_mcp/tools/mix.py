@@ -99,9 +99,11 @@ _NUMBER_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*(k?)", re.I)
 
 
 def _strip_number(param: dict[str, Any]) -> float | None:
-    """A Channel parameter's value in its own units (Hz, dB, ms, %, 0/1) from its display."""
-    if param.get("name") == "Bass Mono":
-        return float(param.get("value") or 0.0)
+    """A Channel parameter's value in its own units (Hz, dB, ms, %, 0/1). Linear dials are
+    Live's raw value (the display rounds: -15.5 showed "-16 dB" and read as set by hand);
+    the curved frequency dials are read from their display."""
+    if param.get("name") not in _HZ_PARAMS and _num(param.get("value")) is not None:
+        return _num(param.get("value"))
     match = _NUMBER_RE.search(str(param.get("display") or ""))
     if not match:
         return None
@@ -145,8 +147,8 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
         short["master"] = {k: v for k, v in master.items() if k in (
             "destination", "target_lufs", "before", "after", "limiter_gain_db", "makeup_db",
             "limiting_db", "peak_reduction_db", "reset", "eq", "steps", "settings",
-            "headroom_trim_db", "device_check", "stopped", "missing_gain_db", "contrast", "notes", "error",
-            "type")}
+            "headroom_trim_db", "device_check", "stopped", "missing_gain_db", "contrast",
+            "notes", "error", "type")}
     low = result.get("low_end")
     if isinstance(low, dict):
         short["low_end"] = {name: {k: v for k, v in (part or {}).items() if k in (
@@ -1710,7 +1712,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             roles: correct a guessed role: `{"Audio 3": "hats"}` (kick, snare, hats, perc,
                 drums, sub, bass, pad, lead, keys, vocal, guitar, fx).
             seconds: listening window (3..20) — loop the fullest section (the drop).
-            apply: false = listen to the strips as they are and report the plan only.
+            apply: false = listen to the strips as they are and report the plan only: the
+                strip settings, the balance's fader plan and bands, the master's needed gain.
             balance: then balance the faders by role (needs 2+ Engines/Channels).
             master: then master to this destination ("streaming", "club", "apple", "genre"
                 ... see live_master_auto; needs an Engine on the master). None = skip.
@@ -1728,7 +1731,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 against it (`live_mix_phase`) and put a LiveBridge Unmask on the bass that cuts
                 its clashing band while the kick plays (`live_mix_unmask`) — both devices end up
                 on the bass track (a Phase device that changed nothing is removed again).
-            protect: parts the balance never moves (the lead, the vocal).
+            protect: parts whose level stays: the balance never moves their faders, and their
+                strip's Trim gives back what its high-pass/EQ/compression took (the lead, the
+                vocal).
             detail: "summary" (default: per part the moves and the measured change, the
                 balance moves, the master result) or "full" (every reading and reason).
             section_bars: `[first, last]` bar (1-based) of the section to mix on (the drop, e.g.
@@ -1879,7 +1884,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if reading.get("silent"):
                 entry.update(values={}, reasons=["silent in this window: left at rest"])
             else:
-                plan = mix.channel_plan(role, reading)
+                plan = mix.channel_plan(role, reading, remembered.get(name))
                 own = kept.get(name) or {}
                 values = {k: v for k, v in plan["values"].items() if k not in own}
                 reasons = list(plan["reasons"])
@@ -1930,9 +1935,43 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         change = round(crest_before - crest_after, 1)
                         entry["measured"] = (f"crest {crest_before} -> {crest_after} dB "
                                              f"({change:+g} dB off the peaks)")
-                        if change < 0.5:
-                            entry["measured"] += (" — the compressor barely acts here: its "
-                                                  "threshold may sit above the peaks it hears")
+                        attack = float((entry.get("values") or {}).get("Comp Attack") or 0.0)
+                        if change < 0.5 and attack > 5.0:
+                            entry["measured"] += (
+                                f" — with a {attack:g} ms attack the transient passes before the "
+                                "compressor acts: it shapes the body after the hit, so the "
+                                "crest does not drop (it can rise: more punch). The high-pass "
+                                "and EQ change the reading too; judge it by ear.")
+                        elif change < 0.5:
+                            entry["measured"] += (" — little peak reduction measured: the "
+                                                  "high-pass/EQ moved the level too; judge it "
+                                                  "by ear")
+            # protect keeps a part's level, not only its fader: the strip's Trim gives back
+            # what the high-pass, EQ and compression took (the lead lost 4.7 dB, then gained 2.7)
+            for entry in results:
+                name = entry.get("name")
+                if name not in (protect or ()) or "after" not in entry or name not in indexes:
+                    continue
+                was_lufs = (entry.get("before") or {}).get("lufs")
+                now_lufs = entry["after"].get("lufs")
+                if was_lufs is None or now_lufs is None or abs(was_lufs - now_lufs) < 0.3:
+                    continue
+                trim = round(max(-24.0, min(12.0, was_lufs - now_lufs)), 1)
+                answer = set_strip(name, indexes[name], {"Trim": trim})
+                if _is_error(answer):
+                    continue
+                entry.setdefault("changes", {})["Trim"] = f"0 -> {_fmt(trim)}"
+                entry.setdefault("values", {})["Trim"] = trim
+                if name in remembered:
+                    remembered[name]["Trim"] = trim
+                notes.append(f"{name} is protected: Trim {trim:+g} dB keeps its level where it "
+                             f"was ({was_lufs} LUFS) with the strip in place.")
+            if apply:
+                try:
+                    strips_file[strip_set] = remembered
+                    library.write_json(library.library_dir() / _STRIPS_FILE, strips_file)
+                except OSError:
+                    pass
             kicks = [r["name"] for r in results if r.get("role") == "kick" and "error" not in r]
             basses = [r["name"] for r in results if r.get("role") in ("bass", "sub")
                       and "error" not in r]
@@ -1942,39 +1981,49 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     "phase": live_mix_phase(track=basses[0], seconds=2.0),
                     "unmask": live_mix_unmask(track=basses[0], against=kicks[0],
                                               seconds=max(3.0, min(seconds, 8.0)))}
-            if balance and len(pairs) >= 2:
-                jobs.note("balancing the faders")
-                result["balance"] = live_mix_balance(
-                    genre=genre, tracks=None if not tracks else names,
-                    roles={r["name"]: r["role"] for r in results if r.get("role")},
-                    seconds=max(3.0, seconds), protect=protect,
-                    one_shots=[r["name"] for r in results
-                               if (r.get("before") or {}).get("lufs") is None
-                               and "error" not in r] or None)
-            balanced = result.get("balance")
-            if isinstance(balanced, dict) and "plan" in balanced:
-                # one verdict per part: the per-track readings and the balance must agree
-                plan = balanced.get("plan") or {}
-                moves = {m["name"]: m for m in plan.get("moves") or []}
-                for entry in results:
-                    name = entry.get("name")
-                    if name in moves:
-                        entry["balance"] = f"fader {moves[name]['move_db']:+g} dB"
-                    elif name in (balanced.get("left_out") or {}):
-                        entry["balance"] = "left alone: " + balanced["left_out"][name]
-                    elif name in (plan.get("protected") or ()):
-                        entry["balance"] = "protected"
-                    elif name in (plan.get("unchanged") or ()):
-                        entry["balance"] = "unchanged (within the tolerance)"
-            if master:
-                jobs.note(f"mastering for {master}")
-                shared = {b["band"]: b["delta_db"]
-                          for b in ((result.get("balance") or {}).get("bands") or [])
-                          if isinstance(b, dict) and b.get("fix") == "master"}
-                result["master"] = live_master_auto(destination=master, genre=genre,
-                                                    seconds=max(3.0, seconds),
-                                                    chain=master_chain,
-                                                    eq_bands=shared or None)
+        if balance and len(pairs) >= 2:
+            jobs.note("balancing the faders")
+            result["balance"] = live_mix_balance(
+                genre=genre, tracks=None if not tracks else names, apply=apply,
+                roles={r["name"]: r["role"] for r in results if r.get("role")},
+                seconds=max(3.0, seconds), protect=protect,
+                one_shots=[r["name"] for r in results
+                           if (r.get("before") or {}).get("lufs") is None
+                           and "error" not in r] or None)
+        balanced = result.get("balance")
+        if isinstance(balanced, dict):
+            # the roles reached the balance as roles={...}: say where each came from
+            source = {r.get("name"): r.get("role_from") for r in results}
+            for part in balanced.get("parts") or []:
+                if source.get(part.get("name")):
+                    part["role_from"] = source[part["name"]]
+            if not apply and "plan" in balanced:
+                notes.append("apply=false: the balance plan is for the strips as they are "
+                             "now — setting the strips changes the parts' levels, so a "
+                             "real run's moves differ.")
+        if isinstance(balanced, dict) and "plan" in balanced:
+            # one verdict per part: the per-track readings and the balance must agree
+            plan = balanced.get("plan") or {}
+            moves = {m["name"]: m for m in plan.get("moves") or []}
+            for entry in results:
+                name = entry.get("name")
+                if name in moves:
+                    entry["balance"] = f"fader {moves[name]['move_db']:+g} dB"
+                elif name in (balanced.get("left_out") or {}):
+                    entry["balance"] = "left alone: " + balanced["left_out"][name]
+                elif name in (plan.get("protected") or ()):
+                    entry["balance"] = "protected"
+                elif name in (plan.get("unchanged") or ()):
+                    entry["balance"] = "unchanged (within the tolerance)"
+        if master:
+            jobs.note(f"mastering for {master}")
+            shared = {b["band"]: b["delta_db"]
+                      for b in ((result.get("balance") or {}).get("bands") or [])
+                      if isinstance(b, dict) and b.get("fix") == "master"}
+            result["master"] = live_master_auto(destination=master, genre=genre,
+                                                seconds=max(3.0, seconds),
+                                                chain=master_chain, apply=apply,
+                                                eq_bands=shared or None)
         jobs.note("done")
         return result if detail == "full" else _summary(result)
 
