@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security problems **privately** through GitHub:
-[Security → Report a vulnerability](https://github.com/valentijnh/livebridge-ableton-mcp/security/advisories/new).
+[Security → Report a vulnerability](https://github.com/morpheasgr/livebridge-ableton-mcp/security/advisories/new).
 Don't open a public issue. You'll get an answer as soon as possible, and credit in the fix's
 release notes if you want it.
 

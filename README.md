@@ -374,7 +374,7 @@ These are limits of Live's Python API, not of LiveBridge (details and alternativ
 ## FAQ
 
 **Which Ableton Live versions and editions work?**
-Live 12, in every edition. It was built and verified against Live 12.4.5 Suite;
+Live 12, in every edition. It was built against Live 12.4.5 Suite and is tested up to 12.4.16;
 `live_device_insert` needs 12.3 or later, and older 12.x versions load devices through the
 browser tools instead. Some example presets are Suite content; other editions use their own. Live 11 is not supported: the Remote Script is
 written for the Python 3.11 that Live 12 embeds.
@@ -396,7 +396,7 @@ spectrum, stereo, tempo and key. Your ears still have the final say.
 **Is it free?**
 LiveBridge is free and open source (MIT). You need Ableton Live 12 and a Claude plan; Splice is
 optional (searching is free, downloads use your Splice credits). If it helps your music, you can
-[buy the original author a coffee](https://buymeacoffee.com/valentijnh).
+[buy its original author a coffee](https://buymeacoffee.com/valentijnh).
 
 **Does it work on Windows? With Live and Claude on different computers?**
 Yes to both: macOS and Windows, and Claude and Live can run on two computers in your network,
@@ -446,10 +446,13 @@ where the project is going in [ROADMAP.md](ROADMAP.md).
 ## Support
 
 LiveBridge is free. If it saves you time or sparks a track, you can
-[buy the original author (@valentijnh) a coffee](https://buymeacoffee.com/valentijnh) ☕. A star on GitHub, a bug report or a note
+[buy its original author a coffee](https://buymeacoffee.com/valentijnh) ☕. A star on GitHub, a bug report or a note
 about what you made with it helps just as much.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
+MIT — see [LICENSE](LICENSE). LiveBridge was created by
+[Valentijn](https://github.com/valentijnh) ([original repository](https://github.com/valentijnh/livebridge-ableton-mcp));
+this fork adds mixing and mastering by measurement and is maintained by
+[morpheasgr](https://github.com/morpheasgr). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
 of Splice. LiveBridge is an independent project and not affiliated with either.

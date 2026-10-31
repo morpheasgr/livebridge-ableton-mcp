@@ -67,7 +67,7 @@
       "@type": "FAQPage",
       "mainEntity": [
         { "@type": "Question", "name": "Which Ableton Live versions does LiveBridge support?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Ableton Live 12, in every edition. It was built and verified against Live 12.4.5 Suite. Live 11 is not supported." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "Ableton Live 12, in every edition. It was built against Live 12.4.5 Suite and is tested up to Live 12.4.16. Live 11 is not supported." } },
         { "@type": "Question", "name": "Do I need Max for Live?",
           "acceptedAnswer": { "@type": "Answer", "text": "No. LiveBridge is a MIDI Remote Script, the same kind of script that drives Push and other controllers, so it runs in every edition of Live 12." } },
         { "@type": "Question", "name": "Which AI apps can use LiveBridge?",
@@ -304,7 +304,8 @@
     <p class="sub">Live's API cannot hear audio, move a parameter in time or see your keyboard.
       Small Max for Live devices can — and reach every parameter of a plug-in — and Claude adds
       them to your set itself when a task needs them. Everything else works without them. They need Max for Live (Live Suite, or Standard
-      with the add-on); the installer puts them in your User Library.</p>
+      with the add-on); the channel strip and mastering devices need Max 9 (Live 12.2 or newer). The
+      installer puts them in your User Library.</p>
     <div class="features">
       <div class="feature" style="--c: var(--cyan)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12h2l3-7 4 14 4-10 3 5h4"/></svg></div>
@@ -349,7 +350,7 @@
       <div class="feature" style="--c: var(--violet)">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/></svg></div>
         <h3>Balance and master by measurement</h3>
-        <p>"Mix and master this" is one call: Claude puts its own channel strip on every track and a mastering chain on the master — no devices to drag in — then EQs, compresses and high-passes each part for its role, fixes kick against bass, balances the faders and masters to a loudness target. A sound check finds silent or filter-strangled parts before you build on them. Faders go to role levels (kick on top) in real dB, with each band problem placed on a track or the master; the master is driven to a Spotify, Apple or club loudness target and stops before the punch goes. <code>live_sound_check</code> · <code>live_mix_auto</code> · <code>live_mix_unmask</code> · <code>live_mix_phase</code> · <code>live_mix_balance</code> · <code>live_master_auto</code></p>
+        <p>"Mix and master this" is one call: Claude puts its own channel strip on every track and a mastering chain on the master — no devices to drag in — then EQs, compresses and high-passes each part for its role, fixes kick against bass, balances the faders and masters to a loudness target. A sound check finds silent or filter-strangled parts before you build on them. Faders go to role levels (kick on top) in real dB, with each band problem placed on a track or the master; the master is driven to a Spotify, Apple or club loudness target and stops before the punch goes. A rerun on a settled mix changes nothing, and the targets are checked against professionally mix-mastered releases. Your own plug-ins on the tracks? It can just measure, balance and master, and leave your processing alone (<code>strips="measure"</code>). <code>live_sound_check</code> · <code>live_mix_auto</code> · <code>live_mix_unmask</code> · <code>live_mix_phase</code> · <code>live_mix_balance</code> · <code>live_master_auto</code></p>
       </div>
     </div>
     <p class="more"><a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/docs/ENGINE.md">How the devices work →</a></p>
@@ -395,9 +396,10 @@ cd LiveBridge
 powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
         <button class="copy" type="button" data-copy="code-win">Copy</button>
       </div>
-      <p class="note">No git? Download the
-        <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/archive/refs/heads/fork.zip">zip of this fork</a>,
-        unzip it into a folder you keep, and run the same installer.</p>
+      <p class="note">No git? <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/archive/refs/heads/fork.zip">Download the zip</a>,
+        unzip it into a folder you keep and double-click <code>Install LiveBridge.bat</code> (Windows)
+        or <code>Install LiveBridge.command</code> (macOS). Later, <code>Update LiveBridge</code> in the
+        same folder updates it in place and runs the installer again.</p>
     </div>
     <div>
       <ol class="steps">
@@ -487,7 +489,7 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
     <h2 id="faq-title">FAQ</h2>
     <div class="faq">
       <details><summary>Which Ableton Live versions does LiveBridge support?</summary>
-        <p>Ableton Live 12, in every edition. It was built and verified against Live 12.4.5 Suite. Live 11 is not supported: the Remote Script is written for the Python 3.11 that Live 12 embeds.</p></details>
+        <p>Ableton Live 12, in every edition. It was built against Live 12.4.5 Suite and is tested up to Live 12.4.16. Live 11 is not supported: the Remote Script is written for the Python 3.11 that Live 12 embeds.</p></details>
       <details><summary>Do I need Max for Live?</summary>
         <p>No. LiveBridge is a MIDI Remote Script, the same kind of script that drives Push and other controllers, so it runs in every edition of Live 12. With Max for Live (Suite, or the add-on) optional devices add real-time listening, live modulation, follow actions, MIDI input, faster automation recording, mixing and mastering by measurement, and every parameter of any VST3 plug-in.</p></details>
       <details><summary>Which AI apps can use LiveBridge?</summary>
@@ -497,7 +499,7 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
       <details><summary>Does arranging keep my automation?</summary>
         <p>Yes. Live's API drops clip envelopes when it copies clips into the arrangement and cannot read automation lanes, so LiveBridge records them back: scenes laid out as a song keep their sweeps and fades, and copied sections take their lanes along.</p></details>
       <details><summary>Is LiveBridge free?</summary>
-        <p>Yes, free and open source under the MIT license. You need Ableton Live 12 and a Claude plan; Splice is optional (searching is free, downloads use your Splice credits). If it helps your music, you can <a href="https://buymeacoffee.com/valentijnh">buy LiveBridge's original author a coffee</a>.</p></details>
+        <p>Yes, free and open source under the MIT license. You need Ableton Live 12 and a Claude plan; Splice is optional (searching is free, downloads use your Splice credits). If it helps your music, you can <a href="https://buymeacoffee.com/valentijnh">buy its original author a coffee</a>.</p></details>
       <details><summary>Does it work on Windows, and across two computers?</summary>
         <p>Yes. It runs on macOS and Windows, and Claude and Live can run on two different computers in your network, Mac and PC mixed.</p></details>
       <details><summary>Will it mess up my Live set?</summary>
@@ -515,14 +517,16 @@ powershell -ExecutionPolicy Bypass -File installers\install.ps1</pre>
       <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/docs/TOOLS.md">Tool reference</a>
       <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/docs/INSTALL.md">Install guide</a>
       <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/archive/refs/heads/fork.zip">Download zip</a>
-      <a href="https://github.com/valentijnh/livebridge-ableton-mcp/issues">Issues</a>
+      <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/ROADMAP.md">Roadmap</a>
+      <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/issues">Issues</a>
       <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/SECURITY.md">Security</a>
       <a href="https://buymeacoffee.com/valentijnh">Buy the original author a coffee ☕</a>
     </nav>
-    <p>LiveBridge is free software under the MIT license, made by <a href="https://github.com/valentijnh">@valentijnh</a>;
-      this fork by <a href="https://github.com/morpheasgr">@morpheasgr</a> adds the Max for Live devices, sample search,
-      arrangement automation and production know-how
-      (<a href="https://github.com/valentijnh/livebridge-ableton-mcp">original project</a>).
+    <p>LiveBridge is free software under the MIT license, created by <a href="https://github.com/valentijnh">Valentijn</a>
+      (<a href="https://github.com/valentijnh/livebridge-ableton-mcp">original project</a>); this fork, maintained by
+      <a href="https://github.com/morpheasgr">morpheasgr</a>, adds the Max for Live devices, sample search, arrangement
+      automation, production know-how and mixing and mastering by measurement.
       Ableton and Live are trademarks of Ableton AG. Claude is a trademark of Anthropic. Serum is a
       trademark of Xfer Records; Splice is a trademark of Splice. LiveBridge is an independent project,
       not affiliated with or endorsed by any of them.</p>

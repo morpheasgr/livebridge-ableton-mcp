@@ -5,7 +5,7 @@ or other Live versions are all welcome.
 
 ## Reporting a bug
 
-Open an [issue](https://github.com/valentijnh/livebridge-ableton-mcp/issues/new/choose) with:
+Open an [issue](https://github.com/morpheasgr/livebridge-ableton-mcp/issues/new/choose) with:
 
 - your OS, Live version and edition, and how Claude runs (Claude Code / Claude Desktop / other);
 - the output of `live_status(include_server=true)` (the token is redacted);
@@ -18,7 +18,7 @@ Security problems: please don't open a public issue, see [SECURITY.md](SECURITY.
 ## Development setup
 
 ```bash
-git clone https://github.com/valentijnh/livebridge-ableton-mcp.git && cd livebridge-ableton-mcp
+git clone https://github.com/morpheasgr/livebridge-ableton-mcp.git && cd livebridge-ableton-mcp
 python3 -m venv .venv && .venv/bin/pip install -e "mcp_server[dev,audio]"
 .venv/bin/python -m pytest -q tests
 ```

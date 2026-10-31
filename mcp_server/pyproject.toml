@@ -45,12 +45,12 @@ serum = ["cbor2>=5.4", "zstandard>=0.21"]
 livebridge-mcp = "livebridge_mcp.__main__:main"
 
 [project.urls]
-Homepage = "https://valentijnh.github.io/livebridge-ableton-mcp/"
-Repository = "https://github.com/valentijnh/livebridge-ableton-mcp"
-Documentation = "https://github.com/valentijnh/livebridge-ableton-mcp/tree/main/docs"
-Examples = "https://github.com/valentijnh/livebridge-ableton-mcp/tree/main/examples"
-Issues = "https://github.com/valentijnh/livebridge-ableton-mcp/issues"
-Changelog = "https://github.com/valentijnh/livebridge-ableton-mcp/blob/main/CHANGELOG.md"
+Homepage = "https://morpheasgr.github.io/livebridge-ableton-mcp/"
+Repository = "https://github.com/morpheasgr/livebridge-ableton-mcp"
+Documentation = "https://github.com/morpheasgr/livebridge-ableton-mcp/tree/fork/docs"
+Examples = "https://github.com/morpheasgr/livebridge-ableton-mcp/tree/fork/examples"
+Issues = "https://github.com/morpheasgr/livebridge-ableton-mcp/issues"
+Changelog = "https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]
