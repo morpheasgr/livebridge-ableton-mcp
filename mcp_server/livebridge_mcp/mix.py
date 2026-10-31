@@ -330,7 +330,8 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
                  max_move: float | None = None,
                  raise_left: dict[str, float] | None = None,
                  move_left: dict[str, float] | None = None,
-                 protect: Iterable[str] = ()) -> dict[str, Any]:
+                 protect: Iterable[str] = (),
+                 settled: Iterable[str] = ()) -> dict[str, Any]:
     """Fader moves that bring the parts toward their roles' levels WITHOUT moving the mix as a
     whole: the moves are centred (median 0) so the overall level stays where the user had it —
     only the parts that stand out move. (Anchoring on the kick and lowering everything when one
@@ -353,6 +354,9 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
             (``budget_capped``).
         protect: parts that never move (the lead, the vocal); they still count in the
             centring.
+        settled: parts whose faders are still where the last run left them: they get 1 dB
+            more tolerance (a level-neutral target moves a little whenever another part's
+            level changes — an unchanged piano bass crossed the line and moved 1.6 dB).
 
     Returns:
         ``{anchor?, level_shift_db, moves:[{name, role, offset_lu, now_lufs, target_lufs,
@@ -365,6 +369,7 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         return {"anchor": None, "level_shift_db": 0.0, "moves": [], "unchanged": [],
                 "protected": []}
     keep = {str(n).lower() for n in protect}
+    calm = {str(n).lower() for n in settled}
     for part in parts:
         part["offset"] = role_offset(part.get("role"), genre)
         part["post"] = float(part["lufs"]) + float(part["fader_db"])
@@ -388,7 +393,7 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
         move = target - part["post"]
         wanted = move
         flags = {}
-        if abs(move) < min_move:
+        if abs(move) < min_move + (1.0 if part["name"].lower() in calm else 0.0):
             unchanged.append(part["name"])
             continue
         if min_move > 0:                    # to just inside the tolerance, not the target
@@ -696,7 +701,7 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
                        "Comp Attack": attack, "Comp Release": release})
         # makeup only when the attack catches the peaks: a slow attack lets the transient
         # through, and makeup would push that peak higher (the faders restore the level)
-        makeup = round(reduce / 2.0, 1) if attack <= 5.0 else 0.0
+        makeup = steady("Comp Makeup", round(reduce / 2.0, 1), 0.5) if attack <= 5.0 else 0.0
         if makeup:
             values["Comp Makeup"] = makeup
         reasons.append(f"crest {crest:g} dB vs ~{crest_target:g} for a {label}: {ratio:g}:1 "

@@ -922,7 +922,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 raise_left={p["name"]: max_raise_db - raised.get(p["name"], 0.0)
                             for p in parts},
                 move_left={p["name"]: max_move_db - moved.get(p["name"], 0.0) for p in parts},
-                protect=protect or ())
+                protect=protect or (),
+                # still where the last run left them: a small shift of the centre is no reason
+                settled=[n for n in earlier if n not in total])
             for move in plan["moves"]:
                 moved[move["name"]] = moved.get(move["name"], 0.0) + abs(move["move_db"])
                 if move["move_db"] > 0:
@@ -1366,7 +1368,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 # deep as the excess asks for stays (adding to it on every run walked an
                 # unchanged mix's mid to the -6 dB cap); the opposite reading backs it off
                 if current and math.copysign(1.0, current) == math.copysign(1.0, setting):
-                    if abs(setting) <= abs(current) + 0.05:
+                    if abs(setting) <= abs(current) + 0.15:     # the dial's own steps
                         if abs(current) >= 5.9:
                             notes.append(
                                 f"{param} already at {current:+.1f} dB and the master still "
@@ -2005,7 +2007,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     # a control going back to rest gets a reason too (the kick's compressor
                     # went off with none)
                     resting = [k for k in changes if k not in values and k not in own
-                               and _same(mix.CHANNEL_NEUTRAL.get(k), remembered[name].get(k))]
+                               and _same(mix.CHANNEL_NEUTRAL.get(k), remembered[name].get(k))
+                               and not (k == "Trim" and name in (protect or ()))]
                     if resting:
                         crest = (entry.get("before") or {}).get("crest_db")
                         why = (f" (crest {crest:g} dB does not call for compression: a new "
