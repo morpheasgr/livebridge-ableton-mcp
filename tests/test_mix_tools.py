@@ -1091,3 +1091,23 @@ def test_balance_reads_the_mix_without_the_master_chain(app, song, mix_set):
     result = call_tool(app, "live_mix_balance", {"seconds": 3, "apply": False})
     assert result["master"]["lufs"] == pytest.approx(unmastered, abs=0.3), result["master"]
     assert device.is_active and any("switched off for one listen" in n for n in result["notes"])
+
+
+def test_mix_auto_measure_only_keeps_the_users_processing(app, song, mix_set, monkeypatch,
+                                                          tmp_path):
+    """strips='measure': no Channel placed or changed — the run measures, balances, masters."""
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    for name in ("Kick", "Sub", "Pad", "Hats"):            # the user's own EQ on every track
+        factory.add_device(mix_set.track(name), "EQ Eight", "Eq8")
+    before = {n: [d.name for d in mix_set.track(n).devices] for n in mix_set.parts}
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "strips": "measure",
+                                              "place_devices": False, "detail": "full"})
+    assert result["strips"] == "measure", result
+    assert {t["name"] for t in result["tracks"]} == {"Kick", "Sub", "Pad", "Hats"}
+    for entry in result["tracks"]:
+        assert entry["values"] == {} and "changes" not in entry and "after" not in entry
+        assert entry["reasons"] == ["measured only: its own processing stays"]
+    assert "plan" in result["balance"] and result["balance"]["applied"] is True
+    assert {n: [d.name for d in mix_set.track(n).devices] for n in mix_set.parts} == before
+    assert any("strips='measure'" in n for n in result["notes"])
+    assert call_tool(app, "live_mix_auto", {"strips": "off"})["type"] == "bad_args"
