@@ -1015,6 +1015,7 @@ def test_mix_auto_keeps_a_protected_parts_level_and_plans_without_applying(
     monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
     _strips(mix_set, monkeypatch)
     plain = mix_set.request
+    loss = {"db": -4.0}
 
     def request(device, cmd, args=None, timeout=5.0):
         answer = plain(device, cmd, args, timeout)
@@ -1023,7 +1024,7 @@ def test_mix_auto_keeps_a_protected_parts_level_and_plans_without_applying(
                          if d.name == "LiveBridge Channel")
             p = {q.name: q.value for q in strip.parameters}
             lufs, crest, share = mix_set.parts[device["track"]]
-            lufs += (-4.0 if p["HP Freq"] > 20.5 else 0.0) + p["Trim"]
+            lufs += (loss["db"] if p["HP Freq"] > 20.5 else 0.0) + p["Trim"]
             answer["frames"] = frames_for(lufs, crest, share)
         return answer
     monkeypatch.setattr(engine, "request", request)
@@ -1042,5 +1043,14 @@ def test_mix_auto_keeps_a_protected_parts_level_and_plans_without_applying(
     pad = next(t for t in result["tracks"] if t["name"] == "Pad")
     strip = next(d for d in mix_set.track("Pad").devices if d.name == "LiveBridge Channel")
     assert {q.name: q.value for q in strip.parameters}["Trim"] == pytest.approx(4.0, abs=0.2)
-    assert pad["changes"]["Trim"].endswith("4") or "4" in pad["changes"]["Trim"]
+    assert pad["changes"]["Trim"].startswith("0 -> 4")
+    assert pad["after"]["before_trim"] and pad["after"]["lufs_with_trim"] == pytest.approx(
+        pad["before"]["lufs"], abs=0.2)
     assert any("Pad is protected: Trim" in n for n in result["notes"])
+    # a rerun hearing the strip a little differently keeps the Trim (no 2.2 -> 1.4 drift)
+    loss["db"] = -4.7
+    again = call_tool(app, "live_mix_auto", {"seconds": 3, "place_devices": False,
+                                             "detail": "full", "protect": ["Pad"]})
+    pad = next(t for t in again["tracks"] if t["name"] == "Pad")
+    assert "Trim" not in pad.get("changes", {}), pad
+    assert {q.name: q.value for q in strip.parameters}["Trim"] == pytest.approx(4.0, abs=0.05)

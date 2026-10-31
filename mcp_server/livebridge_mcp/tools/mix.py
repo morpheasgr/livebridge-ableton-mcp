@@ -1957,15 +1957,28 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 if was_lufs is None or now_lufs is None or abs(was_lufs - now_lufs) < 0.3:
                     continue
                 trim = round(max(-24.0, min(12.0, was_lufs - now_lufs)), 1)
+                # the readings swing ~1 dB between runs: the last run's Trim stays when the new
+                # one is that close (2.2 became 1.4 on an unchanged mix)
+                last_trim = (was.get(name) or {}).get("Trim")
+                if last_trim is not None and abs(last_trim) >= 0.05 and \
+                        abs(last_trim - trim) < 1.0:
+                    trim = round(last_trim, 1)
                 answer = set_strip(name, indexes[name], {"Trim": trim})
                 if _is_error(answer):
                     continue
-                entry.setdefault("changes", {})["Trim"] = f"0 -> {_fmt(trim)}"
+                if not _same(last_trim, trim):
+                    entry.setdefault("changes", {})["Trim"] = f"{_fmt(last_trim)} -> {_fmt(trim)}"
+                else:
+                    entry.get("changes", {}).pop("Trim", None)
                 entry.setdefault("values", {})["Trim"] = trim
+                # "after" was measured before the Trim: say so, and give the level with it
+                entry["after"]["before_trim"] = True
+                entry["after"]["lufs_with_trim"] = round(now_lufs + trim, 1)
                 if name in remembered:
                     remembered[name]["Trim"] = trim
                 notes.append(f"{name} is protected: Trim {trim:+g} dB keeps its level where it "
-                             f"was ({was_lufs} LUFS) with the strip in place.")
+                             f"was ({was_lufs} LUFS) with the strip in place (its 'after' "
+                             f"reading, {now_lufs}, is before the Trim).")
             if apply:
                 try:
                     strips_file[strip_set] = remembered
