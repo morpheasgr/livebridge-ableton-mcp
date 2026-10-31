@@ -463,15 +463,19 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     """A rerun: the last run's +18 dB is set back to 0 for 'before'; the shared band excess
     goes on the device's EQ; past Limit Gain's limit the compressor's makeup drives on."""
     device = add_master_device(song, limit_gain=18.0)
+    next(p for p in device.parameters if p.name == "EQ Low Cut").value = 1   # an older run's
     result = call_tool(app, "live_master_auto", {
         "destination": "club", "seconds": 3, "chain": "livebridge",
         "eq_bands": {"mid": 7.0, "air": 0.4}})
     assert result["reset"] == {"Limit Gain": 18.0}, result
+    assert master_params(device)["EQ Low Cut"] == 0                  # 80 Hz: off the master
+    assert any("EQ Low Cut switched off" in n for n in result["notes"])
     assert result["before"]["lufs"] < result["after"]["lufs"] - 6
     params = master_params(device)
     assert params["EQ Mid"] == pytest.approx(-3.5) and params["EQ Mid Freq"] == pytest.approx(700)
-    assert result["eq"]["EQ Mid"].startswith("0 -> -3.5") and result["steps"][0] == \
-        {"eq": result["eq"]}
+    assert result["eq"]["EQ Mid"].startswith("0 -> -3.5")
+    assert result["steps"][0] == {"set": {"EQ Low Cut": "On -> Off"}}
+    assert result["steps"][1] == {"eq": result["eq"]}
     assert "EQ High" not in result["eq"]                      # 0.4 dB: left alone
     assert result["settings"]["Limit Gain"] == f"{round(params['Limit Gain'], 2):g} dB"
     assert result["crest_drop_db"] == pytest.approx(
