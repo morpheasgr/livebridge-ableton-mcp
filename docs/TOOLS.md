@@ -1648,6 +1648,7 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `protect` | list[str] \| null | `null` |
 | `detail` | str | `"summary"` |
 | `section_bars` | list[int] \| null | `null` |
+| `strips` | str | `"set"` |
 
 Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 

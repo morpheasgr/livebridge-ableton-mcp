@@ -1753,6 +1753,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         protect: list[str] | None = None,
         detail: str = "summary",
         section_bars: list[int] | None = None,
+        strips: str = "set",
     ) -> Any:
         """Mix (and master) the song by measurement in one call — the devices it needs are put
         in place by the tool itself. On each track with a LiveBridge Channel (a channel
@@ -1799,6 +1800,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 vocal).
             detail: "summary" (default: per part the moves and the measured change, the
                 balance moves, the master result) or "full" (every reading and reason).
+            strips: "set" (default: LiveBridge Channels process each part as above) or
+                "measure": your own processing stays — no Channel is placed or changed, an
+                Engine (meters only, no sound change) goes at the end of each track that has no
+                LiveBridge meter, and the run only measures, balances the faders and masters
+                (for mixes built on your own EQ/compressor plug-ins). A Channel already on a
+                track is read as it is, not set to rest. `low_end` does not run here (it
+                would add LiveBridge devices to your chains).
             section_bars: `[first, last]` bar (1-based) of the section to mix on (the drop, e.g.
                 `[113, 128]`): the tool loops it, starts playback there and stops again at
                 the end, giving your loop back. Default: the bars playing now, or the
@@ -1828,6 +1836,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("seconds must be 3..20", cmd=cmd)
         if master_chain not in ("native", "livebridge"):
             return tool_error("master_chain must be 'native' or 'livebridge'", cmd=cmd)
+        if strips not in ("set", "measure"):
+            return tool_error("strips must be 'set' or 'measure'", cmd=cmd)
+        measure_only = strips == "measure"
         bad = [r for r in (roles or {}).values() if r not in mix.ROLES]
         if bad:
             return tool_error(f"unknown role(s) {bad}; use one of {', '.join(mix.ROLES)}",
@@ -1836,18 +1847,31 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         # the plan needs the meters too (apply=false included): a Channel at rest and an Engine
         # do not change the sound, and the report lists what was placed
         if place_devices:
-            jobs.note("placing LiveBridge Channels and the master's Engine")
-            placed = place_meters(tracks, master=bool(master) or balance)
+            jobs.note("placing LiveBridge Engines (meters only) and the master's Engine"
+                      if measure_only else
+                      "placing LiveBridge Channels and the master's Engine")
+            placed = place_meters(tracks, master=bool(master) or balance,
+                                  strips=not measure_only)
             if placed.get("error"):
                 return placed["error"]
         try:
             found = engine.devices()
         except engine.EngineError as exc:
             return _engine_failure(exc, cmd)
-        channels = [d for d in found if d.get("strip") and d.get("role") == "track"]
+        # measure-only: any LiveBridge meter on a track will do (an Engine, or a Channel read
+        # as it is)
+        channels = [d for d in found if d.get("role") == "track" and (
+            measure_only or d.get("strip"))]
         if tracks:
             wanted = {t.lower() for t in tracks}
             channels = [d for d in channels if str(d.get("track") or "").lower() in wanted]
+        if not channels and measure_only:
+            return tool_error(
+                "no LiveBridge Engine on " + ("these tracks" if tracks else "any track")
+                + (": run with place_devices=true (the default) to put one at the end of every "
+                   "track that makes sound" if not place_devices else
+                   ": none could be placed (is the LiveBridge Engine installed in the User "
+                   "Library?)"), type="not_found", cmd=cmd)
         if not channels:
             return tool_error(
                 "no LiveBridge Channel on " + ("these tracks" if tracks else "any track")
@@ -1874,12 +1898,16 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return bridge_call(bridge, "devices.set_parameters",
                                {"track": name, "device": index, "values": _for_live(values)})
 
-        indexes = {name: strip_index(name) for name in names}
+        indexes = {} if measure_only else {name: strip_index(name) for name in names}
         missing = [n for n, i in indexes.items() if i is None]
         if missing:
             notes.append("Channel not found in the device list of " + ", ".join(missing)
                          + " (renamed?): left out.")
-        pairs = [(d, n) for d, n in zip(channels, names) if indexes[n] is not None]
+        pairs = [(d, n) for d, n in zip(channels, names)
+                 if measure_only or indexes[n] is not None]
+        if measure_only:
+            notes.append("strips='measure': your own processing stays — no Channel was placed "
+                         "or changed; the parts were measured as they sound.")
         # a muted track whose mute is not automated never plays: its strip stays as it is
         # (a track muted now but switched on by automation elsewhere does get its strip)
         state = faders([n for _d, n in pairs])
@@ -1905,7 +1933,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         kept: dict[str, dict[str, str]] = {}
         #: each strip's controls before this run, for the before -> after report
         was: dict[str, dict[str, float | None]] = {}
-        if apply:
+        if apply and not measure_only:
             for _device, name in pairs:          # at rest: measure the raw part
                 rest = dict(mix.CHANNEL_NEUTRAL)
                 page = bridge_call(bridge, "devices.parameters", {
@@ -1929,7 +1957,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 if _is_error(answer):
                     return answer
             time.sleep(_SETTLE_S)
-        else:
+        elif not measure_only:
             notes.append("apply=false: the plan is based on the strips as they are now — if "
                          "they already process, it is not a plan for the raw parts.")
         jobs.note(f"listening to {len(pairs)} parts at rest")
@@ -1946,6 +1974,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                      else role_info["from"], "before": _reading(reading)}
             if reading.get("silent"):
                 entry.update(values={}, reasons=["silent in this window: left at rest"])
+            elif measure_only:
+                entry.update(values={}, reasons=["measured only: its own processing stays"])
             else:
                 plan = mix.channel_plan(role, reading, remembered.get(name))
                 own = kept.get(name) or {}
@@ -1972,7 +2002,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     entry["changes"] = changes
             results.append(entry)
         result: dict[str, Any] = {"applied": bool(apply), "tracks": results, "notes": notes}
-        if apply:
+        if measure_only:
+            result["strips"] = "measure"
+        if apply and not measure_only:
             try:
                 strips_file[strip_set] = remembered
                 library.write_json(library.library_dir() / _STRIPS_FILE, strips_file)
@@ -1981,7 +2013,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                              "them as set by hand.")
         if placed is not None and (placed["placed"] or placed["replaced"] or placed["skipped"]):
             result["placed"] = placed
-        if apply:
+        if apply and not measure_only:
             jobs.note("listening again with the strips set")
             time.sleep(_SETTLE_S)
             live = [(d, n) for d, n in pairs
