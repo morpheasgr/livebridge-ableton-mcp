@@ -1076,6 +1076,7 @@ def test_mix_auto_keeps_a_protected_parts_level_and_plans_without_applying(
                                              "detail": "full", "protect": ["Pad"]})
     pad = next(t for t in again["tracks"] if t["name"] == "Pad")
     assert "Trim" not in pad.get("changes", {}), pad
+    assert not any("back to rest" in r for r in pad["reasons"]), pad["reasons"]
     assert {q.name: q.value for q in strip.parameters}["Trim"] == pytest.approx(4.0, abs=0.05)
 
 
@@ -1125,3 +1126,13 @@ def test_channel_plan_says_when_the_threshold_is_clamped():
     calm = mix.channel_plan("keys", reading(-3.0))
     assert calm["values"]["Comp Threshold"] < 0 and not any(
         "before its fader" in r for r in calm["reasons"])
+
+
+def test_balance_plan_gives_settled_parts_more_tolerance():
+    """A part still where the last run left it stays put when the centre shifts a little."""
+    parts = [{"name": n, "role": "pad", "lufs": l, "fader_db": 0.0} for n, l in (
+        ("A", -20.0), ("B", -20.0), ("C", -20.0), ("Piano", -23.5))]       # 3.5 dB under
+    moved = mix.balance_plan([dict(p) for p in parts], min_move=3.0)
+    assert [m["name"] for m in moved["moves"]] == ["Piano"]
+    kept = mix.balance_plan([dict(p) for p in parts], min_move=3.0, settled=["Piano"])
+    assert kept["moves"] == [] and "Piano" in kept["unchanged"]
