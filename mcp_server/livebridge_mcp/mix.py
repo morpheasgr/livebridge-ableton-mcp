@@ -591,13 +591,16 @@ CHANNEL_NEUTRAL: dict[str, float] = {
 #: release ms, bass mono). Attack lets the role's transient through (kick 20 ms), release
 #: follows its decay.
 STRIP_ROLES: dict[str | None, tuple[float, float | None, float, float, float, bool]] = {
-    "kick": (30.0, 11.0, 4.0, 20.0, 80.0, True),
+    # kick and sub keep everything down to 20 Hz, bass and drums from 25 Hz: in this music the
+    # 30-60 Hz weight is the point (a 30 Hz high-pass cost two released-master comparisons
+    # ~1.7 dB of sub)
+    "kick": (20.0, 11.0, 4.0, 20.0, 80.0, True),
     "snare": (100.0, 10.0, 4.0, 5.0, 120.0, False),
     "hats": (300.0, None, 2.0, 1.0, 60.0, False),
     "perc": (150.0, 11.0, 3.0, 5.0, 80.0, False),
-    "drums": (30.0, 10.0, 3.0, 10.0, 100.0, True),
+    "drums": (25.0, 10.0, 3.0, 10.0, 100.0, True),
     "sub": (20.0, 6.0, 4.0, 10.0, 150.0, True),
-    "bass": (30.0, 7.0, 4.0, 10.0, 120.0, True),
+    "bass": (25.0, 7.0, 4.0, 10.0, 120.0, True),
     "pad": (150.0, None, 2.0, 30.0, 300.0, False),
     "lead": (150.0, 9.0, 3.0, 10.0, 150.0, False),
     "keys": (120.0, 10.0, 2.5, 10.0, 150.0, False),
