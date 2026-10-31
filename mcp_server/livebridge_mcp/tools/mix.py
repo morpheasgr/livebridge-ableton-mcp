@@ -1486,11 +1486,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             elif class_name == _MASTER_DEVICE:
                 ready = bridge_call(bridge, "devices.set_parameters", {
                     "track": "master", "device": find(devices, _MASTER_DEVICE)["index"],
-                    "values": {"EQ Low Cut": 1.0, "Comp Ratio": 2.0,
-                               "Limit Mode": "True peak"}})
+                    "values": {"Comp Ratio": 2.0, "Limit Mode": "True peak"}})
                 if _is_error(ready):
-                    manual.append("LiveBridge Master: EQ Low Cut on, Comp Ratio 2, Limit Mode "
-                                  f"True peak (not set: {ready.get('error')}).")
+                    manual.append("LiveBridge Master: Comp Ratio 2, Limit Mode True peak (not "
+                                  f"set: {ready.get('error')}).")
                 manual.append("LiveBridge Master: lower Comp Threshold until the loudest "
                               "section shows 1-3 dB of gain reduction (open the device; the "
                               "meter is not readable through Live's API).")
@@ -1501,6 +1500,18 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               cmd=cmd)
         index = limiter["index"]
         steps: list[dict[str, Any]] = []
+        # the Channel EQ's Low Cut is a fixed 80 Hz high-pass: on a master it takes the sub
+        # and the kick's body (two LiveBridge masters had 9-13 dB less sub than the released
+        # ones). Earlier versions switched it on; it goes off.
+        if chain_kind == "livebridge" and (read_param(index, "EQ Low Cut")[0] or 0.0) >= 0.5:
+            cut = bridge_call(bridge, "devices.set_parameters", {
+                "track": "master", "device": index, "values": {"EQ Low Cut": 0.0}})
+            if not _is_error(cut):
+                steps.append({"set": {"EQ Low Cut": "On -> Off"}})
+                notes.append("EQ Low Cut switched off: it is a fixed 80 Hz high-pass that took "
+                             "the sub off the master (earlier LiveBridge versions switched it "
+                             "on). Live's 25 Hz rumble cut belongs on the tracks — the Channels' "
+                             "high-pass does that.")
 
         def set_limiter(values: dict[str, str]) -> Any:
             return bridge_call(bridge, "devices.set_parameters",

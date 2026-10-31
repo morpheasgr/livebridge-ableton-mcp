@@ -201,7 +201,8 @@ Gain/Ceiling/Mode/Lookahead/Auto Release, Width, Bass Mono, Bass Mono Freq, Outp
 `live_device_*`, automation and `live_master_auto(chain="livebridge")` drive it like any
 device. The reference pages document these objects' parameters but not their inlets and
 outlets; the patch assumes stereo in/out on the left inlets/outlets (Channel EQ is wired
-once per side, which works whether it is mono or stereo). Switches are Off/On `live.menu`s (a
+once per side, which works whether it is mono or stereo). EQ Low Cut is the Channel EQ's own high-pass, fixed at 80 Hz: off by default and never switched
+on by LiveBridge (on a master it removes the sub). Switches are Off/On `live.menu`s (a
 `live.text` toggle showed Live "val1"/"val2"). The frequency dials have an exponent: Live's raw
 value is the dial's position mapped linearly onto the range (EQ Mid Freq 1 kHz reads 3752.44,
 Bass Mono Freq 120 Hz reads 292.01) while the DSP receives the displayed Hz — set them as

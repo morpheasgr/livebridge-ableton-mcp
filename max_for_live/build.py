@@ -437,7 +437,9 @@ _UNIT = {"float": 1, "ms": 2, "hz": 3, "db": 4, "pct": 5}
 #: target objects, Max message, scale). Ableton's own DSP (abl.device.*) does the work; each
 #: dial is a Live parameter, so LiveBridge (and automation) set it like any device's.
 MASTER_PARAMS = (
-    ("EQ Low Cut", "toggle", 0, 1, 1, None, ("eql", "eqr"), "highpass", 1.0),
+    # the Channel EQ's high-pass is fixed at 80 Hz: never on a master by default (it took the
+    # sub off two masters)
+    ("EQ Low Cut", "toggle", 0, 1, 0, None, ("eql", "eqr"), "highpass", 1.0),
     ("EQ Low", "dial", -15.0, 15.0, 0.0, "db", ("eql", "eqr"), "lowgain", 1.0),
     ("EQ Mid", "dial", -12.0, 12.0, 0.0, "db", ("eql", "eqr"), "midgain", 1.0),
     ("EQ Mid Freq", "dial", 120.0, 7500.0, 1000.0, "hz", ("eql", "eqr"), "midfreq", 1.0),
