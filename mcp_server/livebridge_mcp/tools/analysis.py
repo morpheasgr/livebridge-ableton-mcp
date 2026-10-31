@@ -393,8 +393,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 (default: the same as `start`/`duration`) — a 32 s bounce of the drop against
                 the drop of a full reference (reference_start=224, reference_duration=32).
             from_sound: count `start` / `reference_start` from each file's first sound
-                (default): a master's short silent gap before the music (up to 2 s, reported
-                as `file.lead_silence_s`) does not shift the bars. false = from sample 0.
+                (default) when the silence before it is a mastering gap — a few milliseconds,
+                at most 50 ms (`file.lead_silence_s`). A longer silence is part of the music
+                (a first bar opening with an off-beat hi-hat) and shifts nothing. false = from
+                sample 0.
 
         Returns:
             `{file:{path, name, duration, sample_rate, channels, format, analysed?}, kind,

@@ -134,12 +134,17 @@ def test_audio_tool_measures_a_loop(tcp_bridge, song, tmp_path):
     import soundfile as sf
     audio, rate = sf.read(loop, always_2d=True)
     gapped = str(tmp_path / "gapped.wav")
-    sf.write(gapped, np.vstack([np.zeros((int(0.25 * rate), audio.shape[1])), audio]), rate)
+    sf.write(gapped, np.vstack([np.zeros((int(0.02 * rate), audio.shape[1])), audio]), rate)
     shifted = call_tool(_APP, "live_audio_analyze", {
         "file_path": loop, "duration": 2, "reference": gapped, "reference_start": 4,
         "reference_duration": 2})
-    assert shifted["reference"]["file"]["lead_silence_s"] == pytest.approx(0.25, abs=0.01)
-    assert shifted["reference"]["file"]["analysed"] == [4.25, 6.25]
+    assert shifted["reference"]["file"]["lead_silence_s"] == pytest.approx(0.02, abs=0.002)
+    assert shifted["reference"]["file"]["analysed"] == [4.02, 6.02]
+    # a quarter second of silence is the music (an off-beat hi-hat first): no shift
+    late = str(tmp_path / "late.wav")
+    sf.write(late, np.vstack([np.zeros((int(0.25 * rate), audio.shape[1])), audio]), rate)
+    kept = call_tool(_APP, "live_audio_analyze", {"file_path": late, "start": 4, "duration": 2})
+    assert kept["file"]["analysed"] == [4.0, 6.0] and "lead_silence_s" not in kept["file"]
     raw = call_tool(_APP, "live_audio_analyze", {"file_path": gapped, "start": 4, "duration": 2,
                                                  "from_sound": False})
     assert raw["file"]["analysed"] == [4.0, 6.0] and "lead_silence_s" not in raw["file"]

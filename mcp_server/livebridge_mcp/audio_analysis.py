@@ -282,22 +282,24 @@ def _flags(result: dict[str, Any], kind: str) -> list[str]:
     return flags
 
 
-#: the most leading silence counted as a file's gap before the music (a master's few hundred
-#: milliseconds), and the level below which a sample is silence
-LEAD_SILENCE_MAX_S = 2.0
+#: the most leading silence counted as a file's gap before the music: a master's few
+#: milliseconds (3 and 29 ms measured, analogue chains included). Anything longer is the music
+#: itself — a first bar that opens with an off-beat hi-hat starts 125-250 ms late on purpose —
+#: and must not shift the bars. The level below which a sample is silence:
+LEAD_SILENCE_MAX_S = 0.05
 _SILENCE_LEVEL = 10.0 ** (-60.0 / 20.0)
 
 
 def lead_silence(path: str) -> float:
-    """Seconds of silence before the first sound (at most :data:`LEAD_SILENCE_MAX_S`): some
-    masters start with a short gap, which shifts every bar-based window."""
+    """Seconds of silence before the first sound when it is a mastering gap (at most
+    :data:`LEAD_SILENCE_MAX_S`), else 0: a longer silence belongs to the music."""
     np, _signal, sf, _pyln = _deps()
     info = sf.info(path)
-    frames = min(int(LEAD_SILENCE_MAX_S * info.samplerate), info.frames)
+    frames = min(int(LEAD_SILENCE_MAX_S * info.samplerate) + 1, info.frames)
     head = sf.read(path, start=0, frames=frames, dtype="float32", always_2d=True)[0]
     loud = np.nonzero(np.max(np.abs(head), axis=1) > _SILENCE_LEVEL)[0] if len(head) else []
     if not len(loud):
-        return 0.0                  # silent for 2 s: a quiet intro, not a gap — no shift
+        return 0.0                  # still silent after 50 ms: the music starts late, no shift
     return round(int(loud[0]) / float(info.samplerate), 3)
 
 
@@ -312,8 +314,9 @@ def analyze_file(path: str, start: float = 0.0, duration: float | None = None,
         kind: "mix" (full track: mix flags apply), "stem"/"loop"/"one_shot" (no spectral
             targets) or "auto" (one_shot below 2 s, loop below 20 s, else mix).
         sections: include the energy curve over time.
-        from_sound: count ``start`` from the first sound, not from the file's first sample
-            (a master's silent gap before the music, up to 2 s: ``file.lead_silence_s``).
+        from_sound: count ``start`` from the first sound, not from the file's first sample,
+            when the silence before it is a mastering gap (up to 50 ms:
+            ``file.lead_silence_s``); a longer silence is the music and shifts nothing.
 
     Raises:
         MissingDependency: the audio extra is not installed.
