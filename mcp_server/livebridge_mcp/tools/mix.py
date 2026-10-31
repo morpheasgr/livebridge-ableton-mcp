@@ -1564,6 +1564,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 time.sleep(_SETTLE_S)
                 current = measure(None if loud_bar is None else loud_bar)
         checked = False
+        steps_taken = 0
         for _step in range(_MAX_STEPS):
             now = _reading(current)
             if now["lufs"] is None:
@@ -1573,6 +1574,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if abs(delta) <= 0.3:
                 break
             new_drive = max(low, min(high, drive + max(-6.0, min(6.0, delta))))
+            # a rerun starts where the last run ended (its drive went to 0 for 'before') when
+            # that fits what is missing: one step instead of climbing 6 dB at a time
+            last_drive = sum(reset.values()) if reset and not steps_taken else None
+            if last_drive is not None and abs(last_drive - (drive + delta)) < 4.0:
+                new_drive = max(low, min(high, last_drive))
             if abs(new_drive - drive) < 0.1:
                 if delta > 0:
                     result["missing_gain_db"] = round(delta, 1)
@@ -1594,6 +1600,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if _is_error(answer):
                 return answer
             old_drive, drive = drive, new_drive
+            steps_taken += 1
             time.sleep(_SETTLE_S)
             try:
                 current = measure(None if loud_bar is None else loud_bar)
