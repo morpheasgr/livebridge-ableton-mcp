@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://valentijnh.github.io/livebridge-ableton-mcp/"><img src="docs/images/banner.png" alt="LiveBridge: make music in Ableton Live by talking to Claude" width="100%"></a>
+  <a href="https://morpheasgr.github.io/livebridge-ableton-mcp/"><img src="docs/images/banner.png" alt="LiveBridge: make music in Ableton Live by talking to Claude" width="100%"></a>
 </p>
 
 <h1 align="center">LiveBridge · Ableton Live MCP server for Claude</h1>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/valentijnh/livebridge-ableton-mcp/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/valentijnh/livebridge-ableton-mcp/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="https://github.com/morpheasgr/livebridge-ableton-mcp/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/morpheasgr/livebridge-ableton-mcp/actions/workflows/tests.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Ableton Live 12" src="https://img.shields.io/badge/Ableton%20Live-12-111111">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <a href="https://valentijnh.github.io/livebridge-ableton-mcp/"><b>Website</b></a> ·
+  <a href="https://morpheasgr.github.io/livebridge-ableton-mcp/"><b>Website</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="examples/"><b>Examples</b></a> ·
   <a href="examples/prompts.md"><b>100+ prompts</b></a> ·
@@ -162,14 +162,14 @@ Claude Code. Node.js (`npx`) is only needed for Splice in Claude Desktop's JSON 
 ### macOS
 
 ```bash
-git clone https://github.com/valentijnh/livebridge-ableton-mcp.git LiveBridge && cd LiveBridge
+git clone https://github.com/morpheasgr/livebridge-ableton-mcp.git LiveBridge && cd LiveBridge
 ./installers/install.sh            # or: python3 installers/install.py
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/valentijnh/livebridge-ableton-mcp.git LiveBridge; cd LiveBridge
+git clone https://github.com/morpheasgr/livebridge-ableton-mcp.git LiveBridge; cd LiveBridge
 powershell -ExecutionPolicy Bypass -File installers\install.ps1   # or: py installers\install.py
 ```
 
@@ -367,7 +367,7 @@ These are limits of Live's Python API, not of LiveBridge (details and alternativ
 ## FAQ
 
 **Which Ableton Live versions and editions work?**
-Live 12, in every edition. It was built and verified against Live 12.4.5 Suite;
+Live 12, in every edition. It was built against Live 12.4.5 Suite and is tested up to 12.4.16;
 `live_device_insert` needs 12.3 or later, and older 12.x versions load devices through the
 browser tools instead. Some example presets are Suite content; other editions use their own. Live 11 is not supported: the Remote Script is
 written for the Python 3.11 that Live 12 embeds.
@@ -389,7 +389,7 @@ spectrum, stereo, tempo and key. Your ears still have the final say.
 **Is it free?**
 LiveBridge is free and open source (MIT). You need Ableton Live 12 and a Claude plan; Splice is
 optional (searching is free, downloads use your Splice credits). If it helps your music, you can
-[buy me a coffee](https://buymeacoffee.com/valentijnh).
+[buy its original author a coffee](https://buymeacoffee.com/valentijnh).
 
 **Does it work on Windows? With Live and Claude on different computers?**
 Yes to both: macOS and Windows, and Claude and Live can run on two computers in your network,
@@ -439,10 +439,13 @@ where the project is going in [ROADMAP.md](ROADMAP.md).
 ## Support
 
 LiveBridge is free. If it saves you time or sparks a track, you can
-[buy me a coffee](https://buymeacoffee.com/valentijnh) ☕. A star on GitHub, a bug report or a note
+[buy its original author a coffee](https://buymeacoffee.com/valentijnh) ☕. A star on GitHub, a bug report or a note
 about what you made with it helps just as much.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
+MIT — see [LICENSE](LICENSE). LiveBridge was created by
+[Valentijn](https://github.com/valentijnh) ([original repository](https://github.com/valentijnh/livebridge-ableton-mcp));
+this fork adds mixing and mastering by measurement and is maintained by
+[morpheasgr](https://github.com/morpheasgr). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
 of Splice. LiveBridge is an independent project and not affiliated with either.

@@ -209,7 +209,7 @@ def source(args: argparse.Namespace) -> Tuple[str, str]:
         data = loaded if isinstance(loaded, dict) else {}
     except (OSError, ValueError):
         pass
-    repo = args.repo or data.get("repo") or "valentijnh/livebridge-ableton-mcp"
+    repo = args.repo or data.get("repo") or "morpheasgr/livebridge-ableton-mcp"
     branch = args.branch or data.get("branch") or "main"
     return repo, branch
 

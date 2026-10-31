@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for reporting! Connection problems (script not listed, "not reachable", token or
-        firewall) are usually solved by [TROUBLESHOOTING.md](https://github.com/valentijnh/livebridge-ableton-mcp/blob/main/docs/TROUBLESHOOTING.md).
+        firewall) are usually solved by [TROUBLESHOOTING.md](https://github.com/morpheasgr/livebridge-ableton-mcp/blob/fork/docs/TROUBLESHOOTING.md).
         Security issues: please report them privately instead (see SECURITY.md).
   - type: textarea
     id: what
