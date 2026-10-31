@@ -1679,12 +1679,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         result["after"] = _reading(current)
         # what the device holds now, read back from Live (not what the tool meant to set)
         held = {name: read_param(index, name) for name in (
-            drive_names + (ceiling_name,) + (("EQ Low", "EQ Mid", "EQ Mid Freq", "EQ High")
-                                             if chain_kind == "livebridge" else ()))}
+            drive_names + (ceiling_name,) + (("EQ Low Cut", "EQ Low", "EQ Mid", "EQ Mid Freq",
+                                              "EQ High") if chain_kind == "livebridge"
+                                             else ()))}
         # the exact value where the display rounds (Limit Gain 14.2 shows "14 dB")
         result["settings"] = {
-            name: (f"{round(value, 2):g} dB" if chain_kind == "livebridge" and value is not None
-                   and name not in _HZ_PARAMS else shown)
+            name: (("On" if value >= 0.5 else "Off") if name == "EQ Low Cut" and value is not None
+                   else f"{round(value, 1):g} dB" if chain_kind == "livebridge" and
+                   value is not None and name not in _HZ_PARAMS else shown)
             for name, (value, shown) in held.items()}
         # the report's gain is what Live holds, not what the tool asked for
         if held[gain_name][0] is not None:
@@ -2000,6 +2002,18 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                for k, v in remembered[name].items()
                                if k in before_values and not _same(before_values.get(k), v)}
                     entry["changes"] = changes
+                    # a control going back to rest gets a reason too (the kick's compressor
+                    # went off with none)
+                    resting = [k for k in changes if k not in values and k not in own
+                               and _same(mix.CHANNEL_NEUTRAL.get(k), remembered[name].get(k))]
+                    if resting:
+                        crest = (entry.get("before") or {}).get("crest_db")
+                        why = (f" (crest {crest:g} dB does not call for compression: a new "
+                               "compressor needs a clear case, one LiveBridge set itself stays "
+                               "in a wider range)" if any(k.startswith("Comp") for k in resting)
+                               and crest is not None else "")
+                        entry["reasons"].append(", ".join(resting) + " back to rest: this "
+                                                "reading does not call for it" + why)
             results.append(entry)
         result: dict[str, Any] = {"applied": bool(apply), "tracks": results, "notes": notes}
         if measure_only:

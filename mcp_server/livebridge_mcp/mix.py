@@ -112,7 +112,7 @@ GENRES: dict[str, dict[str, Any]] = {
                       # measured, not a rule of thumb: two released masters in the style
                       # (one stem-, one mix-mastered) put 2-5 kHz 6-10 dB and 5-20 kHz 4-5 dB
                       # under the old profile (-7, -10), the mids ~2 dB above it
-                      "bands": (-1.0, -2.5, -6.0, -5.0, -15.0, -14.5),
+                      "bands": (-1.0, -2.5, -6.0, -5.0, -15.0, -14.5), "measured": True,
                       # the melody carries the track: leads, pads and keys sit close to the
                       # kick instead of 6-10 LU under it
                       "roles": {"kick": 0.0, "sub": -2.0, "bass": -3.0, "lead": -2.0,
@@ -316,8 +316,11 @@ def genre_balance(bands_db: dict[str, float], genre: str, tolerance: float = 4.0
     return {"genre": genre, "label": GENRES[genre]["label"], "target_lufs": GENRES[genre]["lufs"],
             "bands": rows, "notes": notes or [f"Within {tolerance:g} dB of a typical "
                                               f"{GENRES[genre]['label']} balance in every band."],
-            "caveat": "Genre balances are rules of thumb (HighVoltSound's style profiles), not "
-                      "measured releases: compare with a reference track for real targets."}
+            "caveat": ("Measured from released masters in the style (two tracks): a "
+                       "starting point, not a rule — compare with a reference track for real "
+                       "targets." if GENRES[genre].get("measured") else
+                       "Genre balances are rules of thumb (HighVoltSound's style profiles), not "
+                       "measured releases: compare with a reference track for real targets.")}
 
 
 # ----------------------------------------------------------------------------- balance
@@ -677,8 +680,18 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
     if crest_target is not None and crest is not None and peak is not None and \
             crest > crest_target + (0.5 if was("Comp Ratio") else 2.5):
         reduce = max(0.5, min(crest - crest_target, 8.0))
-        threshold = steady("Comp Threshold",
-                           max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio))), 2.0)
+        wanted = peak - reduce / (1.0 - 1.0 / ratio)
+        threshold = steady("Comp Threshold", max(-40.0, min(0.0, wanted)), 2.0)
+        # the dial ends at 0 dB: a part peaking far above 0 dBFS before its fader (fine in
+        # floating point) gets its threshold below where it should be — more reduction than
+        # planned. Say so, and how much
+        clamped = None
+        planned = reduce
+        if wanted > 0.5 and threshold >= 0.0:
+            got = max(0.0, peak - threshold) * (1.0 - 1.0 / ratio)
+            if got > reduce + 0.5:
+                clamped = got
+                reduce = got
         values.update({"Comp Threshold": round(threshold, 1), "Comp Ratio": ratio,
                        "Comp Attack": attack, "Comp Release": release})
         # makeup only when the attack catches the peaks: a slow attack lets the transient
@@ -691,7 +704,12 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
                        f"attack {attack:g} ms, release {release:g} ms"
                        + (f", makeup +{makeup:g} dB" if makeup else
                           " — no makeup: the attack lets the transient through, the fader "
-                          "restores the level"))
+                          "restores the level")
+                       + (f". It peaks at {peak:+.1f} dBFS before its fader: the threshold "
+                          f"stops at 0 dB, so about {clamped:.1f} dB comes off instead of "
+                          f"{planned:.1f} — lower the instrument's output (or the clip gain) "
+                          "until it peaks near 0 dBFS and run again" if clamped is not None
+                          else ""))
     if mono:
         values["Bass Mono"] = 1.0
         reasons.append("bass mono below 120 Hz: the low end stays centred")

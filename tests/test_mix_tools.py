@@ -1111,3 +1111,17 @@ def test_mix_auto_measure_only_keeps_the_users_processing(app, song, mix_set, mo
     assert {n: [d.name for d in mix_set.track(n).devices] for n in mix_set.parts} == before
     assert any("strips='measure'" in n for n in result["notes"])
     assert call_tool(app, "live_mix_auto", {"strips": "off"})["type"] == "bad_args"
+
+
+def test_channel_plan_says_when_the_threshold_is_clamped():
+    """A part peaking far above 0 dBFS before its fader: the 0 dB dial limit costs reduction."""
+    def reading(peak):
+        return {"loudness": {"crest_db": 18.0, "peak_db": peak, "lufs": -14.0},
+                "spectrum": {"bands_db": {"mid": -4}}}
+    hot = mix.channel_plan("keys", reading(20.0))                  # wants +6.7 dB
+    assert hot["values"]["Comp Threshold"] == 0.0
+    assert any("peaks at +20.0 dBFS before its fader" in r and "instead of 8.0" in r
+               for r in hot["reasons"]), hot["reasons"]
+    calm = mix.channel_plan("keys", reading(-3.0))
+    assert calm["values"]["Comp Threshold"] < 0 and not any(
+        "before its fader" in r for r in calm["reasons"])
