@@ -422,7 +422,8 @@ def balance_plan(parts: list[dict[str, Any]], genre: str | None = None,
 
 
 def band_decisions(master_bands: dict[str, float], tracks: list[dict[str, Any]],
-                   genre: str | None = None, tolerance: float = 3.0) -> list[dict[str, Any]]:
+                   genre: str | None = None, tolerance: float = 3.0,
+                   previous: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Where to fix each band the master has too much / too little of.
 
     Args:
@@ -430,6 +431,9 @@ def band_decisions(master_bands: dict[str, float], tracks: list[dict[str, Any]],
         tracks: ``[{name, role, bands_db, post_lufs}]`` (post-fader loudness).
         genre: compare with the genre's balance; default the mix targets of
             ``live_audio_analyze``.
+        previous: the last run's ``{band: fix}`` on this set: near the line (top share
+            33-47 %, 8-12 % for a part to count) a band keeps it — a share moving 34 -> 41 %
+            between runs flipped the verdict, and the master EQ with it.
 
     Returns:
         ``[{band, hz, delta_db, fix: "master"|"tracks", tracks:[{name, share}], advice}]``:
@@ -460,7 +464,11 @@ def band_decisions(master_bands: dict[str, float], tracks: list[dict[str, Any]],
         total = sum(p for p, _t in energy) or 1.0
         ranked = sorted(((p / total, t) for p, t in energy), key=lambda x: -x[0])
         top = [(s, t) for s, t in ranked if s >= 0.15][:4]
-        spread = len([s for s, _t in ranked if s >= 0.1]) >= 3 and ranked and ranked[0][0] < 0.4
+        last = (previous or {}).get(name)
+        count_at, top_below = (0.08, 0.47) if last == "master" else \
+            (0.12, 0.33) if last == "tracks" else (0.1, 0.4)
+        spread = len([s for s, _t in ranked if s >= count_at]) >= 3 and bool(ranked) and \
+            ranked[0][0] < top_below
         entry = {"band": name, "hz": hz, "delta_db": round(delta, 1),
                  "fix": "master" if spread else "tracks",
                  "tracks": [{"name": t["name"], "share": round(s, 2)} for s, t in top]}
@@ -609,7 +617,8 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
     set on this strip last time: each decision has hysteresis around it (a move that is on
     stays on unless the reading clearly leaves its range, one that is off needs a clear case),
     and a value within its jitter of the last one is kept — a rerun on the same mix changes
-    nothing (a lead at crest 10.5 vs 10.9 around a 10.5 limit gained and lost a compressor).
+    nothing (a lead at crest 10.5 vs 10.9 around a 10.5 limit gained and lost a compressor;
+    a threshold follows the window's peak, which swings up to 2 dB between runs).
     """
     hp, crest_target, ratio, attack, release, mono = STRIP_ROLES.get(role, STRIP_ROLES[None])
     last = previous or {}
@@ -639,7 +648,7 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
         boxy = max(float(bands.get("low_mid", -90.0)), mud)
         mid_at = float(last.get("Mid Freq", 0.0)) if was("Mid") else None
         if role in _MUDDY_ROLES and mud > edge(-6.0, mid_at == 350.0):
-            cut = steady("Mid", -round(min(4.0, 1.5 + max(0.0, mud + 6.0) * 0.6), 1), 0.5)
+            cut = steady("Mid", -round(min(4.0, 1.5 + max(0.0, mud + 6.0) * 0.6), 1), 1.0)
             values.update({"Mid Freq": 350.0, "Mid": cut})
             reasons.append(f"{-mud:.0f} dB below total in 250-500 Hz is a lot for a {label}: "
                            f"{cut:g} dB at 350 Hz (mud)")
@@ -663,7 +672,7 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
             crest > crest_target + (0.5 if was("Comp Ratio") else 2.5):
         reduce = max(0.5, min(crest - crest_target, 8.0))
         threshold = steady("Comp Threshold",
-                           max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio))), 1.0)
+                           max(-40.0, min(0.0, peak - reduce / (1.0 - 1.0 / ratio))), 2.0)
         values.update({"Comp Threshold": round(threshold, 1), "Comp Ratio": ratio,
                        "Comp Attack": attack, "Comp Release": release})
         # makeup only when the attack catches the peaks: a slow attack lets the transient
