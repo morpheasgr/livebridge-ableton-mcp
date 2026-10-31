@@ -440,7 +440,8 @@ The Remote Script is standard-library only and must stay Python 3.11 compatible.
 parsing (tracks, devices, colours, times, paging) lives in `remote_script/LiveBridge/resolve.py`.
 After adding or changing a tool or command, regenerate the reference:
 `.venv/bin/python installers/gen_tools_doc.py` (`tests/test_consistency.py` fails when it is stale).
-More in [CONTRIBUTING.md](CONTRIBUTING.md); changes per version in [CHANGELOG.md](CHANGELOG.md).
+More in [CONTRIBUTING.md](CONTRIBUTING.md); changes per version in [CHANGELOG.md](CHANGELOG.md);
+where the project is going in [ROADMAP.md](ROADMAP.md).
 
 ## Support
 
