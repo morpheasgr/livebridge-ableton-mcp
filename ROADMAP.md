@@ -76,7 +76,14 @@ The releases taught more than any rule of thumb. Turn that into the method:
    off.
 3. **A/B built in.** After mastering, bounce the section and compare it with the reference
    automatically — the check that is done by hand today.
-4. **Mix targets from the same data.** Where the releases consistently differ from LiveBridge's
+4. **Line the reference up properly.** Bar numbers only mean something once the reference's
+   grid is known. For a release of the same track: align it to LiveBridge's own bounce by
+   cross-correlation — independent of genre, rhythm or how the track starts (an off-beat hi-hat,
+   a breakbeat, an ambient intro), and the session knows where bar 1 is. For any other
+   reference: estimate tempo and downbeat from the music, the way DJ software places its grid,
+   show where bar 1 landed and let the user correct it — "the first kick is the downbeat" holds
+   for four-to-the-floor tracks only.
+5. **Mix targets from the same data.** Where the releases consistently differ from LiveBridge's
    mixes (the sub weight, for one), turn that into role levels and band targets for the balance —
    as advice first, action only when the user switches it on.
 
