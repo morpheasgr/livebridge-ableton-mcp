@@ -3,8 +3,9 @@
 LiveBridge's version is the Remote Script's (`VERSION` in `remote_script/LiveBridge/LiveBridge.py`);
 the MCP server package and the installer have their own version numbers. `live_status` shows both.
 
-## 0.3.0 (MCP server) / 1.1.2 (Remote Script)
+## 0.3.0 (MCP server) / 1.1.3 (Remote Script)
 
+- Remote Script 1.1.3: `live_plugin_param_map` and `live_plugin_expose` stop waiting after 45 s when Live never indexes the rack file they wrote (it answered "indexing" forever on a Windows machine): the error names the file and says to check that it lies in the User Library Live uses (Preferences > Library; a moved library: `LIVEBRIDGE_USER_LIBRARY`); the "indexing" answers include the file's path.
 - Docs: example 9, mix and master by measurement (run on a real project), in the examples, the README's "What you can ask" and the site's example cards; a "Mix and master by measurement" section in the prompt library; the README names all the LiveBridge devices.
 - The website, README and project links point to this fork (morpheasgr/livebridge-ableton-mcp, branch `fork`) — downloads, clone commands and docs links led to the original repository, which does not have the mixing and mastering work; credit to Valentijn as the original author stays (license, footer, README). The site gains the double-click installer and updater, the Max 9 requirement of the channel strip and mastering devices, `strips="measure"`, the tested Live versions (up to 12.4.16) and links to the changelog and roadmap.
 - From the stability check: the master's gain search counts a reading exactly 0.3 LU off as on target (floating point made it 0.30000000000000027 and took one more step); the compressor threshold's jitter is 3 dB (a bass's peak swung 1.3 dB between identical runs and moved its threshold 2.2).

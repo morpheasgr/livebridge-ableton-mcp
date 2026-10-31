@@ -451,6 +451,20 @@ def test_map_returns_the_shipped_serum2_map_at_once(bridge, env):
     assert not (env.library_path / "LiveBridge").exists()
 
 
+def test_map_stops_waiting_when_live_never_indexes_the_rack(bridge, env, song, monkeypatch):
+    """A rack file outside the User Library Live uses is never indexed: after the timeout the
+    call says where it wrote it, instead of answering "indexing" forever."""
+    env.index_after = 10 ** 6                                 # Live never lists it
+    clock = [1000.0]
+    monkeypatch.setattr(handler.time, "time", lambda: clock[0])
+    first = run(bridge, "plugin_racks.map", plugin="Tiny Synth")
+    assert first["status"] == "indexing" and first["file"].endswith("LB_probe_tinysynth_vst3.adg")
+    clock[0] += handler.INDEX_TIMEOUT_S + 1
+    stuck = fail(bridge, "plugin_racks.map", plugin="Tiny Synth")
+    assert stuck["type"] == "timeout" and "Location of User Library" in stuck["message"]
+    assert "LB_probe_tinysynth_vst3.adg" in stuck["message"]
+
+
 def test_map_probes_an_unknown_plugin_and_caches_it(bridge, env, song):
     tracks_before = len(song.tracks)
     first = run(bridge, "plugin_racks.map", plugin="Tiny Synth")

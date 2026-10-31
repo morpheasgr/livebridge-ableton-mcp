@@ -278,6 +278,32 @@ def _write_and_find(ctx, identity, library, file_name, xml):
     return path, _rack_item(ctx, file_name)
 
 
+#: rack files written but not yet in Live's browser: path -> when we started waiting
+_INDEX_WAIT = {}
+#: how long Live gets to index a new rack file before the wait is called off
+INDEX_TIMEOUT_S = 45.0
+
+
+def _indexing(file_path, answer):
+    """``answer`` while Live indexes ``file_path`` — or a clear error once it has had
+    :data:`INDEX_TIMEOUT_S`: a file Live never indexes lies outside the User Library it
+    uses (a moved library, a second one), and the call would say "indexing" forever."""
+    started = _INDEX_WAIT.setdefault(file_path, time.time())
+    if time.time() - started > INDEX_TIMEOUT_S:
+        _INDEX_WAIT.pop(file_path, None)
+        raise BridgeError(
+            "timeout", "Live has not indexed %s after %d s. Check that this folder is inside "
+            "the User Library Live uses (Preferences > Library > Location of User Library; "
+            "a moved library: set LIVEBRIDGE_USER_LIBRARY to its folder), and look for "
+            "LiveBridge > Racks under User Library in Live's browser." % (
+                file_path, INDEX_TIMEOUT_S))
+    return answer
+
+
+def _indexed(file_path):
+    _INDEX_WAIT.pop(file_path, None)
+
+
 def _file_safe(text):
     """A file-name-safe version of a plug-in name (Windows forbids <>:"/\\|?*)."""
     return re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(text)).strip(" .") or "plugin"
@@ -480,10 +506,12 @@ def plugin_racks_map(ctx, plugin=None, track=None, device=None, plugin_format=No
                 return _map_summary(data, "probed", filter, offset, limit)
             job.pending = ids
             xml = lib.rack_xml(identity, [{"id": pid} for pid in ids])
-            _path, item = _write_and_find(ctx, identity, library, job.file_name, xml)
+            rack_path, item = _write_and_find(ctx, identity, library, job.file_name, xml)
             if item is None:
-                return {"status": "indexing", "plugin": identity.get("name"),
-                        "note": "Live is indexing %s — call again in a second" % job.file_name}
+                return _indexing(rack_path, {
+                    "status": "indexing", "plugin": identity.get("name"), "file": rack_path,
+                    "note": "Live is indexing %s — call again in a second" % job.file_name})
+            _indexed(rack_path)
             map_track = _map_track(ctx, identity)
             _clear_devices(map_track)
             rack = _load_rack(ctx, item, job.file_name, map_track)
@@ -767,8 +795,10 @@ def plugin_racks_expose(ctx, track=None, plugin=None, parameters=None, macros=No
     file_name = EXPOSE_FILE % _file_safe(identity.get("name") or "plugin")
     file_path, item = _write_and_find(ctx, identity, library, file_name, xml)
     if item is None:
-        return {"status": "indexing", "file": file_path,
-                "note": "Live is indexing the new rack file — call again in a second"}
+        return _indexing(file_path, {
+            "status": "indexing", "file": file_path,
+            "note": "Live is indexing the new rack file — call again in a second"})
+    _indexed(file_path)
 
     if new_track:
         kind = "audio" if identity.get("kind") == "audio_effect" else "midi"
