@@ -243,6 +243,15 @@ def test_band_decisions_master_or_tracks():
     (owned,) = [d for d in mix.band_decisions(master, one) if d["band"] == "mud"]
     assert owned["fix"] == "tracks" and owned["tracks"][0]["name"] == "A"
     assert "A" in owned["advice"] and mud
+    # near the line the last verdict holds: A owns 41 % of the mud, B-D share the rest
+    near = [{"name": n, "role": "pad", "bands_db": bands_db(shares(mud=1)),
+             "post_lufs": lufs} for n, lufs in (("A", -17.3), ("B", -20.0), ("C", -20.5),
+                                                 ("D", -21.0))]
+    fix = {d["band"]: d["fix"] for d in mix.band_decisions(master, near)}
+    assert fix["mud"] == "tracks"                                   # 41 % > 40 %: one owner
+    held = {d["band"]: d["fix"] for d in mix.band_decisions(master, near,
+                                                            previous={"mud": "master"})}
+    assert held["mud"] == "master"                                  # the last run's verdict
 
 
 def test_patch_health_and_filter_cutoffs():
@@ -462,7 +471,9 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     assert result["eq"]["EQ Mid"].startswith("0 -> -3.5") and result["steps"][0] == \
         {"eq": result["eq"]}
     assert "EQ High" not in result["eq"]                      # 0.4 dB: left alone
-    assert result["settings"]["Limit Gain"].startswith(f"{params['Limit Gain']:.1f}")
+    assert result["settings"]["Limit Gain"] == f"{round(params['Limit Gain'], 2):g} dB"
+    assert result["crest_drop_db"] == pytest.approx(
+        result["before"]["crest_db"] - result["after"]["crest_db"], abs=0.11)
     assert not result.get("headroom_trim_db")                 # no fader moves
     assert result["after"]["lufs"] == pytest.approx(-8.0, abs=0.6) or "stopped" in result
     # the bands are measured after the EQ: a rerun hearing less excess than the cut in
@@ -545,6 +556,7 @@ def test_analyze_with_genre(app, tmp_path):
 def test_master_auto_keeps_the_drop_bigger_than_the_breakdown(app, song, mix_set):
     mix_set.quiet_from = 64.0                                  # bar 17: breakdown
     song.is_playing = False
+    song.start_time = 8.0                                      # the user's marker: bar 3
     result = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                                  "loud_bar": 1, "quiet_bar": 17})
     contrast = result["contrast"]
@@ -552,6 +564,7 @@ def test_master_auto_keeps_the_drop_bigger_than_the_breakdown(app, song, mix_set
     if contrast["after_lu"] < contrast["before_lu"] - 2:
         assert any("backed off" in n for n in result["notes"])
     assert song.is_playing is False                           # stopped again afterwards
+    assert song.start_time == 8.0                             # the start marker is back
 
 
 # ----------------------------------------------------------------------------- channel strips

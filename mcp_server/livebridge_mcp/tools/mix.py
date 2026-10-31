@@ -95,6 +95,8 @@ _BALANCE_FILE = "balance_state.json"
 #: the one-shot check's hysteresis: a part the last run counted is skipped only below
 #: min_active - this, one it skipped is counted only above min_active + this
 _ACTIVE_MARGIN = 0.1
+#: the balance memory's entry for the last run's band verdicts (not a track)
+_BANDS_KEY = "~bands"
 _NUMBER_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*(k?)", re.I)
 
 
@@ -146,7 +148,8 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
     if isinstance(master, dict):
         short["master"] = {k: v for k, v in master.items() if k in (
             "destination", "target_lufs", "before", "after", "limiter_gain_db", "makeup_db",
-            "limiting_db", "peak_reduction_db", "reset", "eq", "steps", "settings",
+            "limiting_db", "peak_reduction_db", "crest_drop_db", "reset", "eq", "steps",
+            "settings",
             "headroom_trim_db", "device_check", "stopped", "missing_gain_db", "contrast",
             "notes", "error", "type")}
     low = result.get("low_end")
@@ -338,22 +341,26 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         time.sleep(1.0)
         return {"stop": True, "bars": "the arrangement loop", "marker": marker}
 
+    def put_marker_back(marker: float | None) -> None:
+        """The start marker back where it was, once Live has applied the stop (a marker
+        written in the same tick as the stop is lost)."""
+        if marker is None:
+            return
+        end = time.time() + 3.0
+        while time.time() < end:
+            state = bridge_call(bridge, "transport.get")
+            if not isinstance(state, dict) or _is_error(state) or not state.get("is_playing"):
+                break
+            time.sleep(0.1)
+        bridge_call(bridge, "transport.set_position",
+                    {"position": marker, "set_start_marker": True})
+
     def stop_section(started: dict[str, Any] | None) -> None:
         if not started or "error" in started:
             return
         if started.get("stop"):
             bridge_call(bridge, "transport.stop")
-            # Live applies the stop on its next tick: a marker written before that is lost
-            end = time.time() + 3.0
-            while time.time() < end:
-                state = bridge_call(bridge, "transport.get")
-                if not isinstance(state, dict) or _is_error(state) or \
-                        not state.get("is_playing"):
-                    break
-                time.sleep(0.1)
-            if started.get("marker") is not None:
-                bridge_call(bridge, "transport.set_position",
-                            {"position": started["marker"], "set_start_marker": True})
+            put_marker_back(started.get("marker"))
         old = started.get("loop")
         if old is not None:
             args: dict[str, Any] = {"enabled": old["on"]}
@@ -384,7 +391,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             bound = signature.bind_partial(*args, **kwargs)
             bound.apply_defaults()
             if bound.arguments.get("loud_bar") is not None:
-                return fn(*args, **kwargs)        # it jumps between sections itself
+                # it jumps between sections itself; starting a stopped song there moves the
+                # start marker (113.1.1 stayed where 1.1.1 was): put it back afterwards
+                state = bridge_call(bridge, "transport.get")
+                stopped = isinstance(state, dict) and not _is_error(state) and \
+                    not state.get("is_playing") and not jobs.nested()
+                marker = _num((state.get("start_time") or {}).get("beats")) \
+                    if stopped and isinstance(state.get("start_time"), dict) else None
+                try:
+                    return fn(*args, **kwargs)
+                finally:
+                    put_marker_back(marker)
             started = None
             if not jobs.nested() and "section_bars" in bound.arguments:
                 started = start_section(bound.arguments.get("section_bars"))
@@ -1008,7 +1025,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                 "post_lufs": p["lufs"] + p["fader_db"]} for p in parts]
                 bands = (reading.get("spectrum") or {}).get("bands_db") or {}
                 if bands and tracks_post:
-                    answer["bands"] = mix.band_decisions(bands, tracks_post, key)
+                    answer["bands"] = mix.band_decisions(
+                        bands, tracks_post, key,
+                        previous=((memory.get(set_key) or {}).get(_BANDS_KEY)
+                                  if isinstance(memory.get(set_key), dict) else None))
         else:
             notes.append("No Engine on the master: headroom and the track-or-master band check "
                          "were skipped.")
@@ -1022,6 +1042,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     kept[name] = {"fader_db": round(volume, 2), "used": used,
                                   "raised_db": round(raised.get(name, 0.0), 2),
                                   "moved_db": round(moved.get(name, 0.0), 2)}
+            if answer.get("bands") is not None:
+                kept[_BANDS_KEY] = {b["band"]: b["fix"] for b in answer["bands"]}
             memory[set_key] = kept
             try:
                 library.write_json(library.library_dir() / _BALANCE_FILE, memory)
@@ -1626,7 +1648,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         held = {name: read_param(index, name) for name in (
             drive_names + (ceiling_name,) + (("EQ Low", "EQ Mid", "EQ Mid Freq", "EQ High")
                                              if chain_kind == "livebridge" else ()))}
-        result["settings"] = {name: shown for name, (_value, shown) in held.items()}
+        # the exact value where the display rounds (Limit Gain 14.2 shows "14 dB")
+        result["settings"] = {
+            name: (f"{round(value, 2):g} dB" if chain_kind == "livebridge" and value is not None
+                   and name not in _HZ_PARAMS else shown)
+            for name, (value, shown) in held.items()}
         # the report's gain is what Live holds, not what the tool asked for
         if held[gain_name][0] is not None:
             result["limiter_gain_db"] = round(held[gain_name][0], 1)
@@ -1639,6 +1665,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if before_lufs is not None and after_lufs is not None and "device_check" not in result:
             # drive minus loudness gained: what the limiter costs in loudness, on average
             result["limiting_db"] = round(max(0.0, drive - (after_lufs - before_lufs)), 1)
+            crest_was, crest_now = result["before"]["crest_db"], result["after"]["crest_db"]
+            if crest_was is not None and crest_now is not None:
+                # the easiest of the three to hear: how much punch the master gave up
+                result["crest_drop_db"] = round(crest_was - crest_now, 1)
             if before_peak is not None and after_peak is not None:
                 # what it shaves off the loudest peaks (the crest factor's loss)
                 result["peak_reduction_db"] = round(max(0.0, before_peak + drive - after_peak),
@@ -1961,7 +1991,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 # one is that close (2.2 became 1.4 on an unchanged mix)
                 last_trim = (was.get(name) or {}).get("Trim")
                 if last_trim is not None and abs(last_trim) >= 0.05 and \
-                        abs(last_trim - trim) < 1.0:
+                        abs(last_trim - trim) < 1.5:
                     trim = round(last_trim, 1)
                 answer = set_strip(name, indexes[name], {"Trim": trim})
                 if _is_error(answer):
