@@ -485,6 +485,9 @@ def test_master_auto_measures_before_at_neutral_and_sets_the_eq(app, song, mix_s
     assert master_params(device)["EQ Mid"] == pytest.approx(-3.5) and "eq" not in again
     assert any("EQ Mid kept at -3.5 dB" in n for n in again["notes"]), again["notes"]
     assert set(again["reset"]) <= {"Limit Gain", "Comp Makeup"} and again["reset"]
+    first = next(s for s in again["steps"] if "gain_db" in s)       # resumes, no 6 dB climb
+    assert first["gain_db"] == pytest.approx(sum(again["reset"].values()), abs=0.05)
+    assert len([s for s in again["steps"] if "gain_db" in s]) <= 2
     call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                         "chain": "livebridge", "eq_bands": {"mid": 9.0}})
     assert master_params(device)["EQ Mid"] == pytest.approx(-4.0)
