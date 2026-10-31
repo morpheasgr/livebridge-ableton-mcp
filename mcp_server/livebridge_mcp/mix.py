@@ -109,7 +109,10 @@ GENRES: dict[str, dict[str, Any]] = {
                         "lead": -6.0, "keys": -6.0, "perc": -8.0, "hats": -9.0, "pad": -8.0,
                         "fx": -12.0}},
     "melodic_house": {"label": "Melodic House / Techno, Progressive", "lufs": -9.0,
-                      "bands": (-1.0, -3.0, -6.0, -7.0, -7.0, -10.0),
+                      # measured, not a rule of thumb: two released masters in the style
+                      # (one stem-, one mix-mastered) put 2-5 kHz 6-10 dB and 5-20 kHz 4-5 dB
+                      # under the old profile (-7, -10), the mids ~2 dB above it
+                      "bands": (-1.0, -2.5, -6.0, -5.0, -15.0, -14.5),
                       # the melody carries the track: leads, pads and keys sit close to the
                       # kick instead of 6-10 LU under it
                       "roles": {"kick": 0.0, "sub": -2.0, "bass": -3.0, "lead": -2.0,
