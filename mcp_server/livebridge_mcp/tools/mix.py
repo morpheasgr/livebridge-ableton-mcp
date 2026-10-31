@@ -195,19 +195,24 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                    "mute": bool(entry.get("mute"))}
         return found
 
-    def master_chain_before_engine() -> list[str]:
-        """The active devices in front of the master's Engine: its peak is then theirs (a
-        limiter's output), not the mix's."""
+    def master_chain_before_engine() -> list[dict[str, Any]]:
+        """The active devices in front of the master's Engine (``{index, name}``): what the
+        Engine hears is then their output (a limiter's), not the mix."""
         listing = bridge_call(bridge, "devices.list", {"track": "master"})
-        before: list[str] = []
+        before: list[dict[str, Any]] = []
         for device in (listing.get("devices") or []) if isinstance(listing, dict) and \
                 not _is_error(listing) else []:
             name = str(device.get("name") or "")
             if "livebridge engine" in name.lower():
                 return before
             if device.get("is_active", True):
-                before.append(name)
+                before.append({"index": device.get("index"), "name": name})
         return []
+
+    def switch_master_chain(devices: list[dict[str, Any]], on: bool) -> None:
+        for device in devices:
+            bridge_call(bridge, "devices.set_state", {"track": "master",
+                                                      "device": device["index"], "active": on})
 
     def current_set() -> str:
         """The open set's key for per-set memories: its path, else its name, else "unsaved"."""
@@ -980,21 +985,31 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             answer["genre"] = key
             answer["genre_label"] = mix.GENRES[key]["label"]
         if master is not None:
+            # the mix as it reaches the master: a mastering chain in front of the Engine is
+            # switched off for this one listen (its limiter reshaped the bands: sub read -10.0
+            # mastered vs -7.4 raw) and on again
+            chain_ahead = master_chain_before_engine()
+            switch_master_chain(chain_ahead, False)
             try:
+                rewind()
                 reading = engine.listen(master, min(seconds, 6.0))
             except engine.EngineError as exc:
                 notes.append(f"master Engine not read ({exc}).")
                 reading = None
+            finally:
+                switch_master_chain(chain_ahead, True)
+            if chain_ahead:
+                notes.append("The master was read with " + ", ".join(
+                    d["name"] for d in chain_ahead) + " switched off for one listen (the mix "
+                    "itself, not the mastered sound) and on again.")
             if reading is not None and not reading.get("silent"):
                 answer["master"] = _reading(reading)
                 peak = (reading.get("loudness") or {}).get("peak_db")
                 excess = (peak + headroom_db) if peak is not None else 0.0
-                chain_ahead = master_chain_before_engine()
                 if chain_ahead and excess > 0.5:
-                    notes.append(f"Master peaks at {peak} dB, but that is after "
-                                 f"{', '.join(chain_ahead)} on the master (a limiter's output, "
-                                 "not the mix's headroom): faders not trimmed — "
-                                 "live_master_auto sets the headroom in front of its chain.")
+                    notes.append(f"The mix peaks at {peak} dB into the master chain: faders "
+                                 "not trimmed — the chain sets its own input level "
+                                 "(live_master_auto).")
                 elif excess > 0.5:
                     answer["headroom_trim_db"] = round(-excess, 1)
                     if apply:
@@ -1555,7 +1570,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 stopped = "the master went silent while measuring"
                 break
             delta = target - now["lufs"]
-            if abs(delta) <= 0.5:
+            if abs(delta) <= 0.3:
                 break
             new_drive = max(low, min(high, drive + max(-6.0, min(6.0, delta))))
             if abs(new_drive - drive) < 0.1:
@@ -1991,7 +2006,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 # one is that close (2.2 became 1.4 on an unchanged mix)
                 last_trim = (was.get(name) or {}).get("Trim")
                 if last_trim is not None and abs(last_trim) >= 0.05 and \
-                        abs(last_trim - trim) < 1.5:
+                        abs(last_trim - trim) < 1.0:
                     trim = round(last_trim, 1)
                 answer = set_strip(name, indexes[name], {"Trim": trim})
                 if _is_error(answer):
