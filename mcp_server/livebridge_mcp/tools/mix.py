@@ -1368,7 +1368,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 # deep as the excess asks for stays (adding to it on every run walked an
                 # unchanged mix's mid to the -6 dB cap); the opposite reading backs it off
                 if current and math.copysign(1.0, current) == math.copysign(1.0, setting):
-                    if abs(setting) <= abs(current) + 0.15:     # the dial's own steps
+                    # deeper only by a step worth hearing (and past the dial's own steps:
+                    # -2.0 reads back -2.05)
+                    if abs(setting) < abs(current) + 0.5:
                         if abs(current) >= 5.9:
                             notes.append(
                                 f"{param} already at {current:+.1f} dB and the master still "

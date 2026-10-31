@@ -1136,3 +1136,14 @@ def test_balance_plan_gives_settled_parts_more_tolerance():
     assert [m["name"] for m in moved["moves"]] == ["Piano"]
     kept = mix.balance_plan([dict(p) for p in parts], min_move=3.0, settled=["Piano"])
     assert kept["moves"] == [] and "Piano" in kept["unchanged"]
+
+
+def test_a_threshold_at_the_dial_end_keeps_its_hysteresis():
+    """The compressor was on with its threshold at 0 dB (the dial's end): a 0.8 dB move is
+    jitter, not a change (it read as 'no compressor' because 0 equals rest)."""
+    reading = {"loudness": {"crest_db": 18.0, "peak_db": 11.2, "lufs": -14.0},
+               "spectrum": {"bands_db": {"mid": -4}}}
+    previous = {**mix.CHANNEL_NEUTRAL, "Comp Threshold": 0.0, "Comp Ratio": 3.0}
+    assert mix.channel_plan("lead", reading)["values"]["Comp Threshold"] == -0.8   # fresh
+    plan = mix.channel_plan("lead", reading, previous)
+    assert plan["values"]["Comp Threshold"] == 0.0                                 # kept
