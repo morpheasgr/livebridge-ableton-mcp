@@ -89,6 +89,8 @@ class FakeEngines:
 
     def limiter(self):
         for device in self.song.master_track.devices:
+            if not device.is_active:                  # switched off: passes the sound
+                continue
             params = {p.name: p.value for p in device.parameters}
             if device.class_name == "Limiter" and "Gain" in params:
                 return params["Gain"], params["Ceiling"]
@@ -102,7 +104,7 @@ class FakeEngines:
 
     def output(self):
         for device in self.song.master_track.devices:
-            if device.name == "LiveBridge Master" and not self.broken:
+            if device.name == "LiveBridge Master" and not self.broken and device.is_active:
                 return {p.name: p.value for p in device.parameters}.get("Output", 0.0)
         return 0.0
 
@@ -899,7 +901,8 @@ def test_balance_leaves_the_headroom_behind_a_master_chain_alone(app, song, mix_
     result = call_tool(app, "live_mix_balance", {"seconds": 3,
                                                   "protect": list(mix_set.parts)})
     assert "headroom_trim_db" not in result
-    assert any("after Limiter" in n for n in result["notes"])
+    assert any("into the master chain" in n for n in result["notes"])
+    assert any("Limiter switched off for one listen" in n for n in result["notes"])
     assert all(fader_db(t) == pytest.approx(0.0, abs=0.05) for t in song.tracks)
 
 
@@ -1067,3 +1070,17 @@ def test_mix_auto_keeps_a_protected_parts_level_and_plans_without_applying(
     pad = next(t for t in again["tracks"] if t["name"] == "Pad")
     assert "Trim" not in pad.get("changes", {}), pad
     assert {q.name: q.value for q in strip.parameters}["Trim"] == pytest.approx(4.0, abs=0.05)
+
+
+def test_balance_reads_the_mix_without_the_master_chain(app, song, mix_set):
+    """With a master chain in front of the Engine the balance hears the mix itself: the
+    chain is switched off for that one listen and on again."""
+    device = add_master_device(song, limit_gain=14.0)
+    factory.add_device(song.master_track, "LiveBridge Engine", "MxDeviceAudioEffect")
+    raw = mix_set.master_reading
+    device.parameters[0].value = 0
+    unmastered = raw()[0]
+    device.parameters[0].value = 1
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "apply": False})
+    assert result["master"]["lufs"] == pytest.approx(unmastered, abs=0.3), result["master"]
+    assert device.is_active and any("switched off for one listen" in n for n in result["notes"])

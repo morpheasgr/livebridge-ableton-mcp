@@ -1602,7 +1602,7 @@ Balance the mix by measurement: listens to every track with a LiveBridge Engine 
 | `section_bars` | list[int] \| null | `null` |
 | `one_shots` | list[str] \| null | `null` |
 
-Bridge: `devices.list`, `mixer.get`, `mixer.set_many`, `song.summary`, `transport.get`, `transport.play`
+Bridge: `devices.list`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `song.summary`, `transport.get`, `transport.play`
 
 #### `live_master_auto`
 
@@ -1646,7 +1646,7 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `detail` | str | `"summary"` |
 | `section_bars` | list[int] \| null | `null` |
 
-Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -3617,7 +3617,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `devices.set_parameter` | M | parameter, value, track=null, device=null, normalized=false | `live_device_set_parameter` | Set one parameter by number, normalized 0..1, value item or display string |
 | `devices.set_parameters` | M | values, track=null, device=null, normalized=false | `live_audio_align`, `live_device_set_parameters`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_sound_load` | Set many parameters atomically (validated first, one undo step) |
 | `devices.set_properties` | M | values, track=null, device=null | `live_device_properties` | Set class-specific device properties (wavetable, IR, modes, voices ...) |
-| `devices.set_state` | M | track=null, device=null, active=null, name=null, collapsed=null, select=null, compare_b=null, show_chains=null, save_to_compare_slot=false | `live_device_set_state` | Turn a device on/off, rename, collapse, select, A/B compare |
+| `devices.set_state` | M | track=null, device=null, active=null, name=null, collapsed=null, select=null, compare_b=null, show_chains=null, save_to_compare_slot=false | `live_device_set_state`, `live_mix_auto`, `live_mix_balance` | Turn a device on/off, rename, collapse, select, A/B compare |
 | `eval.python` | M | code="", expr=null, detail="summary", reset=false | `live_eval_python` | Execute Python inside Live (song/app/browser/ctx/Live in scope) |
 | `lom.call` | M | path, method, args=null, kwargs=null, detail="summary" | `live_lom_call` | Call any LOM method |
 | `lom.children` |  | path, detail="minimal", offset=0, limit=200 | `live_lom_children` | List the children of a LOM path |
