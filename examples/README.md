@@ -15,6 +15,7 @@ yourself.
 | 6 | [Mix check](06-mix-check.md) | *"Check my mix against my reference track…"* | meters, a bounce, LUFS and spectrum vs a reference, EQ, side-chain, limiter |
 | 7 | [Live on another computer](07-two-computers.md) | *"Connect to Live on my Windows PC…"* | LAN mode, discovery, sending files to the Live machine |
 | 8 | [Anything else](08-escape-hatches.md) | *"Rename every clip after its track and scene"* | the Live Object Model, batches, Python inside Live |
+| 9 | [Mix and master by measurement](09-mix-and-master.md) | *"Mix and master this track for club playback…"* | channel strips per role, faders by role, a master to a loudness target, a plan first, protected parts, a comparison with a released master |
 
 More: [100+ prompts to copy](prompts.md) · [Scripting Live from Python without Claude](python/).
 
@@ -26,7 +27,8 @@ Not re-run for these pages: the steps that play audio (the meters and the bounce
 Splice's own search and download (example 4, which needs a Splice login; its file names are
 placeholders) and example 7, which needs two computers.
 [`tests/test_examples.py`](../tests/test_examples.py) checks on every commit that each tool
-and argument used on these pages exists.
+and argument used on these pages exists. Example 9 was run against Live 12.4.16 Suite on Windows
+(October 2026) on a finished project.
 
 The calls are written like Python so they're easy to read. `true`, `false` and `null` are JSON
 values, as in the MCP messages Claude actually sends.

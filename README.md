@@ -66,10 +66,12 @@ It works on **macOS and Windows**, with **every Live 12 edition** (built and ver
 Live 12.4.5 Suite), with Live on the same computer as Claude **or on another computer in your
 network**, which is handy when you switch between a Mac and a Windows PC.
 
-No Max for Live needed: the core is a small MIDI Remote Script. With Max for Live, two optional
-devices — **LiveBridge Engine** and **LiveBridge MIDI** — add what Live's API cannot do: listening
-while the song plays, live modulation, follow actions, MIDI input and faster automation recording
-([docs/ENGINE.md](docs/ENGINE.md)). Claude adds them to your set itself when a task needs them.
+No Max for Live needed: the core is a small MIDI Remote Script. With Max for Live, optional
+LiveBridge devices add what Live's API cannot do: listening while the song plays (**Engine**),
+mixing and mastering by measurement (**Channel**, **Master**, **Phase**, **Unmask**; Channel and
+Master need Max 9), live modulation, follow actions, MIDI input (**MIDI**), faster automation
+recording and every parameter of a VST3 plug-in (**Host**) ([docs/ENGINE.md](docs/ENGINE.md)).
+Claude adds them to your set itself when a task needs them.
 
 ## What you can ask
 
@@ -81,6 +83,7 @@ while the song plays, live modulation, follow actions, MIDI input and faster aut
 | *"Find a hi-hat loop on Splice and put it on a new track"* | Splice's official MCP server for search and download, LiveBridge for import and warping | [4](examples/04-splice-samples.md) |
 | *"Turn this loop into a full track with a build-up and a breakdown"* | scenes, a clap roll, a filter sweep, the arrangement in one call, locators | [5](examples/05-song-structure.md) |
 | *"Check my mix against my reference track"* | meters, a bounce, LUFS and spectrum comparison, EQ, side-chain, limiter | [6](examples/06-mix-check.md) |
+| *"Mix and master this track for club playback"* | a channel strip per part set by role, faders balanced by role, the master driven to a loudness target, every move measured and explained | [9](examples/09-mix-and-master.md) |
 | *"Connect to Live on my Windows PC"* | LAN mode with a token, discovery, file upload to the Live machine | [7](examples/07-two-computers.md) |
 | *"Rename every clip after its track and scene"* | the whole Live Object Model, batches, Python inside Live | [8](examples/08-escape-hatches.md) |
 

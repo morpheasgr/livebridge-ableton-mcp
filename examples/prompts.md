@@ -132,6 +132,25 @@ clip" for whatever is selected.
 - Add a delay return with a dotted-eighth delay.
 - Group the drum effects into an Audio Effect Rack.
 
+## Mix and master by measurement
+
+Needs the LiveBridge devices (Max for Live; the channel strip and the mastering chain need Max 9).
+Claude places them itself. Loop or name the fullest section (the drop) so every part plays.
+
+- Mix and master this track for club playback. The drop is bars 113-128. Show me the plan first.
+- Mix this for Spotify: -14 LUFS, and keep the vocal's level where it is.
+- Balance the faders by role for melodic techno, but don't touch the lead.
+- That's a riser, not a snare, and "Lead KEY" is the lead: fix the roles and run it again.
+- Run the mix again and tell me if anything changed.
+- I use my own plug-ins on every track: just measure, balance the faders and master.
+- Master the drop to -9 LUFS with a -1 dB ceiling, and stop before it loses its punch.
+- Sound check: is anything silent, muted by mistake or filtered shut in this section?
+- Do the kick and the bass cancel each other? Fix the phase if they do.
+- The bass muddies the kick: duck its clashing band only while the kick plays.
+- Does the drop still hit harder than the breakdown after mastering? Breakdown at bar 89.
+- Compare my drop with the released master (drop at 3:44) and tell me what's still different.
+- What did you change on each track, and why?
+
 ## Recording and bouncing
 
 - Bounce the first 8 bars of the master to an audio track.
