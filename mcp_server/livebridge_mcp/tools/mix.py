@@ -1586,7 +1586,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 stopped = "the master went silent while measuring"
                 break
             delta = target - now["lufs"]
-            if abs(delta) <= 0.3:
+            if abs(delta) <= 0.3 + 1e-6:           # readings are in 0.1 steps: -8.3 is in
                 break
             new_drive = max(low, min(high, drive + max(-6.0, min(6.0, delta))))
             # a rerun starts where the last run ended (its drive went to 0 for 'before') when

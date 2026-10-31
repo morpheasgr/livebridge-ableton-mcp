@@ -632,7 +632,7 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
     stays on unless the reading clearly leaves its range, one that is off needs a clear case),
     and a value within its jitter of the last one is kept — a rerun on the same mix changes
     nothing (a lead at crest 10.5 vs 10.9 around a 10.5 limit gained and lost a compressor;
-    a threshold follows the window's peak, which swings up to 2 dB between runs).
+    a threshold follows the window's peak, which swings 2-3 dB between runs).
     """
     hp, crest_target, ratio, attack, release, mono = STRIP_ROLES.get(role, STRIP_ROLES[None])
     last = previous or {}
@@ -689,7 +689,7 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
             crest > crest_target + (0.5 if was("Comp Ratio") else 2.5):
         reduce = max(0.5, min(crest - crest_target, 8.0))
         wanted = peak - reduce / (1.0 - 1.0 / ratio)
-        threshold = steady("Comp Threshold", max(-40.0, min(0.0, wanted)), 2.0)
+        threshold = steady("Comp Threshold", max(-40.0, min(0.0, wanted)), 3.0)
         # the dial ends at 0 dB: a part peaking far above 0 dBFS before its fader (fine in
         # floating point) gets its threshold below where it should be — more reduction than
         # planned. Say so, and how much
