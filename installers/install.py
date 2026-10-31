@@ -1484,11 +1484,14 @@ class Installer(Ops):
 
     def splice_desktop_entry(self) -> Optional[Dict[str, Any]]:
         """Claude Desktop entry bridging the remote Splice MCP through ``npx mcp-remote``."""
-        connector = ("Splice in Claude Desktop: Settings {a} Connectors {a} Add custom connector "
-                     "{a} URL %s, then sign in." % SPLICE_URL).format(a=self.arrow)
+        connector = ("Splice in Claude Desktop (optional; skip if it is already a connector "
+                     "there): Settings {a} Connectors {a} Add custom connector {a} URL %s, then "
+                     "sign in." % SPLICE_URL).format(a=self.arrow)
         npx = self.host.which("npx")
         if not npx:
-            self.info("npx (Node.js) not found -- Splice is not added to the JSON config.")
+            # not an error: Splice as a Claude Desktop connector needs no Node.js
+            self.info("Splice: no Node.js (npx), so it is not added to claude_desktop_config.json "
+                      "-- fine if Splice is a connector in Claude Desktop (nothing to install).")
             self.manual.append(connector)
             return None
         self.manual.append("Splice in Claude Desktop starts through npx mcp-remote and opens a "
