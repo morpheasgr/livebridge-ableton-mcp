@@ -362,6 +362,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         duration: float | None = None,
         sections: bool = True,
         genre: str | None = None,
+        reference_start: float | None = None,
+        reference_duration: float | None = None,
+        from_sound: bool = True,
     ) -> Any:
         """Listen to audio by measuring it: loudness (LUFS, true peak, crest factor, loudness
         range, clipping), spectral balance in 8 bands with mix flags (mud, harshness, missing
@@ -381,9 +384,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             start, duration: analyse a window in seconds (default: from 0, at most 10 minutes).
             sections: include `energy` (RMS over time, up to 32 steps).
             genre: also compare the balance with a genre's (`genre_balance`: 6 bands, the
-                genre's typical loudness) — techno, trance, dnb, dubstep, hip_hop, trap, pop,
-                rnb, lo_fi, ambient, breaks, funk, jazz, metal, country, reggaeton, classical,
-                balanced. Rules of thumb: a reference track is the better target.
+                genre's typical loudness) — techno, house, melodic_house (melodic techno,
+                progressive), trance, dnb, dubstep, hip_hop, trap, pop, rnb, lo_fi, ambient,
+                breaks, funk, jazz, metal, country, reggaeton, classical, balanced. Rules of
+                thumb: a reference track is the better target. `flags` keep the general
+                full-mix targets; `genre_balance` is the genre's.
+            reference_start, reference_duration: the reference's own window in seconds
+                (default: the same as `start`/`duration`) — a 32 s bounce of the drop against
+                the drop of a full reference (reference_start=224, reference_duration=32).
+            from_sound: count `start` / `reference_start` from each file's first sound
+                (default): a master's short silent gap before the music (up to 2 s, reported
+                as `file.lead_silence_s`) does not shift the bars. false = from sample 0.
 
         Returns:
             `{file:{path, name, duration, sample_rate, channels, format, analysed?}, kind,
@@ -411,6 +422,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("start must be >= 0 seconds", cmd=cmd)
         if duration is not None and duration <= 0:
             return tool_error("duration must be > 0 seconds", cmd=cmd)
+        if reference_start is not None and reference_start < 0:
+            return tool_error("reference_start must be >= 0 seconds", cmd=cmd)
+        if reference_duration is not None and reference_duration <= 0:
+            return tool_error("reference_duration must be > 0 seconds", cmd=cmd)
         genre_name = None
         if genre is not None:
             genre_name = mix.genre_key(genre)
@@ -449,9 +464,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         results = []
         for index, path in enumerate(paths):
             try:
+                window = (start or 0.0, duration) if index == 0 else (
+                    reference_start if reference_start is not None else (start or 0.0),
+                    reference_duration if reference_duration is not None else duration)
                 results.append(audio_analysis.analyze_file(
-                    path, start=start or 0.0, duration=duration,
-                    kind=kind if index == 0 else "mix", sections=sections and index == 0))
+                    path, start=window[0], duration=window[1],
+                    kind=kind if index == 0 else "mix", sections=sections and index == 0,
+                    from_sound=from_sound))
             except audio_analysis.MissingDependency as exc:
                 return tool_error(str(exc), type="unsupported", cmd=cmd)
             except MemoryError:
@@ -480,6 +499,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                             f"{'louder' if gap > 0 else 'quieter'} than a "
                                             f"typical {balance['label']} master.")
             result["genre_balance"] = balance
+            if result.get("flags"):
+                # two yardsticks in one answer: say which is which
+                result["flags"].append(f"The band flags above use general full-mix targets; "
+                                       f"genre_balance compares with {balance['label']}.")
         return result
 
     def audio_source(spec: Any, label: str, cmd: str) -> tuple[str, str] | dict[str, Any]:

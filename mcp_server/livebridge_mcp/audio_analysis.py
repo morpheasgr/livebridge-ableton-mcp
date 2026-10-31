@@ -282,8 +282,28 @@ def _flags(result: dict[str, Any], kind: str) -> list[str]:
     return flags
 
 
+#: the most leading silence counted as a file's gap before the music (a master's few hundred
+#: milliseconds), and the level below which a sample is silence
+LEAD_SILENCE_MAX_S = 2.0
+_SILENCE_LEVEL = 10.0 ** (-60.0 / 20.0)
+
+
+def lead_silence(path: str) -> float:
+    """Seconds of silence before the first sound (at most :data:`LEAD_SILENCE_MAX_S`): some
+    masters start with a short gap, which shifts every bar-based window."""
+    np, _signal, sf, _pyln = _deps()
+    info = sf.info(path)
+    frames = min(int(LEAD_SILENCE_MAX_S * info.samplerate), info.frames)
+    head = sf.read(path, start=0, frames=frames, dtype="float32", always_2d=True)[0]
+    loud = np.nonzero(np.max(np.abs(head), axis=1) > _SILENCE_LEVEL)[0] if len(head) else []
+    if not len(loud):
+        return 0.0                  # silent for 2 s: a quiet intro, not a gap — no shift
+    return round(int(loud[0]) / float(info.samplerate), 3)
+
+
 def analyze_file(path: str, start: float = 0.0, duration: float | None = None,
-                 kind: str = "auto", sections: bool = True) -> dict[str, Any]:
+                 kind: str = "auto", sections: bool = True,
+                 from_sound: bool = False) -> dict[str, Any]:
     """Measure one audio file.
 
     Args:
@@ -292,13 +312,18 @@ def analyze_file(path: str, start: float = 0.0, duration: float | None = None,
         kind: "mix" (full track: mix flags apply), "stem"/"loop"/"one_shot" (no spectral
             targets) or "auto" (one_shot below 2 s, loop below 20 s, else mix).
         sections: include the energy curve over time.
+        from_sound: count ``start`` from the first sound, not from the file's first sample
+            (a master's silent gap before the music, up to 2 s: ``file.lead_silence_s``).
 
     Raises:
         MissingDependency: the audio extra is not installed.
         OSError / RuntimeError: the file cannot be read.
     """
     np, signal, _sf, _pyln = _deps()
-    data, rate, meta = _load(path, start, duration)
+    gap = lead_silence(path) if from_sound else 0.0
+    data, rate, meta = _load(path, start + gap, duration)
+    if gap:
+        meta["lead_silence_s"] = gap
     if not len(data):
         raise ValueError("the file (or the chosen window) contains no audio")
     seconds = len(data) / float(rate)

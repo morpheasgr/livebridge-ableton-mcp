@@ -121,6 +121,28 @@ def test_audio_tool_measures_a_loop(tcp_bridge, song, tmp_path):
     assert result["comparison"]["lufs"] == 0.0 and result["comparison"]["notes"] == []
     window = call_tool(_APP, "live_audio_analyze", {"file_path": loop, "start": 2, "duration": 1})
     assert window["kind"] == "one_shot" and window["file"]["analysed"] == [2.0, 3.0]
+    # the reference has its own window: a bounce from 0 against seconds 4-6 of a full track
+    paired = call_tool(_APP, "live_audio_analyze", {
+        "file_path": loop, "duration": 2, "reference": loop, "reference_start": 4,
+        "reference_duration": 2})
+    assert paired["file"]["analysed"] == [0.0, 2.0]
+    assert paired["reference"]["file"]["analysed"] == [4.0, 6.0]
+    assert call_tool(_APP, "live_audio_analyze", {"file_path": loop, "reference": loop,
+                                                  "reference_start": -1})["type"] == "bad_args"
+    # a master with a short silent gap before the music: windows count from the first sound
+    import numpy as np
+    import soundfile as sf
+    audio, rate = sf.read(loop, always_2d=True)
+    gapped = str(tmp_path / "gapped.wav")
+    sf.write(gapped, np.vstack([np.zeros((int(0.25 * rate), audio.shape[1])), audio]), rate)
+    shifted = call_tool(_APP, "live_audio_analyze", {
+        "file_path": loop, "duration": 2, "reference": gapped, "reference_start": 4,
+        "reference_duration": 2})
+    assert shifted["reference"]["file"]["lead_silence_s"] == pytest.approx(0.25, abs=0.01)
+    assert shifted["reference"]["file"]["analysed"] == [4.25, 6.25]
+    raw = call_tool(_APP, "live_audio_analyze", {"file_path": gapped, "start": 4, "duration": 2,
+                                                 "from_sound": False})
+    assert raw["file"]["analysed"] == [4.0, 6.0] and "lead_silence_s" not in raw["file"]
 
 
 def test_audio_tool_refusals(tcp_bridge, song, tmp_path, monkeypatch):

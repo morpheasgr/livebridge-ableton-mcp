@@ -103,6 +103,9 @@ Listen to audio by measuring it: loudness (LUFS, true peak, crest factor, loudne
 | `duration` | float \| null | `null` |
 | `sections` | bool | `true` |
 | `genre` | str \| null | `null` |
+| `reference_start` | float \| null | `null` |
+| `reference_duration` | float \| null | `null` |
+| `from_sound` | bool | `true` |
 
 Bridge: `clips.get`
 
