@@ -645,8 +645,11 @@ def channel_plan(role: str | None, reading: dict[str, Any] | None,
         return base - step if on else base + step
 
     def steady(name: str, value: float, jitter: float) -> float:
-        return float(last[name]) if was(name) and abs(float(last[name]) - value) < jitter \
-            else value
+        # a threshold at the dial's 0 dB end is still a set compressor (it equals rest only
+        # in number): whether the compressor was on is what counts
+        on = was("Comp Ratio") if name == "Comp Threshold" else was(name)
+        return float(last[name]) if on and name in last and \
+            abs(float(last[name]) - value) < jitter else value
 
     values: dict[str, float] = {}
     reasons: list[str] = []
