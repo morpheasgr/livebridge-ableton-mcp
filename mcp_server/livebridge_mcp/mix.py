@@ -172,6 +172,29 @@ SIX_BANDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("high_mid", "2-5 kHz", ("presence",)), ("high", "5-20 kHz", ("high", "air")),
 )
 
+#: Third-party limiters live_master_auto(chain="plugin") can drive: a part of the plug-in's
+#: device name -> the Live parameters for the drive into the limiter and its ceiling (both
+#: exposed by the plug-in itself, set as plain numbers so "dBTP" or a unit-less display match),
+#: and what the user has to set in the plug-in's own window (not reachable through Live).
+PLUGIN_LIMITERS: dict[str, dict[str, Any]] = {
+    "pro-l 2": {"label": "FabFilter Pro-L 2", "drive": "Gain", "ceiling": "Output Level",
+                "manual": "Pro-L 2: True Peak Limiting is on by default — check it is on "
+                          "if you saved your own device default — and pick the Style in its "
+                          "window (neither is reachable through Live)."},
+    "ozone 12 maximizer": {"label": "iZotope Ozone 12 Maximizer", "drive": "MAX: Input Gain",
+                           "ceiling": "MAX: Output Level",
+                           "manual": "Ozone 12 Maximizer: choose the IRC mode and switch true "
+                                     "peak on in its window (they are not plug-in "
+                                     "parameters)."},
+}
+
+
+def plugin_limiter(name: Any) -> dict[str, Any] | None:
+    """The PLUGIN_LIMITERS entry for a device name ("Pro-L 2", "FabFilter Pro-L 2"), or None."""
+    text = str(name or "").lower()
+    return next((spec for key, spec in PLUGIN_LIMITERS.items() if key in text), None)
+
+
 #: master loudness targets: destination -> (integrated LUFS, limiter ceiling dB, min crest dB)
 DESTINATIONS: dict[str, tuple[float, float, float]] = {
     "streaming": (-14.0, -1.0, 9.0), "spotify": (-14.0, -1.0, 9.0),

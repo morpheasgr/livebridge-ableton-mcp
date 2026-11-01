@@ -82,6 +82,8 @@ def _chain_devices(kind: str) -> tuple[tuple[str, str], ...]:
     """(device name, class name or _MASTER_DEVICE) of a master chain, in order."""
     if kind == "livebridge":
         return ((_MASTER_DEVICE, _MASTER_DEVICE),)
+    if kind == "plugin":
+        return ()                       # the user's own limiter, already on the master
     return (("EQ Eight", "Eq8"), ("Glue Compressor", "GlueCompressor"), ("Limiter", "Limiter"))
 
 
@@ -1114,7 +1116,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             chain: "native" (EQ Eight, Glue Compressor, Limiter) or "livebridge": one
                 LiveBridge Master device (Ableton's Channel EQ, Compressor, Limiter and Utility
                 DSP in a single Max device, Max 9 / Live 12.2+: EQ Low Cut, Comp Ratio/Attack,
-                Limit Gain/Ceiling/Mode, Width, Bass Mono... all Live parameters).
+                Limit Gain/Ceiling/Mode, Width, Bass Mono... all Live parameters), or "plugin":
+                your own limiter already on the master in front of the Engine — FabFilter
+                Pro-L 2 or iZotope Ozone 12 Maximizer — driven the same way (its gain and
+                ceiling); band fixes then come as advice, and what the plug-in does not expose
+                (true peak, style) is yours to set in its window.
             place_devices: put a LiveBridge Engine on the master first when there is none (default).
             eq_bands: master bands to correct, {band: dB too much (+) or too little (-)} —
                 live_mix_balance's `bands` with fix "master" (live_mix_auto passes them).
@@ -1166,8 +1172,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("seconds must be 3..20", cmd=cmd)
         if not 0 <= max_gain_db <= 24:
             return tool_error("max_gain_db must be 0..24", cmd=cmd)
-        if chain not in ("native", "livebridge"):
-            return tool_error("chain must be 'native' or 'livebridge'", cmd=cmd)
+        if chain not in ("native", "livebridge", "plugin"):
+            return tool_error("chain must be 'native', 'livebridge' or 'plugin'", cmd=cmd)
         chain_kind = chain
         if (loud_bar is None) != (quiet_bar is None):
             return tool_error("pass both loud_bar and quiet_bar (or neither)", cmd=cmd)
@@ -1253,25 +1259,51 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         return moved
             return loaded
 
+        def pick_limiter(listing: list[dict[str, Any]]) -> dict[str, Any] | None:
+            if chain_kind == "plugin":
+                return next((d for d in listing if d.get("class_name") in (
+                    "PluginDevice", "AuPluginDevice") and mix.plugin_limiter(d.get("name"))),
+                    None)
+            return find(listing, "Limiter" if chain_kind == "native" else _MASTER_DEVICE)
+
         devices = chain()
-        limiter = find(devices, "Limiter" if chain_kind == "native" else _MASTER_DEVICE)
+        limiter = pick_limiter(devices)
         foreign = [d for d in devices if d.get("type") == "audio_effect" and
                    d.get("class_name") in ("PluginDevice", "AuPluginDevice") and
                    _PLUGIN_LIMITER_RE.search(str(d.get("name")))]
+        spec = mix.plugin_limiter(limiter.get("name")) if chain_kind == "plugin" and \
+            limiter is not None else None
+        if chain_kind == "plugin" and limiter is None:
+            return tool_error(
+                "no supported plug-in limiter on the master (" + ", ".join(
+                    v["label"] for v in mix.PLUGIN_LIMITERS.values()) + "): load one in front "
+                "of the master's Engine (live_browser_load(query=\"Pro-L 2\", track=\"master\"), "
+                "then live_device_move it before the Engine), or use chain='livebridge'",
+                type="not_found", cmd=cmd)
+        if spec is not None:
+            manual.append(spec["manual"])
+        if chain_kind != "plugin" and limiter is None and any(
+                mix.plugin_limiter(d.get("name")) for d in foreign):
+            notes.append(f"{foreign[0]['name']} on the master can be driven by LiveBridge: "
+                         "chain='plugin'.")
         if chain_kind == "livebridge" and limiter is None and find(devices, "Limiter"):
             return tool_error("the master already has Live's Limiter: use chain='native' (or "
                               "remove it) — two limiters would fight", type="invalid_state",
                               cmd=cmd)
         gain_name, ceiling_name = ("Gain", "Ceiling") if chain_kind == "native" else (
-            "Limit Gain", "Limit Ceiling")
+            (spec["drive"], spec["ceiling"]) if spec is not None else
+            ("Limit Gain", "Limit Ceiling"))
         # the gain stages this tool drives: they start at 0 dB so "before" is the mix itself
         # (a rerun read the last run's +18 dB as the mix and could not tell it did nothing)
-        drive_names = (gain_name,) if chain_kind == "native" else (gain_name, "Comp Makeup")
+        drive_names = (gain_name, "Comp Makeup") if chain_kind == "livebridge" else (gain_name,)
 
         def db(value: float) -> Any:
             """A dB setting for the chain: LiveBridge Master's dB dials are linear (Live's raw
             value is the dB), so they take the number — as text Live matched it against a
             display that rounds to whole dB above 10 (11.1 landed as 11.5, "12 dB")."""
+            if chain_kind == "plugin":
+                # a plain number: matched against whatever the plug-in shows ("dBTP", none)
+                return f"{value:.1f}"
             return round(value, 2) if chain_kind == "livebridge" else f"{value:.1f} dB"
 
         def read_param(index: int, name: str) -> tuple[float | None, str | None]:
@@ -1412,10 +1444,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             last stage (Output) down 6 dB for one listen and back."""
             check: dict[str, Any] = {"drive_step_db": round(step, 1),
                                      "heard_lu": round(heard, 1)}
-            if chain_kind == "native":
-                check["verdict"] = (f"{step:+.1f} dB of Limiter gain changed the master by "
-                                    f"{heard:+.1f} LU only: the Limiter does not process (is "
-                                    "it on, and is the Engine after it?). Gain set back.")
+            if chain_kind in ("native", "plugin"):
+                what = limiter.get("name") or "the limiter"
+                check["verdict"] = (f"{step:+.1f} dB of {what}'s gain changed the master by "
+                                    f"{heard:+.1f} LU only: {what} does not process (is it on, "
+                                    "and is the Engine after it?). Gain set back.")
                 return check
             out, _shown = read_param(index, "Output")
             out = out or 0.0
@@ -1498,7 +1531,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               "section shows 1-3 dB of gain reduction (open the device; the "
                               "meter is not readable through Live's API).")
         result["chain"] = [d.get("name") for d in devices]
-        limiter = find(devices, "Limiter" if chain_kind == "native" else _MASTER_DEVICE)
+        limiter = pick_limiter(devices)
         if limiter is None:
             return tool_error("no limiter on the master after inserting it", type="internal",
                               cmd=cmd)
@@ -1523,7 +1556,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         # the drive into the limiter: its own gain first, then (LiveBridge Master) the
         # compressor's makeup in front of it — no fader moves
-        low = 0.0 if chain_kind == "native" else -24.0
+        low = 0.0 if chain_kind in ("native", "plugin") else -24.0
         makeup = chain_kind == "livebridge" and read_param(index, "Comp Makeup")[0] is not None
         high = max_gain_db + (_MAKEUP_MAX_DB if makeup else 0.0)
         drive_names = (gain_name, "Comp Makeup") if makeup else (gain_name,)
@@ -1548,7 +1581,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         now = _reading(current)
         # a mix already louder than the target: Live's Limiter has no negative gain, so the
         # faders come down together (listed in steps); LiveBridge Master turns its gain down
-        if chain_kind == "native" and drive < 0.1 and now["lufs"] is not None and \
+        if chain_kind in ("native", "plugin") and drive < 0.1 and now["lufs"] is not None and \
                 now["lufs"] > target + 0.5:
             trim = now["lufs"] - target + 2.0
             listing = bridge_call(bridge, "mixer.get", {"detail": "minimal"})
@@ -1788,7 +1821,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             master: then master to this destination ("streaming", "club", "apple", "genre"
                 ... see live_master_auto; needs an Engine on the master). None = skip.
             master_chain: "livebridge" (default: the LiveBridge Master device before the
-                master's Engine) or "native" (EQ Eight -> Glue Compressor -> Limiter).
+                master's Engine), "native" (EQ Eight -> Glue Compressor -> Limiter) or
+                "plugin" (your own Pro-L 2 / Ozone 12 Maximizer already on the master).
             place_devices: put the devices in place first (default, also with apply=false: the
                 plan needs the meters; at rest they do not change the sound): a LiveBridge
                 Channel at the end of every track that makes sound (it replaces a LiveBridge
@@ -1840,8 +1874,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("unknown genre; use one of " + ", ".join(mix.GENRES), cmd=cmd)
         if not 3 <= seconds <= 20:
             return tool_error("seconds must be 3..20", cmd=cmd)
-        if master_chain not in ("native", "livebridge"):
-            return tool_error("master_chain must be 'native' or 'livebridge'", cmd=cmd)
+        if master_chain not in ("native", "livebridge", "plugin"):
+            return tool_error("master_chain must be 'native', 'livebridge' or 'plugin'",
+                              cmd=cmd)
         if strips not in ("set", "measure"):
             return tool_error("strips must be 'set' or 'measure'", cmd=cmd)
         measure_only = strips == "measure"

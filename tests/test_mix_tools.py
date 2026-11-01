@@ -94,6 +94,9 @@ class FakeEngines:
             params = {p.name: p.value for p in device.parameters}
             if device.class_name == "Limiter" and "Gain" in params:
                 return params["Gain"], params["Ceiling"]
+            if mix.plugin_limiter(device.name):                 # Pro-L 2 / Ozone Maximizer
+                spec = mix.plugin_limiter(device.name)
+                return params[spec["drive"]], params[spec["ceiling"]]
             if device.name == "LiveBridge Master":
                 if self.broken:
                     return 0.0, 0.0
@@ -1147,3 +1150,31 @@ def test_a_threshold_at_the_dial_end_keeps_its_hysteresis():
     assert mix.channel_plan("lead", reading)["values"]["Comp Threshold"] == -0.8   # fresh
     plan = mix.channel_plan("lead", reading, previous)
     assert plan["values"]["Comp Threshold"] == 0.0                                 # kept
+
+
+@pytest.mark.parametrize("name, drive, ceiling, unit", [
+    ("Pro-L 2", "Gain", "Output Level", "dBTP"),
+    ("Ozone 12 Maximizer", "MAX: Input Gain", "MAX: Output Level", ""),
+])
+def test_master_auto_drives_the_users_own_plugin_limiter(app, song, mix_set, name, drive,
+                                                         ceiling, unit):
+    """chain='plugin': Pro-L 2 or the Ozone 12 Maximizer on the master, driven like Live's
+    Limiter — gain and ceiling set as plain numbers ("dBTP" or a display without unit)."""
+    assert call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                               "chain": "plugin"})["type"] == "not_found"
+    limiter = factory.add_device(song.master_track, name, "PluginDevice", params=[
+        {"name": drive, "value": 0.0, "min": 0.0, "max": 30.0, "unit": "dB"},
+        {"name": ceiling, "value": 0.0, "min": -30.0, "max": 0.0, "unit": unit}])
+    factory.add_device(song.master_track, "LiveBridge Engine", "MxDeviceAudioEffect")
+    result = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                 "chain": "plugin"})
+    assert result["applied"] and result["inserted"] == [], result
+    params = {p.name: p.value for p in limiter.parameters}
+    assert params[ceiling] == pytest.approx(-0.3, abs=0.05) and params[drive] > 0
+    assert result["after"]["lufs"] == pytest.approx(-8.0, abs=0.5) or "stopped" in result
+    assert any(name.split()[0] in m for m in result["manual"])           # true peak etc.
+    assert not any(d.class_name == "Limiter" for d in song.master_track.devices)
+    # a rerun resets its gain for 'before' like LiveBridge's own chain
+    again = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
+                                                "chain": "plugin"})
+    assert drive in again["reset"]

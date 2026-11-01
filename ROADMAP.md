@@ -89,6 +89,10 @@ The releases taught more than any rule of thumb. Turn that into the method:
 
 ### Then: the user's own plug-ins in LiveBridge's roles
 
+Started: the master limiter role drives FabFilter Pro-L 2 and the iZotope Ozone 12 Maximizer
+(`chain="plugin"`), and the parameter maps of Pro-Q 4, Pro-C 3 and Ozone 12 Equalizer are
+measured for the EQ and compressor roles that come next.
+
 Today a user can keep their own processing (`strips="measure"`) or drive any plug-in by hand. Next,
 the automatic steps drive the user's plug-ins too:
 
