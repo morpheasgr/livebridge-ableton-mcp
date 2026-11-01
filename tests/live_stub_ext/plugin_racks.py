@@ -103,6 +103,9 @@ def install(Live):
             self.library = library
             self.plugins = dict((k.upper(), v) for k, v in plugins.items())
             self.index_after = index_after
+            #: false: like Live on a Windows machine, the LiveBridge/Racks folder (created
+            #: while Live runs) is never indexed; the top of the User Library still is
+            self.racks_indexed = True
             self.seen = {}           # path -> listings since first seen
             self.loads = []
             self.listings = 0
@@ -112,10 +115,12 @@ def install(Live):
         def _racks_dir(self):
             return os.path.join(self.library, "LiveBridge", "Racks")
 
-        def _list_racks(self, parent):
+        def _list_racks(self, parent, folder=None, uri="query:UserLibrary#LiveBridge:Racks:"):
             self.listings += 1
             items = []
-            folder = self._racks_dir()
+            if folder is None and not self.racks_indexed:
+                return items
+            folder = folder or self._racks_dir()
             try:
                 names = sorted(os.listdir(folder))
             except OSError:
@@ -130,7 +135,7 @@ def install(Live):
                     continue
                 item = self._items.get(path)
                 if item is None:
-                    item = BrowserItem(name, uri="query:UserLibrary#LiveBridge:Racks:" + name,
+                    item = BrowserItem(name, uri=uri + name,
                                        is_loadable=True, load_kind="lb_rack")
                     item._lb_path = path
                     self._items[path] = item
@@ -194,6 +199,17 @@ def install(Live):
         folder = DynamicFolder("LiveBridge", "query:UserLibrary#LiveBridge",
                                controller._list_livebridge)
         root.add_child(folder)
+        base = type(root)
+
+        class LibraryRoot(base):
+            """The User Library's top level also lists the .adg files lying there."""
+
+            @property
+            def children(self):
+                static = list(base.children.fget(self))
+                return model.BrowserItemVector(static + controller._list_racks(
+                    self, folder=controller.library, uri="query:UserLibrary#"))
+        root.__class__ = LibraryRoot
         original = type(browser).load_item
 
         def load_item(self, item, /):

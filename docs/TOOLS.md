@@ -2164,7 +2164,7 @@ Get (or build once) a plug-in's name → VST3 ParameterId map — what live_plug
 | `filter` | str \| null | `null` |
 | `offset` | int | `0` |
 | `limit` | int | `50` |
-| `wait_seconds` | float | `240.0` |
+| `wait_seconds` | float | `30.0` |
 | `cancel` | bool | `false` |
 
 Bridge: `plugin_racks.map`

@@ -140,6 +140,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 break
             if _time.monotonic() >= deadline:
                 result["timed_out"] = True
+                result["next"] = "call again (same arguments) to continue"
                 return result
             await asyncio.sleep(_POLL_SECONDS)
         if editor_open is not None and result.get("device"):
@@ -161,7 +162,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         filter: str | None = None,
         offset: int = 0,
         limit: int = 50,
-        wait_seconds: float = 240.0,
+        wait_seconds: float = 30.0,
         cancel: bool = False,
     ) -> Any:
         """Get (or build once) a plug-in's name → VST3 ParameterId map — what
@@ -183,8 +184,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             filter: Name filter for the returned page ("cutoff", "osc b", "macro").
             offset: Page start.
             limit: Page size 1..1000.
-            wait_seconds: How long to keep probing (0..600); on timeout the probe keeps its
-                progress — call again to continue.
+            wait_seconds: How long this call keeps probing (0..600, default 30 — an MCP client
+                gives up on a call after about a minute, 240 timed out); the probe keeps its
+                progress — call again until status is "done". A probe stuck at "indexing" stops
+                after 45 s with an error that says what Live's browser shows.
             cancel: Abort a running probe and delete "LB_MAP".
 
         Returns:
@@ -222,6 +225,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             args["refresh"] = False     # continue the running probe, never restart it
             if _time.monotonic() >= deadline:
                 result["timed_out"] = True
+                result["next"] = "call again (same arguments) to continue"
                 return result
             if result.get("status") == "indexing":
                 await asyncio.sleep(_POLL_SECONDS)

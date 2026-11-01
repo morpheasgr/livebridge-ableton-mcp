@@ -461,8 +461,29 @@ def test_map_stops_waiting_when_live_never_indexes_the_rack(bridge, env, song, m
     assert first["status"] == "indexing" and first["file"].endswith("LB_probe_tinysynth_vst3.adg")
     clock[0] += handler.INDEX_TIMEOUT_S + 1
     stuck = fail(bridge, "plugin_racks.map", plugin="Tiny Synth")
-    assert stuck["type"] == "timeout" and "Location of User Library" in stuck["message"]
-    assert "LB_probe_tinysynth_vst3.adg" in stuck["message"]
+    assert stuck["type"] == "timeout" and "LB_probe_tinysynth_vst3.adg" in stuck["message"]
+    assert "on disk: yes" in stuck["message"]
+    # it says what Live's browser does show (here the folders, never the file)
+    assert "Live's browser shows" in stuck["message"], stuck["message"]
+
+
+def test_map_falls_back_to_the_library_top_when_racks_is_not_indexed(bridge, env, song,
+                                                                     monkeypatch):
+    """Live on Windows never indexed <User Library>/LiveBridge/Racks (made while Live runs):
+    after 10 s the probe also writes its rack to the top of the User Library and finishes."""
+    env.racks_indexed = False
+    clock = [1000.0]
+    monkeypatch.setattr(handler.time, "time", lambda: clock[0])
+    first = run(bridge, "plugin_racks.map", plugin="Tiny Synth")
+    assert first["status"] == "indexing", {k: first.get(k) for k in ("status", "source", "path")}
+    clock[0] += handler.ROOT_FALLBACK_S + 1
+    result = None
+    for _ in range(12):
+        result = run(bridge, "plugin_racks.map", plugin="Tiny Synth", max_seconds=30)
+        if result["status"] == "done":
+            break
+    assert (result["status"], result["count"]) == ("done", 160), result
+    assert not (env.library_path / "LB_probe_tinysynth_vst3.adg").exists()   # cleaned up
 
 
 def test_map_probes_an_unknown_plugin_and_caches_it(bridge, env, song):

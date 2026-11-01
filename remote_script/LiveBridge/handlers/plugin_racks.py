@@ -154,22 +154,37 @@ def load_param_map(identity, library):
     return data, source
 
 
-def _rack_item(ctx, file_name):
-    """The browser item of ``<User Library>/LiveBridge/Racks/<file_name>`` or None
-    (not indexed yet)."""
-    root = compat.safe_getattr(ctx.browser, "user_library")
+def _same_name(item_name, wanted):
+    """Browser item names compared loosely: any case, with or without ".adg" (what the
+    browser reports for a file may differ by platform)."""
+    def norm(text):
+        text = str(text or "").strip().lower()
+        return text[:-4] if text.endswith(".adg") else text
+    return norm(item_name) == norm(wanted)
+
+
+def _rack_item(ctx, file_name, in_root=False):
+    """The browser item of ``<User Library>/LiveBridge/Racks/<file_name>`` — or, with
+    ``in_root``, of the copy at the top of the User Library — or None (not indexed yet)."""
+    library_root = compat.safe_getattr(ctx.browser, "user_library")
+    root = library_root
     for folder_name in ("LiveBridge", "Racks"):
         found = None
         for child in browser_handlers.children_of(root):
-            if compat.safe_getattr(child, "name") == folder_name:
+            if _same_name(compat.safe_getattr(child, "name"), folder_name):
                 found = child
                 break
         if found is None:
-            return None
+            root = None
+            break
         root = found
-    for child in browser_handlers.children_of(root):
-        if compat.safe_getattr(child, "name") == file_name:
+    for child in browser_handlers.children_of(root) if root is not None else ():
+        if _same_name(compat.safe_getattr(child, "name"), file_name):
             return child
+    if in_root:
+        for child in browser_handlers.children_of(library_root):
+            if _same_name(compat.safe_getattr(child, "name"), file_name):
+                return child
     return None
 
 
@@ -269,13 +284,38 @@ def _load_rack(ctx, item, file_name, track, replace_index=None):
                       "'corrupt')" % (file_name, _name(track)))
 
 
+#: rack files that also go to the top of the User Library: Live on Windows did not index
+#: <User Library>/LiveBridge/Racks, a folder LiveBridge creates while Live runs (the probe
+#: said "indexing" for minutes); the top of the library is watched from Live's start
+_ROOT_COPY = set()
+#: seconds without indexing before the copy at the top of the library is written
+ROOT_FALLBACK_S = 10.0
+
+
 def _write_and_find(ctx, identity, library, file_name, xml):
     path = os.path.join(lib.racks_dir(library), file_name)
     try:
         lib.write_rack(path, xml)
     except OSError as error:
         raise BridgeError("invalid_state", "cannot write %s: %s" % (path, error))
-    return path, _rack_item(ctx, file_name)
+    waited = time.time() - _INDEX_WAIT.get(path, time.time())
+    if file_name in _ROOT_COPY or waited > ROOT_FALLBACK_S:
+        _ROOT_COPY.add(file_name)
+        try:
+            lib.write_rack(os.path.join(library, file_name), xml)
+        except OSError:
+            pass
+    return path, _rack_item(ctx, file_name, in_root=file_name in _ROOT_COPY)
+
+
+def _drop_root_copy(library, file_name):
+    """Remove the copy at the top of the User Library once the probe is done."""
+    if file_name in _ROOT_COPY:
+        _ROOT_COPY.discard(file_name)
+        try:
+            os.remove(os.path.join(library, file_name))
+        except OSError:
+            pass
 
 
 #: rack files written but not yet in Live's browser: path -> when we started waiting
@@ -284,19 +324,51 @@ _INDEX_WAIT = {}
 INDEX_TIMEOUT_S = 45.0
 
 
-def _indexing(file_path, answer):
+def _browser_view(ctx):
+    """What Live's browser shows under User Library > LiveBridge > Racks (for the timeout
+    report): ``(user library folders, LiveBridge shown, Racks shown, rack files shown)``."""
+    root = compat.safe_getattr(ctx.browser, "user_library")
+    top = [str(compat.safe_getattr(c, "name")) for c in browser_handlers.children_of(root)]
+    bridge = next((c for c in browser_handlers.children_of(root)
+                   if compat.safe_getattr(c, "name") == "LiveBridge"), None)
+    racks = next((c for c in browser_handlers.children_of(bridge)
+                  if compat.safe_getattr(c, "name") == "Racks"), None) if bridge else None
+    files = [str(compat.safe_getattr(c, "name")) for c in browser_handlers.children_of(racks)] \
+        if racks is not None else []
+    return top, bridge is not None, racks is not None, files
+
+
+def _indexing(ctx, file_path, answer):
     """``answer`` while Live indexes ``file_path`` — or a clear error once it has had
-    :data:`INDEX_TIMEOUT_S`: a file Live never indexes lies outside the User Library it
-    uses (a moved library, a second one), and the call would say "indexing" forever."""
+    :data:`INDEX_TIMEOUT_S`, saying what Live's browser does show: a file Live never
+    indexes lies outside the User Library it uses (a moved library, a second one) or in a
+    folder Live does not index yet, and the call would say "indexing" forever."""
     started = _INDEX_WAIT.setdefault(file_path, time.time())
     if time.time() - started > INDEX_TIMEOUT_S:
         _INDEX_WAIT.pop(file_path, None)
+        top, has_bridge, has_racks, files = _browser_view(ctx)
+        on_disk = os.path.isfile(file_path)
+        if not has_bridge:
+            seen = ("Live's browser shows no LiveBridge folder in the User Library (it shows: "
+                    "%s) — LiveBridge wrote into a folder Live does not use as its User "
+                    "Library: compare Preferences > Library > Location of User Library, and "
+                    "set LIVEBRIDGE_USER_LIBRARY to it" % (", ".join(top[:12]) or "nothing"))
+        elif not has_racks:
+            seen = ("Live's browser shows User Library > LiveBridge but no Racks folder in it — "
+                    "Live has not indexed the new folder: open User Library > LiveBridge in "
+                    "Live's browser and call again")
+        else:
+            seen = ("Live's browser shows User Library > LiveBridge > Racks with %d file(s) "
+                    "(%s) but not this one — Live is not picking up new files there: open that "
+                    "folder in Live's browser and call again" % (
+                        len(files), ", ".join(files[:6]) or "none"))
+        if os.path.basename(file_path) in _ROOT_COPY:
+            seen += (". A copy at the top of the User Library was not picked up either: Live "
+                     "is not indexing this User Library at all — restart Live, or check its "
+                     "location")
         raise BridgeError(
-            "timeout", "Live has not indexed %s after %d s. Check that this folder is inside "
-            "the User Library Live uses (Preferences > Library > Location of User Library; "
-            "a moved library: set LIVEBRIDGE_USER_LIBRARY to its folder), and look for "
-            "LiveBridge > Racks under User Library in Live's browser." % (
-                file_path, INDEX_TIMEOUT_S))
+            "timeout", "Live has not indexed %s after %d s (on disk: %s). %s." % (
+                file_path, INDEX_TIMEOUT_S, "yes" if on_disk else "NO", seen))
     return answer
 
 
@@ -484,6 +556,7 @@ def plugin_racks_map(ctx, plugin=None, track=None, device=None, plugin_format=No
     key = lib.map_key(identity)
     if cancel:
         _JOBS.pop(key, None)
+        _drop_root_copy(library, PROBE_FILE % key)
         _delete_map_track(ctx)
         return {"status": "cancelled", "plugin": identity.get("name")}
     job = _JOBS.get(key)
@@ -503,14 +576,23 @@ def plugin_racks_map(ctx, plugin=None, track=None, device=None, plugin_format=No
             if not ids:
                 data = _finish_job(ctx, job)
                 _JOBS.pop(key, None)
+                _drop_root_copy(library, job.file_name)
                 return _map_summary(data, "probed", filter, offset, limit)
             job.pending = ids
             xml = lib.rack_xml(identity, [{"id": pid} for pid in ids])
             rack_path, item = _write_and_find(ctx, identity, library, job.file_name, xml)
             if item is None:
-                return _indexing(rack_path, {
-                    "status": "indexing", "plugin": identity.get("name"), "file": rack_path,
-                    "note": "Live is indexing %s — call again in a second" % job.file_name})
+                try:
+                    return _indexing(ctx, rack_path, {
+                        "status": "indexing", "plugin": identity.get("name"),
+                        "file": rack_path,
+                        "note": "Live is indexing %s — call again in a second" % job.file_name})
+                except BridgeError:
+                    # given up: the next call starts a clean probe (after the user's fix)
+                    _JOBS.pop(key, None)
+                    _drop_root_copy(library, job.file_name)
+                    _delete_map_track(ctx)
+                    raise
             _indexed(rack_path)
             map_track = _map_track(ctx, identity)
             _clear_devices(map_track)
@@ -795,7 +877,7 @@ def plugin_racks_expose(ctx, track=None, plugin=None, parameters=None, macros=No
     file_name = EXPOSE_FILE % _file_safe(identity.get("name") or "plugin")
     file_path, item = _write_and_find(ctx, identity, library, file_name, xml)
     if item is None:
-        return _indexing(file_path, {
+        return _indexing(ctx, file_path, {
             "status": "indexing", "file": file_path,
             "note": "Live is indexing the new rack file — call again in a second"})
     _indexed(file_path)
