@@ -1178,3 +1178,67 @@ def test_master_auto_drives_the_users_own_plugin_limiter(app, song, mix_set, nam
     again = call_tool(app, "live_master_auto", {"destination": "club", "seconds": 3,
                                                 "chain": "plugin"})
     assert drive in again["reset"]
+
+
+def _pro_q4_rack(song):
+    """LiveBridge's own Pro-Q 4 instance as an earlier run left it: a rack on the master with
+    the band controls the EQ role exposes (Live shows choice parameters as value items)."""
+    rack = factory.add_rack(song.master_track, "LB Master EQ (Pro-Q 4)", kind="audio_effect",
+                            chains=1)
+    params = []
+    for n in (1, 2, 3):
+        params += [
+            {"name": f"Band {n} Used", "value": 0, "min": 0, "max": 1, "is_quantized": True,
+             "value_items": ("Unused", "Used")},
+            {"name": f"Band {n} Enabled", "value": 1, "min": 0, "max": 1, "is_quantized": True,
+             "value_items": ("Disabled", "Enabled")},
+            {"name": f"Band {n} Q", "value": 1.0, "min": 0.025, "max": 40.0},
+            {"name": f"Band {n} Frequency", "value": 1000.0, "min": 10.0, "max": 30000.0,
+             "unit": "Hz"},
+            {"name": f"Band {n} Gain", "value": 0.0, "min": -30.0, "max": 30.0, "unit": "dB"},
+            {"name": f"Band {n} Shape", "value": 0, "min": 0, "max": 3, "is_quantized": True,
+             "value_items": ("Bell", "Low Shelf", "High Shelf", "Notch")}]
+    plugin = factory.add_device(rack.chains[0], "Pro-Q 4", "PluginDevice", params=params)
+    return rack, plugin
+
+
+def test_master_band_fixes_go_on_the_users_eq_plugin(app, song, mix_set):
+    """eq_plugin="Pro-Q 4": the shared band fix is set on LiveBridge's own Pro-Q 4 instance
+    (band 2 a bell at the band, used and enabled), in front of the user's Pro-L 2."""
+    _rack, eq = _pro_q4_rack(song)
+    factory.add_device(song.master_track, "Pro-L 2", "PluginDevice", params=[
+        {"name": "Gain", "value": 0.0, "min": 0.0, "max": 30.0, "unit": "dB"},
+        {"name": "Output Level", "value": 0.0, "min": -30.0, "max": 0.0, "unit": "dBTP"}])
+    factory.add_device(song.master_track, "LiveBridge Engine", "MxDeviceAudioEffect")
+    assert call_tool(app, "live_master_auto", {"chain": "plugin", "eq_plugin": "Pro-Q 3"})[
+        "type"] == "bad_args"
+    result = call_tool(app, "live_master_auto", {
+        "destination": "club", "seconds": 3, "chain": "plugin", "eq_plugin": "Pro-Q 4",
+        "eq_bands": {"mid": 7.0, "high": -5.0}})
+    assert result["applied"], result
+    p = {q.name: q.value for q in eq.parameters}
+    assert p["Band 2 Used"] == 1 and p["Band 2 Gain"] == pytest.approx(-3.5)
+    assert p["Band 2 Frequency"] == pytest.approx(700.0, rel=0.01) and p["Band 2 Shape"] == 0
+    assert p["Band 3 Gain"] == pytest.approx(2.5) and p["Band 3 Shape"] == 2   # high shelf
+    assert p["Band 3 Frequency"] == pytest.approx(8000.0, rel=0.01)
+    assert p["Band 1 Used"] == 0                                         # no low fix asked
+    assert set(result["eq"]) == {"EQ Mid (Band 2 Gain)", "EQ High (Band 3 Gain)"}
+    # the rerun reads its own setting back: a smaller excess keeps the cut
+    again = call_tool(app, "live_master_auto", {
+        "destination": "club", "seconds": 3, "chain": "plugin", "eq_plugin": "Pro-Q 4",
+        "eq_bands": {"mid": 6.2}})
+    assert {q.name: q.value for q in eq.parameters}["Band 2 Gain"] == pytest.approx(-3.5)
+    assert "eq" not in again
+
+
+def test_master_eq_plugin_that_cannot_load_falls_back_to_advice(app, song, mix_set):
+    factory.add_device(song.master_track, "Pro-L 2", "PluginDevice", params=[
+        {"name": "Gain", "value": 0.0, "min": 0.0, "max": 30.0, "unit": "dB"},
+        {"name": "Output Level", "value": 0.0, "min": -30.0, "max": 0.0, "unit": "dBTP"}])
+    factory.add_device(song.master_track, "LiveBridge Engine", "MxDeviceAudioEffect")
+    result = call_tool(app, "live_master_auto", {
+        "destination": "club", "seconds": 3, "chain": "plugin",
+        "eq_plugin": "Ozone 12 Equalizer", "eq_bands": {"mid": 7.0}})
+    assert result["applied"] and "eq" not in result, result
+    assert any("Ozone 12 Equalizer could not be loaded" in n for n in result["notes"])
+    assert any(m.startswith("Master EQ") for m in result["manual"])

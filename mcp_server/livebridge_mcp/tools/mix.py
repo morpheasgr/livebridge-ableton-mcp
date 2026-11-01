@@ -1088,6 +1088,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         chain: str = "native",
         place_devices: bool = True,
         eq_bands: dict[str, float] | None = None,
+        eq_plugin: str | None = None,
     ) -> Any:
         """Master the song to a loudness target by measurement: uses (or builds) EQ Eight ->
         Glue Compressor -> Limiter (or the LiveBridge Master device, `chain="livebridge"`) on
@@ -1129,6 +1130,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 measured after that EQ, so a cut already as deep as the reading asks for
                 stays (a rerun does not deepen it); with the native chain they become advice
                 in `manual`.
+            eq_plugin: put those band fixes on your own EQ plug-in instead: "Pro-Q 4"
+                (FabFilter) or "Ozone 12 Equalizer" (iZotope). LiveBridge loads its own instance,
+                "LB Master EQ (...)", in front of the limiter (your own EQs stay untouched) and
+                reuses it on later runs — a low shelf, a bell at the band, a high shelf. Any
+                chain; with "livebridge" it replaces LiveBridge Master's EQ for the fixes.
 
         Returns:
             `{destination, target_lufs, ceiling_db, applied, chain, inserted, reset?,
@@ -1174,6 +1180,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("max_gain_db must be 0..24", cmd=cmd)
         if chain not in ("native", "livebridge", "plugin"):
             return tool_error("chain must be 'native', 'livebridge' or 'plugin'", cmd=cmd)
+        eq_spec = mix.plugin_eq(eq_plugin) if eq_plugin else None
+        if eq_plugin and eq_spec is None:
+            return tool_error("eq_plugin must be one of " + ", ".join(
+                v["plugin"] for v in mix.PLUGIN_EQS.values()), cmd=cmd)
         chain_kind = chain
         if (loud_bar is None) != (quiet_bar is None):
             return tool_error("pass both loud_bar and quiet_bar (or neither)", cmd=cmd)
@@ -1371,9 +1381,48 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     f"{b} {d:+g} dB" for b, d in eq_bands.items()) + ".")
             return result
 
-        def master_eq(index: int | None, bands: dict[str, float]) -> dict[str, str]:
+        def place_plugin_eq(spec: dict[str, Any], at: int) -> dict[str, Any] | None:
+            """LiveBridge's own instance of the EQ plug-in in front of the limiter (loaded with
+            its band controls exposed the first time, reused after): ``{kind, path, spec,
+            name}``, or None with a note when it cannot be loaded."""
+            name = f"LB Master EQ ({spec['short']})"
+
+            def placed() -> dict[str, Any] | None:
+                return next((d for d in chain() if d.get("name") == name), None)
+            found = placed()
+            if found is None:
+                args = {"track": "master", "plugin": spec["plugin"], "replace": False,
+                        "parameters": mix.plugin_eq_parameters(spec), "name": name,
+                        "editor_open": False}
+                end = time.time() + 30.0
+                while True:
+                    loaded = bridge_call(bridge, "plugin_racks.expose", args, timeout=60.0)
+                    if _is_error(loaded) or not isinstance(loaded, dict):
+                        notes.append(f"{spec['label']} could not be loaded for the band fixes "
+                                     f"({(loaded or {}).get('error')}): they come as advice.")
+                        return None
+                    if loaded.get("status") != "indexing" or time.time() > end:
+                        break
+                    time.sleep(1.0)
+                found = placed()
+                if found is None:
+                    notes.append(f"{name} did not appear on the master: band fixes as advice.")
+                    return None
+                if found.get("index") != at:
+                    bridge_call(bridge, "devices.move", {"track": "master",
+                                                         "device": found["index"],
+                                                         "position": at})
+                    found = placed() or found
+                notes.append(f"Loaded {name} in front of the limiter for the band fixes (your "
+                             "own EQs are untouched).")
+            return {"kind": "plugin", "spec": spec, "name": name,
+                    "path": f"song.master_track.devices[{found['index']}].chains[0].devices[0]"}
+
+        def master_eq(target: dict[str, Any] | None, bands: dict[str, float]
+                      ) -> dict[str, str]:
             """Half of each shared band excess (at most 4 dB, +-6 dB with what is there) on
-            LiveBridge Master's EQ; Live's chain gets the advice instead."""
+            LiveBridge Master's EQ or LiveBridge's own instance of an EQ plug-in; Live's chain
+            gets the advice instead."""
             wanted: dict[str, tuple[float, float | None]] = {}
             for band, delta in bands.items():
                 target_param = _MASTER_EQ_BANDS.get(str(band))
@@ -1385,16 +1434,32 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     wanted[param] = (float(delta), freq)
             if not wanted:
                 return {}
-            if index is None:
+            if target is None:
                 manual.append("Master EQ (EQ Eight): " + "; ".join(
                     f"{'cut' if d > 0 else 'boost'} {p.replace('EQ ', '').lower()}"
                     f"{f' around {f:g} Hz' if f else ''} about {min(abs(d) / 2, 4):.1f} dB"
                     for p, (d, f) in wanted.items()) + " (shared by many tracks).")
                 return {}
-            values: dict[str, str] = {}
+            spec = target.get("spec")
+
+            def gain_name(param: str) -> str:
+                return spec["gain"].format(n=spec["bands"][param]) if spec else param
+
+            def read(param: str) -> tuple[float | None, str | None]:
+                if spec is None:
+                    return read_param(target["index"], param)
+                got = bridge_call(bridge, "devices.get_parameter", {
+                    "track": "master", "device": target["path"], "parameter": gain_name(param)})
+                if isinstance(got, dict) and not _is_error(got):
+                    shown = str(got.get("display", ""))
+                    parsed = re.match(r"^\s*([+-]?\d+(?:\.\d+)?)", shown)
+                    return (float(parsed.group(1)) if parsed else None), shown
+                return None, None
+
+            settings: dict[str, tuple[float, float | None]] = {}
             was: dict[str, float] = {}
             for param, (delta, freq) in wanted.items():
-                current = read_param(index, param)[0] or 0.0
+                current = read(param)[0] or 0.0
                 setting = -math.copysign(min(abs(delta) / 2.0, 4.0), delta)
                 # the bands are measured after this EQ: a cut already in place that is as
                 # deep as the excess asks for stays (adding to it on every run walked an
@@ -1421,21 +1486,56 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 elif current:
                     setting = current + setting
                 was[param] = current
-                values[param] = db(max(-6.0, min(6.0, setting)))
-                if freq is not None:
-                    values["EQ Mid Freq"] = f"{freq:g} Hz"
-            if not values:
+                settings[param] = (max(-6.0, min(6.0, setting)), freq)
+            if not settings:
                 return {}
+            optional: dict[str, str] = {}
+            if spec is None:
+                values: dict[str, Any] = {}
+                for param, (gain, freq) in settings.items():
+                    values[param] = db(gain)
+                    if freq is not None:
+                        values["EQ Mid Freq"] = f"{freq:g} Hz"
+            else:
+                values = {}
+                db_text = (lambda v: f"{v:.1f} dB") if spec["units"] else \
+                    (lambda v: f"{v:.1f}")
+                hz_text = (lambda v: f"{v:g} Hz") if spec["units"] else (lambda v: f"{v:g}")
+                for param, (gain, freq) in settings.items():
+                    n = spec["bands"][param]
+                    for field in ("used", "enabled"):
+                        if spec.get(field):
+                            values[spec[field][0].format(n=n)] = spec[field][1]
+                    values[spec["gain"].format(n=n)] = db_text(gain)
+                    band_freq = freq if freq is not None else spec["freqs"].get(param)
+                    if band_freq is not None:
+                        values[spec["freq"].format(n=n)] = hz_text(band_freq)
+                    # the shape and Q: names of choices differ between versions — set
+                    # apart, so a refusal there leaves the band itself set
+                    if spec.get("shape") and param in spec["shapes"]:
+                        optional[spec["shape"].format(n=n)] = spec["shapes"][param]
+                    if spec.get("q") and param == "EQ Mid":
+                        optional[spec["q"][0].format(n=n)] = spec["q"][1]
+            device = target["path"] if spec else target["index"]
             answer = bridge_call(bridge, "devices.set_parameters",
-                                 {"track": "master", "device": index, "values": values})
+                                 {"track": "master", "device": device, "values": values})
             if _is_error(answer):
                 notes.append(f"master EQ not set: {answer.get('error')}")
                 return {}
+            if optional:
+                extra = bridge_call(bridge, "devices.set_parameters",
+                                    {"track": "master", "device": device, "values": optional})
+                if _is_error(extra):
+                    notes.append(f"{target.get('name')}: band shape/Q not set "
+                                 f"({extra.get('error')}): check the bands' shapes in its "
+                                 "window (low shelf, bell, high shelf).")
             done = {}
-            for param in values:
-                shown = read_param(index, param)[1]
-                done[param] = (f"{_fmt(was[param])} -> {shown}" if param in was else
-                               str(shown))
+            for param in settings:
+                shown = read(param)[1]
+                label = f"{param} ({gain_name(param)})" if spec else param
+                done[label] = (f"{_fmt(was[param])} -> {shown}" if param in was else str(shown))
+            if spec is None and any(f is not None for _g, f in settings.values()):
+                done["EQ Mid Freq"] = str(read_param(target["index"], "EQ Mid Freq")[1])
             return done
 
         def device_check(index: int, step: float, heard: float,
@@ -1535,6 +1635,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if limiter is None:
             return tool_error("no limiter on the master after inserting it", type="internal",
                               cmd=cmd)
+        eq_target: dict[str, Any] | None = None
+        if eq_spec is not None and eq_bands:
+            eq_target = place_plugin_eq(eq_spec, limiter["index"])
+            devices = chain()
+            result["chain"] = [d.get("name") for d in devices]
+            limiter = pick_limiter(devices)
         index = limiter["index"]
         steps: list[dict[str, Any]] = []
         # the Channel EQ's Low Cut is a fixed 80 Hz high-pass: on a master it takes the sub
@@ -1605,7 +1711,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 current = measure(None if loud_bar is None else loud_bar)
         # the master band fixes of live_mix_balance (shared by many tracks): on the device's EQ
         if eq_bands:
-            eq = master_eq(index if chain_kind == "livebridge" else None, eq_bands)
+            eq = master_eq(eq_target or ({"kind": "livebridge", "index": index}
+                                         if chain_kind == "livebridge" else None), eq_bands)
             if eq:
                 result["eq"] = eq
                 steps.append({"eq": eq})
@@ -1793,6 +1900,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         detail: str = "summary",
         section_bars: list[int] | None = None,
         strips: str = "set",
+        master_eq_plugin: str | None = None,
     ) -> Any:
         """Mix (and master) the song by measurement in one call — the devices it needs are put
         in place by the tool itself. On each track with a LiveBridge Channel (a channel
@@ -1823,6 +1931,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             master_chain: "livebridge" (default: the LiveBridge Master device before the
                 master's Engine), "native" (EQ Eight -> Glue Compressor -> Limiter) or
                 "plugin" (your own Pro-L 2 / Ozone 12 Maximizer already on the master).
+            master_eq_plugin: the master band fixes on LiveBridge's own instance of "Pro-Q 4"
+                or "Ozone 12 Equalizer" (see live_master_auto's eq_plugin) instead of
+                LiveBridge Master's EQ or advice.
             place_devices: put the devices in place first (default, also with apply=false: the
                 plan needs the meters; at rest they do not change the sound): a LiveBridge
                 Channel at the end of every track that makes sound (it replaces a LiveBridge
@@ -1879,6 +1990,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               cmd=cmd)
         if strips not in ("set", "measure"):
             return tool_error("strips must be 'set' or 'measure'", cmd=cmd)
+        if master_eq_plugin and mix.plugin_eq(master_eq_plugin) is None:
+            return tool_error("master_eq_plugin must be one of " + ", ".join(
+                v["plugin"] for v in mix.PLUGIN_EQS.values()), cmd=cmd)
         measure_only = strips == "measure"
         bad = [r for r in (roles or {}).values() if r not in mix.ROLES]
         if bad:
@@ -2185,7 +2299,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             result["master"] = live_master_auto(destination=master, genre=genre,
                                                 seconds=max(3.0, seconds),
                                                 chain=master_chain, apply=apply,
-                                                eq_bands=shared or None)
+                                                eq_bands=shared or None,
+                                                eq_plugin=master_eq_plugin)
         jobs.note("done")
         return result if detail == "full" else _summary(result)
 

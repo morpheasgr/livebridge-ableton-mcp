@@ -1,0 +1,2291 @@
+{
+ "plugin": "Pro-Q 4",
+ "vendor": "FabFilter",
+ "format": "VST3",
+ "class_id": "ED57BD725C60467EA64DD2F400758B6F",
+ "plugin_version": "4.1.0.0",
+ "source": "probed by plugin_racks.map on Live 12.4.16",
+ "created": "2026-11-01 14:50:05",
+ "count": 512,
+ "plugin_parameter_count": 737,
+ "missing": [
+  "Band 1 Side Chain Audition",
+  "Band 1 Spectral Enabled",
+  "Band 1 Solo",
+  "Band 2 Side Chain Audition",
+  "Band 2 Spectral Enabled",
+  "Band 2 Solo",
+  "Band 3 Side Chain Audition",
+  "Band 3 Spectral Enabled",
+  "Band 3 Solo",
+  "Band 4 Side Chain Audition",
+  "Band 4 Spectral Enabled",
+  "Band 4 Solo",
+  "Band 5 Side Chain Audition",
+  "Band 5 Spectral Enabled",
+  "Band 5 Solo",
+  "Band 6 Side Chain Audition",
+  "Band 6 Spectral Enabled",
+  "Band 6 Solo",
+  "Band 7 Side Chain Audition",
+  "Band 7 Spectral Enabled",
+  "Band 7 Solo",
+  "Band 8 Side Chain Audition",
+  "Band 8 Spectral Enabled",
+  "Band 8 Solo",
+  "Band 9 Side Chain Audition",
+  "Band 9 Spectral Enabled",
+  "Band 9 Solo",
+  "Band 10 Side Chain Audition",
+  "Band 10 Spectral Enabled",
+  "Band 10 Solo",
+  "Band 11 Side Chain Audition",
+  "Band 11 Spectral Enabled",
+  "Band 11 Solo",
+  "Band 12 Side Chain Audition",
+  "Band 12 Spectral Enabled",
+  "Band 12 Solo",
+  "Band 13 Side Chain Audition",
+  "Band 13 Spectral Enabled",
+  "Band 13 Solo",
+  "Band 14 Side Chain Audition",
+  "Band 14 Spectral Enabled",
+  "Band 14 Solo",
+  "Band 15 Side Chain Audition",
+  "Band 15 Spectral Enabled",
+  "Band 15 Solo",
+  "Band 16 Side Chain Audition",
+  "Band 16 Spectral Enabled",
+  "Band 16 Solo",
+  "Band 17 Side Chain Audition",
+  "Band 17 Spectral Enabled",
+  "Band 17 Solo",
+  "Band 18 Side Chain Audition",
+  "Band 18 Spectral Enabled",
+  "Band 18 Solo",
+  "Band 19 Side Chain Audition",
+  "Band 19 Spectral Enabled",
+  "Band 19 Solo",
+  "Band 20 Side Chain Audition",
+  "Band 20 Spectral Enabled",
+  "Band 20 Solo",
+  "Band 21 Side Chain Audition",
+  "Band 21 Spectral Enabled",
+  "Band 21 Solo",
+  "Band 22 Side Chain Audition",
+  "Band 22 Spectral Enabled",
+  "Band 22 Solo",
+  "Band 23 Side Chain Audition",
+  "Band 23 Spectral Enabled",
+  "Band 23 Solo",
+  "Band 24 Side Chain Audition",
+  "Band 24 Spectral Enabled",
+  "Band 24 Solo",
+  "Processing Mode",
+  "Processing Resolution",
+  "Character",
+  "Analyzer Show Pre-Processing",
+  "Analyzer Show Post-Processing",
+  "Analyzer Show External Spectrum",
+  "Analyzer External Spectrum",
+  "Analyzer Range",
+  "Analyzer Resolution",
+  "Analyzer Speed",
+  "Analyzer Tilt",
+  "Analyzer Freeze",
+  "Analyzer Show Collisions",
+  "Spectrum Grab",
+  "Display Range",
+  "Solo Gain",
+  "Host Bypass",
+  "Internal",
+  "Internal",
+  "Internal",
+  "MIDI CC",
+  "Pitch Bend",
+  "Channel Pressure",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "Internal"
+ ],
+ "probed": 788,
+ "loads": 43,
+ "seconds": 15.4,
+ "parameters": [
+  [
+   "Band 1 Used",
+   0
+  ],
+  [
+   "Band 1 Enabled",
+   1
+  ],
+  [
+   "Band 1 Frequency",
+   2
+  ],
+  [
+   "Band 1 Gain",
+   3
+  ],
+  [
+   "Band 1 Q",
+   4
+  ],
+  [
+   "Band 1 Shape",
+   5
+  ],
+  [
+   "Band 1 Slope",
+   6
+  ],
+  [
+   "Band 1 Stereo Placement",
+   7
+  ],
+  [
+   "Band 1 Speakers",
+   8
+  ],
+  [
+   "Band 1 Dynamic Range",
+   9
+  ],
+  [
+   "Band 1 Dynamics Enabled",
+   10
+  ],
+  [
+   "Band 1 Dynamics Auto",
+   11
+  ],
+  [
+   "Band 1 Threshold",
+   12
+  ],
+  [
+   "Band 1 Attack",
+   13
+  ],
+  [
+   "Band 1 Release",
+   14
+  ],
+  [
+   "Band 1 External Side Chain",
+   15
+  ],
+  [
+   "Band 1 Side Chain Filtering",
+   16
+  ],
+  [
+   "Band 1 Side Chain Low Frequency",
+   17
+  ],
+  [
+   "Band 1 Side Chain High Frequency",
+   18
+  ],
+  [
+   "Band 1 Spectral Density",
+   21
+  ],
+  [
+   "Band 2 Used",
+   23
+  ],
+  [
+   "Band 2 Enabled",
+   24
+  ],
+  [
+   "Band 2 Frequency",
+   25
+  ],
+  [
+   "Band 2 Gain",
+   26
+  ],
+  [
+   "Band 2 Q",
+   27
+  ],
+  [
+   "Band 2 Shape",
+   28
+  ],
+  [
+   "Band 2 Slope",
+   29
+  ],
+  [
+   "Band 2 Stereo Placement",
+   30
+  ],
+  [
+   "Band 2 Speakers",
+   31
+  ],
+  [
+   "Band 2 Dynamic Range",
+   32
+  ],
+  [
+   "Band 2 Dynamics Enabled",
+   33
+  ],
+  [
+   "Band 2 Dynamics Auto",
+   34
+  ],
+  [
+   "Band 2 Threshold",
+   35
+  ],
+  [
+   "Band 2 Attack",
+   36
+  ],
+  [
+   "Band 2 Release",
+   37
+  ],
+  [
+   "Band 2 External Side Chain",
+   38
+  ],
+  [
+   "Band 2 Side Chain Filtering",
+   39
+  ],
+  [
+   "Band 2 Side Chain Low Frequency",
+   40
+  ],
+  [
+   "Band 2 Side Chain High Frequency",
+   41
+  ],
+  [
+   "Band 2 Spectral Density",
+   44
+  ],
+  [
+   "Band 3 Used",
+   46
+  ],
+  [
+   "Band 3 Enabled",
+   47
+  ],
+  [
+   "Band 3 Frequency",
+   48
+  ],
+  [
+   "Band 3 Gain",
+   49
+  ],
+  [
+   "Band 3 Q",
+   50
+  ],
+  [
+   "Band 3 Shape",
+   51
+  ],
+  [
+   "Band 3 Slope",
+   52
+  ],
+  [
+   "Band 3 Stereo Placement",
+   53
+  ],
+  [
+   "Band 3 Speakers",
+   54
+  ],
+  [
+   "Band 3 Dynamic Range",
+   55
+  ],
+  [
+   "Band 3 Dynamics Enabled",
+   56
+  ],
+  [
+   "Band 3 Dynamics Auto",
+   57
+  ],
+  [
+   "Band 3 Threshold",
+   58
+  ],
+  [
+   "Band 3 Attack",
+   59
+  ],
+  [
+   "Band 3 Release",
+   60
+  ],
+  [
+   "Band 3 External Side Chain",
+   61
+  ],
+  [
+   "Band 3 Side Chain Filtering",
+   62
+  ],
+  [
+   "Band 3 Side Chain Low Frequency",
+   63
+  ],
+  [
+   "Band 3 Side Chain High Frequency",
+   64
+  ],
+  [
+   "Band 3 Spectral Density",
+   67
+  ],
+  [
+   "Band 4 Used",
+   69
+  ],
+  [
+   "Band 4 Enabled",
+   70
+  ],
+  [
+   "Band 4 Frequency",
+   71
+  ],
+  [
+   "Band 4 Gain",
+   72
+  ],
+  [
+   "Band 4 Q",
+   73
+  ],
+  [
+   "Band 4 Shape",
+   74
+  ],
+  [
+   "Band 4 Slope",
+   75
+  ],
+  [
+   "Band 4 Stereo Placement",
+   76
+  ],
+  [
+   "Band 4 Speakers",
+   77
+  ],
+  [
+   "Band 4 Dynamic Range",
+   78
+  ],
+  [
+   "Band 4 Dynamics Enabled",
+   79
+  ],
+  [
+   "Band 4 Dynamics Auto",
+   80
+  ],
+  [
+   "Band 4 Threshold",
+   81
+  ],
+  [
+   "Band 4 Attack",
+   82
+  ],
+  [
+   "Band 4 Release",
+   83
+  ],
+  [
+   "Band 4 External Side Chain",
+   84
+  ],
+  [
+   "Band 4 Side Chain Filtering",
+   85
+  ],
+  [
+   "Band 4 Side Chain Low Frequency",
+   86
+  ],
+  [
+   "Band 4 Side Chain High Frequency",
+   87
+  ],
+  [
+   "Band 4 Spectral Density",
+   90
+  ],
+  [
+   "Band 5 Used",
+   92
+  ],
+  [
+   "Band 5 Enabled",
+   93
+  ],
+  [
+   "Band 5 Frequency",
+   94
+  ],
+  [
+   "Band 5 Gain",
+   95
+  ],
+  [
+   "Band 5 Q",
+   96
+  ],
+  [
+   "Band 5 Shape",
+   97
+  ],
+  [
+   "Band 5 Slope",
+   98
+  ],
+  [
+   "Band 5 Stereo Placement",
+   99
+  ],
+  [
+   "Band 5 Speakers",
+   100
+  ],
+  [
+   "Band 5 Dynamic Range",
+   101
+  ],
+  [
+   "Band 5 Dynamics Enabled",
+   102
+  ],
+  [
+   "Band 5 Dynamics Auto",
+   103
+  ],
+  [
+   "Band 5 Threshold",
+   104
+  ],
+  [
+   "Band 5 Attack",
+   105
+  ],
+  [
+   "Band 5 Release",
+   106
+  ],
+  [
+   "Band 5 External Side Chain",
+   107
+  ],
+  [
+   "Band 5 Side Chain Filtering",
+   108
+  ],
+  [
+   "Band 5 Side Chain Low Frequency",
+   109
+  ],
+  [
+   "Band 5 Side Chain High Frequency",
+   110
+  ],
+  [
+   "Band 5 Spectral Density",
+   113
+  ],
+  [
+   "Band 6 Used",
+   115
+  ],
+  [
+   "Band 6 Enabled",
+   116
+  ],
+  [
+   "Band 6 Frequency",
+   117
+  ],
+  [
+   "Band 6 Gain",
+   118
+  ],
+  [
+   "Band 6 Q",
+   119
+  ],
+  [
+   "Band 6 Shape",
+   120
+  ],
+  [
+   "Band 6 Slope",
+   121
+  ],
+  [
+   "Band 6 Stereo Placement",
+   122
+  ],
+  [
+   "Band 6 Speakers",
+   123
+  ],
+  [
+   "Band 6 Dynamic Range",
+   124
+  ],
+  [
+   "Band 6 Dynamics Enabled",
+   125
+  ],
+  [
+   "Band 6 Dynamics Auto",
+   126
+  ],
+  [
+   "Band 6 Threshold",
+   127
+  ],
+  [
+   "Band 6 Attack",
+   128
+  ],
+  [
+   "Band 6 Release",
+   129
+  ],
+  [
+   "Band 6 External Side Chain",
+   130
+  ],
+  [
+   "Band 6 Side Chain Filtering",
+   131
+  ],
+  [
+   "Band 6 Side Chain Low Frequency",
+   132
+  ],
+  [
+   "Band 6 Side Chain High Frequency",
+   133
+  ],
+  [
+   "Band 6 Spectral Density",
+   136
+  ],
+  [
+   "Band 7 Used",
+   138
+  ],
+  [
+   "Band 7 Enabled",
+   139
+  ],
+  [
+   "Band 7 Frequency",
+   140
+  ],
+  [
+   "Band 7 Gain",
+   141
+  ],
+  [
+   "Band 7 Q",
+   142
+  ],
+  [
+   "Band 7 Shape",
+   143
+  ],
+  [
+   "Band 7 Slope",
+   144
+  ],
+  [
+   "Band 7 Stereo Placement",
+   145
+  ],
+  [
+   "Band 7 Speakers",
+   146
+  ],
+  [
+   "Band 7 Dynamic Range",
+   147
+  ],
+  [
+   "Band 7 Dynamics Enabled",
+   148
+  ],
+  [
+   "Band 7 Dynamics Auto",
+   149
+  ],
+  [
+   "Band 7 Threshold",
+   150
+  ],
+  [
+   "Band 7 Attack",
+   151
+  ],
+  [
+   "Band 7 Release",
+   152
+  ],
+  [
+   "Band 7 External Side Chain",
+   153
+  ],
+  [
+   "Band 7 Side Chain Filtering",
+   154
+  ],
+  [
+   "Band 7 Side Chain Low Frequency",
+   155
+  ],
+  [
+   "Band 7 Side Chain High Frequency",
+   156
+  ],
+  [
+   "Band 7 Spectral Density",
+   159
+  ],
+  [
+   "Band 8 Used",
+   161
+  ],
+  [
+   "Band 8 Enabled",
+   162
+  ],
+  [
+   "Band 8 Frequency",
+   163
+  ],
+  [
+   "Band 8 Gain",
+   164
+  ],
+  [
+   "Band 8 Q",
+   165
+  ],
+  [
+   "Band 8 Shape",
+   166
+  ],
+  [
+   "Band 8 Slope",
+   167
+  ],
+  [
+   "Band 8 Stereo Placement",
+   168
+  ],
+  [
+   "Band 8 Speakers",
+   169
+  ],
+  [
+   "Band 8 Dynamic Range",
+   170
+  ],
+  [
+   "Band 8 Dynamics Enabled",
+   171
+  ],
+  [
+   "Band 8 Dynamics Auto",
+   172
+  ],
+  [
+   "Band 8 Threshold",
+   173
+  ],
+  [
+   "Band 8 Attack",
+   174
+  ],
+  [
+   "Band 8 Release",
+   175
+  ],
+  [
+   "Band 8 External Side Chain",
+   176
+  ],
+  [
+   "Band 8 Side Chain Filtering",
+   177
+  ],
+  [
+   "Band 8 Side Chain Low Frequency",
+   178
+  ],
+  [
+   "Band 8 Side Chain High Frequency",
+   179
+  ],
+  [
+   "Band 8 Spectral Density",
+   182
+  ],
+  [
+   "Band 9 Used",
+   184
+  ],
+  [
+   "Band 9 Enabled",
+   185
+  ],
+  [
+   "Band 9 Frequency",
+   186
+  ],
+  [
+   "Band 9 Gain",
+   187
+  ],
+  [
+   "Band 9 Q",
+   188
+  ],
+  [
+   "Band 9 Shape",
+   189
+  ],
+  [
+   "Band 9 Slope",
+   190
+  ],
+  [
+   "Band 9 Stereo Placement",
+   191
+  ],
+  [
+   "Band 9 Speakers",
+   192
+  ],
+  [
+   "Band 9 Dynamic Range",
+   193
+  ],
+  [
+   "Band 9 Dynamics Enabled",
+   194
+  ],
+  [
+   "Band 9 Dynamics Auto",
+   195
+  ],
+  [
+   "Band 9 Threshold",
+   196
+  ],
+  [
+   "Band 9 Attack",
+   197
+  ],
+  [
+   "Band 9 Release",
+   198
+  ],
+  [
+   "Band 9 External Side Chain",
+   199
+  ],
+  [
+   "Band 9 Side Chain Filtering",
+   200
+  ],
+  [
+   "Band 9 Side Chain Low Frequency",
+   201
+  ],
+  [
+   "Band 9 Side Chain High Frequency",
+   202
+  ],
+  [
+   "Band 9 Spectral Density",
+   205
+  ],
+  [
+   "Band 10 Used",
+   207
+  ],
+  [
+   "Band 10 Enabled",
+   208
+  ],
+  [
+   "Band 10 Frequency",
+   209
+  ],
+  [
+   "Band 10 Gain",
+   210
+  ],
+  [
+   "Band 10 Q",
+   211
+  ],
+  [
+   "Band 10 Shape",
+   212
+  ],
+  [
+   "Band 10 Slope",
+   213
+  ],
+  [
+   "Band 10 Stereo Placement",
+   214
+  ],
+  [
+   "Band 10 Speakers",
+   215
+  ],
+  [
+   "Band 10 Dynamic Range",
+   216
+  ],
+  [
+   "Band 10 Dynamics Enabled",
+   217
+  ],
+  [
+   "Band 10 Dynamics Auto",
+   218
+  ],
+  [
+   "Band 10 Threshold",
+   219
+  ],
+  [
+   "Band 10 Attack",
+   220
+  ],
+  [
+   "Band 10 Release",
+   221
+  ],
+  [
+   "Band 10 External Side Chain",
+   222
+  ],
+  [
+   "Band 10 Side Chain Filtering",
+   223
+  ],
+  [
+   "Band 10 Side Chain Low Frequency",
+   224
+  ],
+  [
+   "Band 10 Side Chain High Frequency",
+   225
+  ],
+  [
+   "Band 10 Spectral Density",
+   228
+  ],
+  [
+   "Band 11 Used",
+   230
+  ],
+  [
+   "Band 11 Enabled",
+   231
+  ],
+  [
+   "Band 11 Frequency",
+   232
+  ],
+  [
+   "Band 11 Gain",
+   233
+  ],
+  [
+   "Band 11 Q",
+   234
+  ],
+  [
+   "Band 11 Shape",
+   235
+  ],
+  [
+   "Band 11 Slope",
+   236
+  ],
+  [
+   "Band 11 Stereo Placement",
+   237
+  ],
+  [
+   "Band 11 Speakers",
+   238
+  ],
+  [
+   "Band 11 Dynamic Range",
+   239
+  ],
+  [
+   "Band 11 Dynamics Enabled",
+   240
+  ],
+  [
+   "Band 11 Dynamics Auto",
+   241
+  ],
+  [
+   "Band 11 Threshold",
+   242
+  ],
+  [
+   "Band 11 Attack",
+   243
+  ],
+  [
+   "Band 11 Release",
+   244
+  ],
+  [
+   "Band 11 External Side Chain",
+   245
+  ],
+  [
+   "Band 11 Side Chain Filtering",
+   246
+  ],
+  [
+   "Band 11 Side Chain Low Frequency",
+   247
+  ],
+  [
+   "Band 11 Side Chain High Frequency",
+   248
+  ],
+  [
+   "Band 11 Spectral Density",
+   251
+  ],
+  [
+   "Band 12 Used",
+   253
+  ],
+  [
+   "Band 12 Enabled",
+   254
+  ],
+  [
+   "Band 12 Frequency",
+   255
+  ],
+  [
+   "Band 12 Gain",
+   256
+  ],
+  [
+   "Band 12 Q",
+   257
+  ],
+  [
+   "Band 12 Shape",
+   258
+  ],
+  [
+   "Band 12 Slope",
+   259
+  ],
+  [
+   "Band 12 Stereo Placement",
+   260
+  ],
+  [
+   "Band 12 Speakers",
+   261
+  ],
+  [
+   "Band 12 Dynamic Range",
+   262
+  ],
+  [
+   "Band 12 Dynamics Enabled",
+   263
+  ],
+  [
+   "Band 12 Dynamics Auto",
+   264
+  ],
+  [
+   "Band 12 Threshold",
+   265
+  ],
+  [
+   "Band 12 Attack",
+   266
+  ],
+  [
+   "Band 12 Release",
+   267
+  ],
+  [
+   "Band 12 External Side Chain",
+   268
+  ],
+  [
+   "Band 12 Side Chain Filtering",
+   269
+  ],
+  [
+   "Band 12 Side Chain Low Frequency",
+   270
+  ],
+  [
+   "Band 12 Side Chain High Frequency",
+   271
+  ],
+  [
+   "Band 12 Spectral Density",
+   274
+  ],
+  [
+   "Band 13 Used",
+   276
+  ],
+  [
+   "Band 13 Enabled",
+   277
+  ],
+  [
+   "Band 13 Frequency",
+   278
+  ],
+  [
+   "Band 13 Gain",
+   279
+  ],
+  [
+   "Band 13 Q",
+   280
+  ],
+  [
+   "Band 13 Shape",
+   281
+  ],
+  [
+   "Band 13 Slope",
+   282
+  ],
+  [
+   "Band 13 Stereo Placement",
+   283
+  ],
+  [
+   "Band 13 Speakers",
+   284
+  ],
+  [
+   "Band 13 Dynamic Range",
+   285
+  ],
+  [
+   "Band 13 Dynamics Enabled",
+   286
+  ],
+  [
+   "Band 13 Dynamics Auto",
+   287
+  ],
+  [
+   "Band 13 Threshold",
+   288
+  ],
+  [
+   "Band 13 Attack",
+   289
+  ],
+  [
+   "Band 13 Release",
+   290
+  ],
+  [
+   "Band 13 External Side Chain",
+   291
+  ],
+  [
+   "Band 13 Side Chain Filtering",
+   292
+  ],
+  [
+   "Band 13 Side Chain Low Frequency",
+   293
+  ],
+  [
+   "Band 13 Side Chain High Frequency",
+   294
+  ],
+  [
+   "Band 13 Spectral Density",
+   297
+  ],
+  [
+   "Band 14 Used",
+   299
+  ],
+  [
+   "Band 14 Enabled",
+   300
+  ],
+  [
+   "Band 14 Frequency",
+   301
+  ],
+  [
+   "Band 14 Gain",
+   302
+  ],
+  [
+   "Band 14 Q",
+   303
+  ],
+  [
+   "Band 14 Shape",
+   304
+  ],
+  [
+   "Band 14 Slope",
+   305
+  ],
+  [
+   "Band 14 Stereo Placement",
+   306
+  ],
+  [
+   "Band 14 Speakers",
+   307
+  ],
+  [
+   "Band 14 Dynamic Range",
+   308
+  ],
+  [
+   "Band 14 Dynamics Enabled",
+   309
+  ],
+  [
+   "Band 14 Dynamics Auto",
+   310
+  ],
+  [
+   "Band 14 Threshold",
+   311
+  ],
+  [
+   "Band 14 Attack",
+   312
+  ],
+  [
+   "Band 14 Release",
+   313
+  ],
+  [
+   "Band 14 External Side Chain",
+   314
+  ],
+  [
+   "Band 14 Side Chain Filtering",
+   315
+  ],
+  [
+   "Band 14 Side Chain Low Frequency",
+   316
+  ],
+  [
+   "Band 14 Side Chain High Frequency",
+   317
+  ],
+  [
+   "Band 14 Spectral Density",
+   320
+  ],
+  [
+   "Band 15 Used",
+   322
+  ],
+  [
+   "Band 15 Enabled",
+   323
+  ],
+  [
+   "Band 15 Frequency",
+   324
+  ],
+  [
+   "Band 15 Gain",
+   325
+  ],
+  [
+   "Band 15 Q",
+   326
+  ],
+  [
+   "Band 15 Shape",
+   327
+  ],
+  [
+   "Band 15 Slope",
+   328
+  ],
+  [
+   "Band 15 Stereo Placement",
+   329
+  ],
+  [
+   "Band 15 Speakers",
+   330
+  ],
+  [
+   "Band 15 Dynamic Range",
+   331
+  ],
+  [
+   "Band 15 Dynamics Enabled",
+   332
+  ],
+  [
+   "Band 15 Dynamics Auto",
+   333
+  ],
+  [
+   "Band 15 Threshold",
+   334
+  ],
+  [
+   "Band 15 Attack",
+   335
+  ],
+  [
+   "Band 15 Release",
+   336
+  ],
+  [
+   "Band 15 External Side Chain",
+   337
+  ],
+  [
+   "Band 15 Side Chain Filtering",
+   338
+  ],
+  [
+   "Band 15 Side Chain Low Frequency",
+   339
+  ],
+  [
+   "Band 15 Side Chain High Frequency",
+   340
+  ],
+  [
+   "Band 15 Spectral Density",
+   343
+  ],
+  [
+   "Band 16 Used",
+   345
+  ],
+  [
+   "Band 16 Enabled",
+   346
+  ],
+  [
+   "Band 16 Frequency",
+   347
+  ],
+  [
+   "Band 16 Gain",
+   348
+  ],
+  [
+   "Band 16 Q",
+   349
+  ],
+  [
+   "Band 16 Shape",
+   350
+  ],
+  [
+   "Band 16 Slope",
+   351
+  ],
+  [
+   "Band 16 Stereo Placement",
+   352
+  ],
+  [
+   "Band 16 Speakers",
+   353
+  ],
+  [
+   "Band 16 Dynamic Range",
+   354
+  ],
+  [
+   "Band 16 Dynamics Enabled",
+   355
+  ],
+  [
+   "Band 16 Dynamics Auto",
+   356
+  ],
+  [
+   "Band 16 Threshold",
+   357
+  ],
+  [
+   "Band 16 Attack",
+   358
+  ],
+  [
+   "Band 16 Release",
+   359
+  ],
+  [
+   "Band 16 External Side Chain",
+   360
+  ],
+  [
+   "Band 16 Side Chain Filtering",
+   361
+  ],
+  [
+   "Band 16 Side Chain Low Frequency",
+   362
+  ],
+  [
+   "Band 16 Side Chain High Frequency",
+   363
+  ],
+  [
+   "Band 16 Spectral Density",
+   366
+  ],
+  [
+   "Band 17 Used",
+   368
+  ],
+  [
+   "Band 17 Enabled",
+   369
+  ],
+  [
+   "Band 17 Frequency",
+   370
+  ],
+  [
+   "Band 17 Gain",
+   371
+  ],
+  [
+   "Band 17 Q",
+   372
+  ],
+  [
+   "Band 17 Shape",
+   373
+  ],
+  [
+   "Band 17 Slope",
+   374
+  ],
+  [
+   "Band 17 Stereo Placement",
+   375
+  ],
+  [
+   "Band 17 Speakers",
+   376
+  ],
+  [
+   "Band 17 Dynamic Range",
+   377
+  ],
+  [
+   "Band 17 Dynamics Enabled",
+   378
+  ],
+  [
+   "Band 17 Dynamics Auto",
+   379
+  ],
+  [
+   "Band 17 Threshold",
+   380
+  ],
+  [
+   "Band 17 Attack",
+   381
+  ],
+  [
+   "Band 17 Release",
+   382
+  ],
+  [
+   "Band 17 External Side Chain",
+   383
+  ],
+  [
+   "Band 17 Side Chain Filtering",
+   384
+  ],
+  [
+   "Band 17 Side Chain Low Frequency",
+   385
+  ],
+  [
+   "Band 17 Side Chain High Frequency",
+   386
+  ],
+  [
+   "Band 17 Spectral Density",
+   389
+  ],
+  [
+   "Band 18 Used",
+   391
+  ],
+  [
+   "Band 18 Enabled",
+   392
+  ],
+  [
+   "Band 18 Frequency",
+   393
+  ],
+  [
+   "Band 18 Gain",
+   394
+  ],
+  [
+   "Band 18 Q",
+   395
+  ],
+  [
+   "Band 18 Shape",
+   396
+  ],
+  [
+   "Band 18 Slope",
+   397
+  ],
+  [
+   "Band 18 Stereo Placement",
+   398
+  ],
+  [
+   "Band 18 Speakers",
+   399
+  ],
+  [
+   "Band 18 Dynamic Range",
+   400
+  ],
+  [
+   "Band 18 Dynamics Enabled",
+   401
+  ],
+  [
+   "Band 18 Dynamics Auto",
+   402
+  ],
+  [
+   "Band 18 Threshold",
+   403
+  ],
+  [
+   "Band 18 Attack",
+   404
+  ],
+  [
+   "Band 18 Release",
+   405
+  ],
+  [
+   "Band 18 External Side Chain",
+   406
+  ],
+  [
+   "Band 18 Side Chain Filtering",
+   407
+  ],
+  [
+   "Band 18 Side Chain Low Frequency",
+   408
+  ],
+  [
+   "Band 18 Side Chain High Frequency",
+   409
+  ],
+  [
+   "Band 18 Spectral Density",
+   412
+  ],
+  [
+   "Band 19 Used",
+   414
+  ],
+  [
+   "Band 19 Enabled",
+   415
+  ],
+  [
+   "Band 19 Frequency",
+   416
+  ],
+  [
+   "Band 19 Gain",
+   417
+  ],
+  [
+   "Band 19 Q",
+   418
+  ],
+  [
+   "Band 19 Shape",
+   419
+  ],
+  [
+   "Band 19 Slope",
+   420
+  ],
+  [
+   "Band 19 Stereo Placement",
+   421
+  ],
+  [
+   "Band 19 Speakers",
+   422
+  ],
+  [
+   "Band 19 Dynamic Range",
+   423
+  ],
+  [
+   "Band 19 Dynamics Enabled",
+   424
+  ],
+  [
+   "Band 19 Dynamics Auto",
+   425
+  ],
+  [
+   "Band 19 Threshold",
+   426
+  ],
+  [
+   "Band 19 Attack",
+   427
+  ],
+  [
+   "Band 19 Release",
+   428
+  ],
+  [
+   "Band 19 External Side Chain",
+   429
+  ],
+  [
+   "Band 19 Side Chain Filtering",
+   430
+  ],
+  [
+   "Band 19 Side Chain Low Frequency",
+   431
+  ],
+  [
+   "Band 19 Side Chain High Frequency",
+   432
+  ],
+  [
+   "Band 19 Spectral Density",
+   435
+  ],
+  [
+   "Band 20 Used",
+   437
+  ],
+  [
+   "Band 20 Enabled",
+   438
+  ],
+  [
+   "Band 20 Frequency",
+   439
+  ],
+  [
+   "Band 20 Gain",
+   440
+  ],
+  [
+   "Band 20 Q",
+   441
+  ],
+  [
+   "Band 20 Shape",
+   442
+  ],
+  [
+   "Band 20 Slope",
+   443
+  ],
+  [
+   "Band 20 Stereo Placement",
+   444
+  ],
+  [
+   "Band 20 Speakers",
+   445
+  ],
+  [
+   "Band 20 Dynamic Range",
+   446
+  ],
+  [
+   "Band 20 Dynamics Enabled",
+   447
+  ],
+  [
+   "Band 20 Dynamics Auto",
+   448
+  ],
+  [
+   "Band 20 Threshold",
+   449
+  ],
+  [
+   "Band 20 Attack",
+   450
+  ],
+  [
+   "Band 20 Release",
+   451
+  ],
+  [
+   "Band 20 External Side Chain",
+   452
+  ],
+  [
+   "Band 20 Side Chain Filtering",
+   453
+  ],
+  [
+   "Band 20 Side Chain Low Frequency",
+   454
+  ],
+  [
+   "Band 20 Side Chain High Frequency",
+   455
+  ],
+  [
+   "Band 20 Spectral Density",
+   458
+  ],
+  [
+   "Band 21 Used",
+   460
+  ],
+  [
+   "Band 21 Enabled",
+   461
+  ],
+  [
+   "Band 21 Frequency",
+   462
+  ],
+  [
+   "Band 21 Gain",
+   463
+  ],
+  [
+   "Band 21 Q",
+   464
+  ],
+  [
+   "Band 21 Shape",
+   465
+  ],
+  [
+   "Band 21 Slope",
+   466
+  ],
+  [
+   "Band 21 Stereo Placement",
+   467
+  ],
+  [
+   "Band 21 Speakers",
+   468
+  ],
+  [
+   "Band 21 Dynamic Range",
+   469
+  ],
+  [
+   "Band 21 Dynamics Enabled",
+   470
+  ],
+  [
+   "Band 21 Dynamics Auto",
+   471
+  ],
+  [
+   "Band 21 Threshold",
+   472
+  ],
+  [
+   "Band 21 Attack",
+   473
+  ],
+  [
+   "Band 21 Release",
+   474
+  ],
+  [
+   "Band 21 External Side Chain",
+   475
+  ],
+  [
+   "Band 21 Side Chain Filtering",
+   476
+  ],
+  [
+   "Band 21 Side Chain Low Frequency",
+   477
+  ],
+  [
+   "Band 21 Side Chain High Frequency",
+   478
+  ],
+  [
+   "Band 21 Spectral Density",
+   481
+  ],
+  [
+   "Band 22 Used",
+   483
+  ],
+  [
+   "Band 22 Enabled",
+   484
+  ],
+  [
+   "Band 22 Frequency",
+   485
+  ],
+  [
+   "Band 22 Gain",
+   486
+  ],
+  [
+   "Band 22 Q",
+   487
+  ],
+  [
+   "Band 22 Shape",
+   488
+  ],
+  [
+   "Band 22 Slope",
+   489
+  ],
+  [
+   "Band 22 Stereo Placement",
+   490
+  ],
+  [
+   "Band 22 Speakers",
+   491
+  ],
+  [
+   "Band 22 Dynamic Range",
+   492
+  ],
+  [
+   "Band 22 Dynamics Enabled",
+   493
+  ],
+  [
+   "Band 22 Dynamics Auto",
+   494
+  ],
+  [
+   "Band 22 Threshold",
+   495
+  ],
+  [
+   "Band 22 Attack",
+   496
+  ],
+  [
+   "Band 22 Release",
+   497
+  ],
+  [
+   "Band 22 External Side Chain",
+   498
+  ],
+  [
+   "Band 22 Side Chain Filtering",
+   499
+  ],
+  [
+   "Band 22 Side Chain Low Frequency",
+   500
+  ],
+  [
+   "Band 22 Side Chain High Frequency",
+   501
+  ],
+  [
+   "Band 22 Spectral Density",
+   504
+  ],
+  [
+   "Band 23 Used",
+   506
+  ],
+  [
+   "Band 23 Enabled",
+   507
+  ],
+  [
+   "Band 23 Frequency",
+   508
+  ],
+  [
+   "Band 23 Gain",
+   509
+  ],
+  [
+   "Band 23 Q",
+   510
+  ],
+  [
+   "Band 23 Shape",
+   511
+  ],
+  [
+   "Band 23 Slope",
+   512
+  ],
+  [
+   "Band 23 Stereo Placement",
+   513
+  ],
+  [
+   "Band 23 Speakers",
+   514
+  ],
+  [
+   "Band 23 Dynamic Range",
+   515
+  ],
+  [
+   "Band 23 Dynamics Enabled",
+   516
+  ],
+  [
+   "Band 23 Dynamics Auto",
+   517
+  ],
+  [
+   "Band 23 Threshold",
+   518
+  ],
+  [
+   "Band 23 Attack",
+   519
+  ],
+  [
+   "Band 23 Release",
+   520
+  ],
+  [
+   "Band 23 External Side Chain",
+   521
+  ],
+  [
+   "Band 23 Side Chain Filtering",
+   522
+  ],
+  [
+   "Band 23 Side Chain Low Frequency",
+   523
+  ],
+  [
+   "Band 23 Side Chain High Frequency",
+   524
+  ],
+  [
+   "Band 23 Spectral Density",
+   527
+  ],
+  [
+   "Band 24 Used",
+   529
+  ],
+  [
+   "Band 24 Enabled",
+   530
+  ],
+  [
+   "Band 24 Frequency",
+   531
+  ],
+  [
+   "Band 24 Gain",
+   532
+  ],
+  [
+   "Band 24 Q",
+   533
+  ],
+  [
+   "Band 24 Shape",
+   534
+  ],
+  [
+   "Band 24 Slope",
+   535
+  ],
+  [
+   "Band 24 Stereo Placement",
+   536
+  ],
+  [
+   "Band 24 Speakers",
+   537
+  ],
+  [
+   "Band 24 Dynamic Range",
+   538
+  ],
+  [
+   "Band 24 Dynamics Enabled",
+   539
+  ],
+  [
+   "Band 24 Dynamics Auto",
+   540
+  ],
+  [
+   "Band 24 Threshold",
+   541
+  ],
+  [
+   "Band 24 Attack",
+   542
+  ],
+  [
+   "Band 24 Release",
+   543
+  ],
+  [
+   "Band 24 External Side Chain",
+   544
+  ],
+  [
+   "Band 24 Side Chain Filtering",
+   545
+  ],
+  [
+   "Band 24 Side Chain Low Frequency",
+   546
+  ],
+  [
+   "Band 24 Side Chain High Frequency",
+   547
+  ],
+  [
+   "Band 24 Spectral Density",
+   550
+  ],
+  [
+   "Gain Scale",
+   555
+  ],
+  [
+   "Output Level",
+   556
+  ],
+  [
+   "Output Pan",
+   557
+  ],
+  [
+   "Output Pan Mode",
+   558
+  ],
+  [
+   "Bypass",
+   559
+  ],
+  [
+   "Output Invert Phase",
+   560
+  ],
+  [
+   "Auto Gain",
+   561
+  ],
+  [
+   "Receive Midi",
+   574
+  ],
+  [
+   "Band 1 Spectral Tilt",
+   576
+  ],
+  [
+   "Band 2 Spectral Tilt",
+   577
+  ],
+  [
+   "Band 3 Spectral Tilt",
+   578
+  ],
+  [
+   "Band 4 Spectral Tilt",
+   579
+  ],
+  [
+   "Band 5 Spectral Tilt",
+   580
+  ],
+  [
+   "Band 6 Spectral Tilt",
+   581
+  ],
+  [
+   "Band 7 Spectral Tilt",
+   582
+  ],
+  [
+   "Band 8 Spectral Tilt",
+   583
+  ],
+  [
+   "Band 9 Spectral Tilt",
+   584
+  ],
+  [
+   "Band 10 Spectral Tilt",
+   585
+  ],
+  [
+   "Band 11 Spectral Tilt",
+   586
+  ],
+  [
+   "Band 12 Spectral Tilt",
+   587
+  ],
+  [
+   "Band 13 Spectral Tilt",
+   588
+  ],
+  [
+   "Band 14 Spectral Tilt",
+   589
+  ],
+  [
+   "Band 15 Spectral Tilt",
+   590
+  ],
+  [
+   "Band 16 Spectral Tilt",
+   591
+  ],
+  [
+   "Band 17 Spectral Tilt",
+   592
+  ],
+  [
+   "Band 18 Spectral Tilt",
+   593
+  ],
+  [
+   "Band 19 Spectral Tilt",
+   594
+  ],
+  [
+   "Band 20 Spectral Tilt",
+   595
+  ],
+  [
+   "Band 21 Spectral Tilt",
+   596
+  ],
+  [
+   "Band 22 Spectral Tilt",
+   597
+  ],
+  [
+   "Band 23 Spectral Tilt",
+   598
+  ],
+  [
+   "Band 24 Spectral Tilt",
+   599
+  ]
+ ]
+}

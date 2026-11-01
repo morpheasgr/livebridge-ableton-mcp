@@ -195,6 +195,50 @@ def plugin_limiter(name: Any) -> dict[str, Any] | None:
     return next((spec for key, spec in PLUGIN_LIMITERS.items() if key in text), None)
 
 
+#: Third-party EQs live_master_auto(eq_plugin=...) can put the master band fixes on: LiveBridge
+#: loads its own instance (named "LB Master EQ (<short>)", in front of the limiter) with these
+#: parameters exposed, and sets one band per fix — low shelf, a bell at the band, high shelf.
+#: ``units``: the plug-in shows "dB" / "Hz" (Pro-Q 4); Ozone's displays have none.
+PLUGIN_EQS: dict[str, dict[str, Any]] = {
+    "pro-q 4": {
+        "label": "FabFilter Pro-Q 4", "plugin": "Pro-Q 4", "short": "Pro-Q 4", "units": True,
+        "bands": {"EQ Low": 1, "EQ Mid": 2, "EQ High": 3},
+        "used": ("Band {n} Used", "Used"), "enabled": ("Band {n} Enabled", "Enabled"),
+        "freq": "Band {n} Frequency", "gain": "Band {n} Gain", "q": ("Band {n} Q", "1.000"),
+        "shape": "Band {n} Shape",
+        "shapes": {"EQ Low": "Low Shelf", "EQ Mid": "Bell", "EQ High": "High Shelf"},
+        "freqs": {"EQ Low": 100.0, "EQ High": 8000.0}},
+    "ozone 12 equalizer": {
+        "label": "iZotope Ozone 12 Equalizer", "plugin": "Ozone 12 Equalizer",
+        "short": "Ozone 12 EQ", "units": False,
+        # its default shapes: band 1 low shelf, 4 a bell, 7 a high shelf
+        "bands": {"EQ Low": 1, "EQ Mid": 4, "EQ High": 7},
+        "used": None, "enabled": ("EQ: Stereo/Main Enable {n}", "On"),
+        "freq": "EQ: Stereo/Main Frequency {n}", "gain": "EQ: Stereo/Main Gain {n}",
+        "q": None, "shape": None, "shapes": {},
+        "freqs": {"EQ Low": 100.0, "EQ High": 8000.0}},
+}
+
+
+def plugin_eq(name: Any) -> dict[str, Any] | None:
+    """The PLUGIN_EQS entry for "Pro-Q 4" / "Ozone 12 Equalizer" (any case), or None."""
+    text = str(name or "").lower()
+    return next((spec for key, spec in PLUGIN_EQS.items() if key in text), None)
+
+
+def plugin_eq_parameters(spec: dict[str, Any]) -> list[str]:
+    """The parameters an EQ role exposes: every control of the bands it uses."""
+    names = []
+    for n in sorted(set(spec["bands"].values())):
+        for field in ("used", "enabled", "q"):
+            if spec.get(field):
+                names.append(spec[field][0].format(n=n))
+        for field in ("freq", "gain", "shape"):
+            if spec.get(field):
+                names.append(spec[field].format(n=n))
+    return names
+
+
 #: master loudness targets: destination -> (integrated LUFS, limiter ceiling dB, min crest dB)
 DESTINATIONS: dict[str, tuple[float, float, float]] = {
     "streaming": (-14.0, -1.0, 9.0), "spotify": (-14.0, -1.0, 9.0),

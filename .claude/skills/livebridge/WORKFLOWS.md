@@ -687,7 +687,9 @@ Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
    not running, or only its limiter is) — fix the device, the numbers are meaningless until
    then. The user's own Pro-L 2 or Ozone 12 Maximizer on the master (in front of the
    Engine): `chain="plugin"` drives it the same way; its true-peak/style switches stay the
-   user's (`manual`). It stops early when the crest factor collapses (the punch goes) — then fix the mix instead (kick/bass balance, fewer
+   user's (`manual`). Band fixes on the user's EQ plug-in: `eq_plugin="Pro-Q 4"` (or
+   "Ozone 12 Equalizer") — LiveBridge loads and keeps its own instance in front of the
+   limiter. It stops early when the crest factor collapses (the punch goes) — then fix the mix instead (kick/bass balance, fewer
    layers in the drop). With `loud_bar=` and `quiet_bar=` it also checks that the drop and the
    breakdown stay apart and backs off if limiting squashed them together.
 5. **Glue threshold** is the user's step (its gain-reduction meter is not readable): 1-3 dB on

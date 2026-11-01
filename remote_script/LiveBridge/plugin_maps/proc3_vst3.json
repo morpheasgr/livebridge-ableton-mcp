@@ -1,0 +1,531 @@
+{
+ "plugin": "Pro-C 3",
+ "vendor": "FabFilter",
+ "format": "VST3",
+ "class_id": "B0A765D64EFE42FA8C7EFA87BF5DA0A9",
+ "plugin_version": "3.0.0.0",
+ "source": "probed by plugin_racks.map on Live 12.4.16",
+ "created": "2026-11-01 14:50:33",
+ "count": 92,
+ "plugin_parameter_count": 237,
+ "missing": [
+  "Show Side Chain",
+  "Audition Side Chain",
+  "Audition Triggering",
+  "Oversampling",
+  "Maximum Lookahead",
+  "Meter Scale",
+  "Knee Display Enabled",
+  "Show Input Level Meter",
+  "Host Bypass",
+  "Internal",
+  "Internal",
+  "Internal",
+  "MIDI CC",
+  "Pitch Bend",
+  "Channel Pressure",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "MIDI CC",
+  "Internal"
+ ],
+ "probed": 285,
+ "loads": 9,
+ "seconds": 3.2,
+ "parameters": [
+  [
+   "Style",
+   0
+  ],
+  [
+   "Threshold",
+   1
+  ],
+  [
+   "Auto Threshold",
+   2
+  ],
+  [
+   "Lock Auto Threshold",
+   3
+  ],
+  [
+   "Ratio",
+   4
+  ],
+  [
+   "Knee",
+   5
+  ],
+  [
+   "Range",
+   6
+  ],
+  [
+   "Attack",
+   7
+  ],
+  [
+   "Release",
+   8
+  ],
+  [
+   "Auto Release",
+   9
+  ],
+  [
+   "Lookahead",
+   10
+  ],
+  [
+   "Hold",
+   11
+  ],
+  [
+   "Character",
+   12
+  ],
+  [
+   "Character Routing",
+   13
+  ],
+  [
+   "Character Drive",
+   14
+  ],
+  [
+   "Wet Gain",
+   15
+  ],
+  [
+   "Wet Pan",
+   16
+  ],
+  [
+   "Dry Gain",
+   17
+  ],
+  [
+   "Dry Pan",
+   18
+  ],
+  [
+   "Auto Gain",
+   19
+  ],
+  [
+   "Side Chain Input",
+   21
+  ],
+  [
+   "Side Chain Level",
+   22
+  ],
+  [
+   "Host Trigger Sync",
+   23
+  ],
+  [
+   "Host Trigger Offset",
+   24
+  ],
+  [
+   "Host Trigger Length",
+   25
+  ],
+  [
+   "Stereo Link",
+   26
+  ],
+  [
+   "Stereo Link Mode",
+   27
+  ],
+  [
+   "Stereo Link Center",
+   28
+  ],
+  [
+   "Stereo Link Surrounds",
+   29
+  ],
+  [
+   "Stereo Link Tops",
+   30
+  ],
+  [
+   "Stereo Link LFE",
+   31
+  ],
+  [
+   "Side Chain EQ Band 1 Used",
+   32
+  ],
+  [
+   "Side Chain EQ Band 1 Enabled",
+   33
+  ],
+  [
+   "Side Chain EQ Band 1 Frequency",
+   34
+  ],
+  [
+   "Side Chain EQ Band 1 Gain",
+   35
+  ],
+  [
+   "Side Chain EQ Band 1 Q",
+   36
+  ],
+  [
+   "Side Chain EQ Band 1 Shape",
+   37
+  ],
+  [
+   "Side Chain EQ Band 1 Slope",
+   38
+  ],
+  [
+   "Side Chain EQ Band 1 Stereo Placement",
+   39
+  ],
+  [
+   "Side Chain EQ Band 1 Speakers",
+   40
+  ],
+  [
+   "Side Chain EQ Band 2 Used",
+   41
+  ],
+  [
+   "Side Chain EQ Band 2 Enabled",
+   42
+  ],
+  [
+   "Side Chain EQ Band 2 Frequency",
+   43
+  ],
+  [
+   "Side Chain EQ Band 2 Gain",
+   44
+  ],
+  [
+   "Side Chain EQ Band 2 Q",
+   45
+  ],
+  [
+   "Side Chain EQ Band 2 Shape",
+   46
+  ],
+  [
+   "Side Chain EQ Band 2 Slope",
+   47
+  ],
+  [
+   "Side Chain EQ Band 2 Stereo Placement",
+   48
+  ],
+  [
+   "Side Chain EQ Band 2 Speakers",
+   49
+  ],
+  [
+   "Side Chain EQ Band 3 Used",
+   50
+  ],
+  [
+   "Side Chain EQ Band 3 Enabled",
+   51
+  ],
+  [
+   "Side Chain EQ Band 3 Frequency",
+   52
+  ],
+  [
+   "Side Chain EQ Band 3 Gain",
+   53
+  ],
+  [
+   "Side Chain EQ Band 3 Q",
+   54
+  ],
+  [
+   "Side Chain EQ Band 3 Shape",
+   55
+  ],
+  [
+   "Side Chain EQ Band 3 Slope",
+   56
+  ],
+  [
+   "Side Chain EQ Band 3 Stereo Placement",
+   57
+  ],
+  [
+   "Side Chain EQ Band 3 Speakers",
+   58
+  ],
+  [
+   "Side Chain EQ Band 4 Used",
+   59
+  ],
+  [
+   "Side Chain EQ Band 4 Enabled",
+   60
+  ],
+  [
+   "Side Chain EQ Band 4 Frequency",
+   61
+  ],
+  [
+   "Side Chain EQ Band 4 Gain",
+   62
+  ],
+  [
+   "Side Chain EQ Band 4 Q",
+   63
+  ],
+  [
+   "Side Chain EQ Band 4 Shape",
+   64
+  ],
+  [
+   "Side Chain EQ Band 4 Slope",
+   65
+  ],
+  [
+   "Side Chain EQ Band 4 Stereo Placement",
+   66
+  ],
+  [
+   "Side Chain EQ Band 4 Speakers",
+   67
+  ],
+  [
+   "Side Chain EQ Band 5 Used",
+   68
+  ],
+  [
+   "Side Chain EQ Band 5 Enabled",
+   69
+  ],
+  [
+   "Side Chain EQ Band 5 Frequency",
+   70
+  ],
+  [
+   "Side Chain EQ Band 5 Gain",
+   71
+  ],
+  [
+   "Side Chain EQ Band 5 Q",
+   72
+  ],
+  [
+   "Side Chain EQ Band 5 Shape",
+   73
+  ],
+  [
+   "Side Chain EQ Band 5 Slope",
+   74
+  ],
+  [
+   "Side Chain EQ Band 5 Stereo Placement",
+   75
+  ],
+  [
+   "Side Chain EQ Band 5 Speakers",
+   76
+  ],
+  [
+   "Side Chain EQ Band 6 Used",
+   77
+  ],
+  [
+   "Side Chain EQ Band 6 Enabled",
+   78
+  ],
+  [
+   "Side Chain EQ Band 6 Frequency",
+   79
+  ],
+  [
+   "Side Chain EQ Band 6 Gain",
+   80
+  ],
+  [
+   "Side Chain EQ Band 6 Q",
+   81
+  ],
+  [
+   "Side Chain EQ Band 6 Shape",
+   82
+  ],
+  [
+   "Side Chain EQ Band 6 Slope",
+   83
+  ],
+  [
+   "Side Chain EQ Band 6 Stereo Placement",
+   84
+  ],
+  [
+   "Side Chain EQ Band 6 Speakers",
+   85
+  ],
+  [
+   "Mix",
+   88
+  ],
+  [
+   "Input Level",
+   89
+  ],
+  [
+   "Input Pan",
+   90
+  ],
+  [
+   "Output Level",
+   91
+  ],
+  [
+   "Output Pan",
+   92
+  ],
+  [
+   "Bypass",
+   93
+  ],
+  [
+   "Midi State",
+   96
+  ]
+ ]
+}

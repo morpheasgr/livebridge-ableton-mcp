@@ -1,0 +1,445 @@
+{
+ "plugin": "Ozone 12 Equalizer",
+ "vendor": "iZotope",
+ "format": "VST3",
+ "class_id": "5653545A425A554F7A6F6E652050726F",
+ "plugin_version": "12.1.0",
+ "source": "probed by plugin_racks.map on Live 12.4.16",
+ "created": "2026-11-01 14:50:59",
+ "count": 107,
+ "plugin_parameter_count": 107,
+ "missing": [],
+ "probed": 295,
+ "loads": 10,
+ "seconds": 4.0,
+ "parameters": [
+  [
+   "GAIN: Input L (Locked)",
+   0
+  ],
+  [
+   "GAIN: Input L (Unlocked)",
+   1
+  ],
+  [
+   "GAIN: Input R (Unlocked)",
+   2
+  ],
+  [
+   "GAIN: Output L (Locked)",
+   3
+  ],
+  [
+   "GAIN: Output L (Unlocked)",
+   4
+  ],
+  [
+   "GAIN: Output R (Unlocked)",
+   5
+  ],
+  [
+   "Global Bypass",
+   6
+  ],
+  [
+   "EQ: Bypass",
+   7
+  ],
+  [
+   "EQ: Global Amount",
+   8
+  ],
+  [
+   "EQ: Stereo/Main Frequency 1",
+   9
+  ],
+  [
+   "EQ: Stereo/Main Frequency 2",
+   10
+  ],
+  [
+   "EQ: Stereo/Main Frequency 3",
+   11
+  ],
+  [
+   "EQ: Stereo/Main Frequency 4",
+   12
+  ],
+  [
+   "EQ: Stereo/Main Frequency 5",
+   13
+  ],
+  [
+   "EQ: Stereo/Main Frequency 6",
+   14
+  ],
+  [
+   "EQ: Stereo/Main Frequency 7",
+   15
+  ],
+  [
+   "EQ: Stereo/Main Frequency 8",
+   16
+  ],
+  [
+   "EQ: Stereo/Main Gain 1",
+   17
+  ],
+  [
+   "EQ: Stereo/Main Gain 2",
+   18
+  ],
+  [
+   "EQ: Stereo/Main Gain 3",
+   19
+  ],
+  [
+   "EQ: Stereo/Main Gain 4",
+   20
+  ],
+  [
+   "EQ: Stereo/Main Gain 5",
+   21
+  ],
+  [
+   "EQ: Stereo/Main Gain 6",
+   22
+  ],
+  [
+   "EQ: Stereo/Main Gain 7",
+   23
+  ],
+  [
+   "EQ: Stereo/Main Gain 8",
+   24
+  ],
+  [
+   "EQ: Stereo/Main Q 1",
+   25
+  ],
+  [
+   "EQ: Stereo/Main Q 2",
+   26
+  ],
+  [
+   "EQ: Stereo/Main Q 3",
+   27
+  ],
+  [
+   "EQ: Stereo/Main Q 4",
+   28
+  ],
+  [
+   "EQ: Stereo/Main Q 5",
+   29
+  ],
+  [
+   "EQ: Stereo/Main Q 6",
+   30
+  ],
+  [
+   "EQ: Stereo/Main Q 7",
+   31
+  ],
+  [
+   "EQ: Stereo/Main Q 8",
+   32
+  ],
+  [
+   "EQ: Stereo/Main Phase 1",
+   33
+  ],
+  [
+   "EQ: Stereo/Main Phase 2",
+   34
+  ],
+  [
+   "EQ: Stereo/Main Phase 3",
+   35
+  ],
+  [
+   "EQ: Stereo/Main Phase 4",
+   36
+  ],
+  [
+   "EQ: Stereo/Main Phase 5",
+   37
+  ],
+  [
+   "EQ: Stereo/Main Phase 6",
+   38
+  ],
+  [
+   "EQ: Stereo/Main Phase 7",
+   39
+  ],
+  [
+   "EQ: Stereo/Main Phase 8",
+   40
+  ],
+  [
+   "EQ: Stereo/Main Enable 1",
+   41
+  ],
+  [
+   "EQ: Stereo/Main Enable 2",
+   42
+  ],
+  [
+   "EQ: Stereo/Main Enable 3",
+   43
+  ],
+  [
+   "EQ: Stereo/Main Enable 4",
+   44
+  ],
+  [
+   "EQ: Stereo/Main Enable 5",
+   45
+  ],
+  [
+   "EQ: Stereo/Main Enable 6",
+   46
+  ],
+  [
+   "EQ: Stereo/Main Enable 7",
+   47
+  ],
+  [
+   "EQ: Stereo/Main Enable 8",
+   48
+  ],
+  [
+   "EQ: Stereo/Main Shape 1",
+   49
+  ],
+  [
+   "EQ: Stereo/Main Shape 2",
+   50
+  ],
+  [
+   "EQ: Stereo/Main Shape 3",
+   51
+  ],
+  [
+   "EQ: Stereo/Main Shape 4",
+   52
+  ],
+  [
+   "EQ: Stereo/Main Shape 5",
+   53
+  ],
+  [
+   "EQ: Stereo/Main Shape 6",
+   54
+  ],
+  [
+   "EQ: Stereo/Main Shape 7",
+   55
+  ],
+  [
+   "EQ: Stereo/Main Shape 8",
+   56
+  ],
+  [
+   "EQ: Stereo/Main Bypass",
+   57
+  ],
+  [
+   "EQ: Aux Frequency 1",
+   58
+  ],
+  [
+   "EQ: Aux Frequency 2",
+   59
+  ],
+  [
+   "EQ: Aux Frequency 3",
+   60
+  ],
+  [
+   "EQ: Aux Frequency 4",
+   61
+  ],
+  [
+   "EQ: Aux Frequency 5",
+   62
+  ],
+  [
+   "EQ: Aux Frequency 6",
+   63
+  ],
+  [
+   "EQ: Aux Frequency 7",
+   64
+  ],
+  [
+   "EQ: Aux Frequency 8",
+   65
+  ],
+  [
+   "EQ: Aux Gain 1",
+   66
+  ],
+  [
+   "EQ: Aux Gain 2",
+   67
+  ],
+  [
+   "EQ: Aux Gain 3",
+   68
+  ],
+  [
+   "EQ: Aux Gain 4",
+   69
+  ],
+  [
+   "EQ: Aux Gain 5",
+   70
+  ],
+  [
+   "EQ: Aux Gain 6",
+   71
+  ],
+  [
+   "EQ: Aux Gain 7",
+   72
+  ],
+  [
+   "EQ: Aux Gain 8",
+   73
+  ],
+  [
+   "EQ: Aux Q 1",
+   74
+  ],
+  [
+   "EQ: Aux Q 2",
+   75
+  ],
+  [
+   "EQ: Aux Q 3",
+   76
+  ],
+  [
+   "EQ: Aux Q 4",
+   77
+  ],
+  [
+   "EQ: Aux Q 5",
+   78
+  ],
+  [
+   "EQ: Aux Q 6",
+   79
+  ],
+  [
+   "EQ: Aux Q 7",
+   80
+  ],
+  [
+   "EQ: Aux Q 8",
+   81
+  ],
+  [
+   "EQ: Aux Phase 1",
+   82
+  ],
+  [
+   "EQ: Aux Phase 2",
+   83
+  ],
+  [
+   "EQ: Aux Phase 3",
+   84
+  ],
+  [
+   "EQ: Aux Phase 4",
+   85
+  ],
+  [
+   "EQ: Aux Phase 5",
+   86
+  ],
+  [
+   "EQ: Aux Phase 6",
+   87
+  ],
+  [
+   "EQ: Aux Phase 7",
+   88
+  ],
+  [
+   "EQ: Aux Phase 8",
+   89
+  ],
+  [
+   "EQ: Aux Enable 1",
+   90
+  ],
+  [
+   "EQ: Aux Enable 2",
+   91
+  ],
+  [
+   "EQ: Aux Enable 3",
+   92
+  ],
+  [
+   "EQ: Aux Enable 4",
+   93
+  ],
+  [
+   "EQ: Aux Enable 5",
+   94
+  ],
+  [
+   "EQ: Aux Enable 6",
+   95
+  ],
+  [
+   "EQ: Aux Enable 7",
+   96
+  ],
+  [
+   "EQ: Aux Enable 8",
+   97
+  ],
+  [
+   "EQ: Aux Shape 1",
+   98
+  ],
+  [
+   "EQ: Aux Shape 2",
+   99
+  ],
+  [
+   "EQ: Aux Shape 3",
+   100
+  ],
+  [
+   "EQ: Aux Shape 4",
+   101
+  ],
+  [
+   "EQ: Aux Shape 5",
+   102
+  ],
+  [
+   "EQ: Aux Shape 6",
+   103
+  ],
+  [
+   "EQ: Aux Shape 7",
+   104
+  ],
+  [
+   "EQ: Aux Shape 8",
+   105
+  ],
+  [
+   "EQ: Aux Bypass",
+   106
+  ]
+ ]
+}

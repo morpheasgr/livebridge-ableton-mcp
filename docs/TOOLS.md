@@ -1625,8 +1625,9 @@ Master the song to a loudness target by measurement: uses (or builds) EQ Eight -
 | `chain` | str | `"native"` |
 | `place_devices` | bool | `true` |
 | `eq_bands` | object \| null | `null` |
+| `eq_plugin` | str \| null | `null` |
 
-Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_auto`
 
@@ -1649,8 +1650,9 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `detail` | str | `"summary"` |
 | `section_bars` | list[int] \| null | `null` |
 | `strips` | str | `"set"` |
+| `master_eq_plugin` | str \| null | `null` |
 
-Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -3646,7 +3648,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `notes.write_arp` | M | track=null, slot=null, clip=null, chords=null, key=null, start=0.0, duration=null, rate="1/16", style="up", octaves=1, octave=3, gate=0.8, velocity=100, accent_velocity=null, swing=0.0, seed=null, clear=true, create=true, extend=true | `live_clip_write_arp` | Write an arpeggio or a simple bassline from chords (symbols, Roman numerals, degrees) |
 | `notes.write_chords` | M | track=null, slot=null, clip=null, chords=null, start=0.0, duration=null, octave=3, velocity=90, voicing="close", inversion=0, voice_leading=false, bass=false, strum=0.0, clear=true, create=true, extend=true, key=null | `live_clip_write_chords` | Write a chord progression from symbols like Am7, F, G/B |
 | `notes.write_pattern` | M | track=null, slot=null, clip=null, pattern=null, step=0.25, start=0.0, velocity=100, accent_velocity=127, ghost_velocity=50, gate=0.9, repeat=1, swing=0.0, clear=true, create=true, extend=true, kit=true | `live_clip_write_euclid`, `live_clip_write_pattern` | Write a step-sequencer pattern: {pitch: 'x...x...'} per row |
-| `plugin_racks.expose` | M | track=null, plugin=null, parameters=null, macros=null, preset_file=null, replace=true, name=null, new_track=false, track_name=null, plugin_format=null, editor_open=null | `live_plugin_expose`, `live_plugin_host_expose` | Load a plug-in in a generated rack that exposes up to 128 chosen parameters |
+| `plugin_racks.expose` | M | track=null, plugin=null, parameters=null, macros=null, preset_file=null, replace=true, name=null, new_track=false, track_name=null, plugin_format=null, editor_open=null | `live_master_auto`, `live_mix_auto`, `live_plugin_expose`, `live_plugin_host_expose` | Load a plug-in in a generated rack that exposes up to 128 chosen parameters |
 | `plugin_racks.map` | M | plugin=null, track=null, device=null, plugin_format=null, refresh=false, max_seconds=5.0, gap=16, cancel=false, filter=null, offset=0, limit=50 | `live_plugin_host_expose`, `live_plugin_param_map` | Find (or read the cached) name -> ParameterId map of a plug-in by probing racks |
 | `plugin_racks.presets` |  | plugin, filter=null, offset=0, limit=50, plugin_format=null, embeddable_only=false | `live_plugin_preset_files` | Preset files of a plug-in on disk (to pick a starting sound) |
 | `plugins.exposure` |  | track=null, device=null, parameters=null | `live_plugin_configure` | Which wanted plug-in parameters Live exposes, and how to expose the rest |

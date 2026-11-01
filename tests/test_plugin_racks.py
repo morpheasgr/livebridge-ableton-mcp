@@ -777,3 +777,23 @@ def test_expose_finds_the_plugin_by_vendor_qualified_name(bridge, env, song):
     result = expose(bridge, track="LB_VENDOR", plugin="Xfer Records/Serum 2",
                     parameters=["macros"])
     assert result["replaced"] == "Serum 2" and [d.name for d in track.devices] == ["Serum 2 Rack"]
+
+
+def test_shipped_maps_hold_every_parameter_the_plugin_roles_use():
+    """The maps measured on a real Live 12.4.16 (Windows) ship with LiveBridge; every name the
+    limiter and EQ roles drive must be in them (a typo here would only show on a user's PC)."""
+    from livebridge_mcp import mix
+    shipped = Path(lib.shipped_maps_dir())
+
+    def names(file_name):
+        data = lib.load_map(str(shipped / file_name))
+        assert data and data["format"] == "VST3" and data["count"] > 0, file_name
+        return {name for name, _pid in data["parameters"]}
+    for key, spec in mix.PLUGIN_LIMITERS.items():
+        mapped = names(key.replace(" ", "").replace("-", "") + "_vst3.json")
+        assert {spec["drive"], spec["ceiling"]} <= mapped, key
+    for key, spec in mix.PLUGIN_EQS.items():
+        mapped = names(key.replace(" ", "").replace("-", "") + "_vst3.json")
+        missing = set(mix.plugin_eq_parameters(spec)) - mapped
+        assert not missing, (key, sorted(missing))
+    assert "Threshold" in names("proc3_vst3.json")            # for the compressor role

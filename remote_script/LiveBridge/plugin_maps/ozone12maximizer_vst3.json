@@ -1,0 +1,97 @@
+{
+ "plugin": "Ozone 12 Maximizer",
+ "vendor": "iZotope",
+ "format": "VST3",
+ "class_id": "5653545A425A4D4F7A6F6E652050726F",
+ "plugin_version": "12.0.2",
+ "source": "probed by plugin_racks.map on Live 12.4.16",
+ "created": "2026-11-01 14:50:45",
+ "count": 20,
+ "plugin_parameter_count": 20,
+ "missing": [],
+ "probed": 208,
+ "loads": 4,
+ "seconds": 2.5,
+ "parameters": [
+  [
+   "GAIN: Input L (Locked)",
+   0
+  ],
+  [
+   "GAIN: Input L (Unlocked)",
+   1
+  ],
+  [
+   "GAIN: Input R (Unlocked)",
+   2
+  ],
+  [
+   "GAIN: Output L (Locked)",
+   3
+  ],
+  [
+   "GAIN: Output L (Unlocked)",
+   4
+  ],
+  [
+   "GAIN: Output R (Unlocked)",
+   5
+  ],
+  [
+   "Global Bypass",
+   6
+  ],
+  [
+   "MAX: Bypass",
+   7
+  ],
+  [
+   "MAX: Input Gain",
+   8
+  ],
+  [
+   "MAX: Output Level",
+   9
+  ],
+  [
+   "MAX: Link Input Gain and Output Level",
+   10
+  ],
+  [
+   "MAX: Character",
+   11
+  ],
+  [
+   "MAX: Upward Compression Amt",
+   12
+  ],
+  [
+   "MAX: Soft Clip On/Off",
+   13
+  ],
+  [
+   "MAX: Soft Clip Mix",
+   14
+  ],
+  [
+   "MAX: Soft Clip Mode",
+   15
+  ],
+  [
+   "MAX: Transient Shaping Amt",
+   16
+  ],
+  [
+   "MAX: Stereo Ind. Sustain Amt",
+   17
+  ],
+  [
+   "MAX: Stereo Ind. Transient Amt",
+   18
+  ],
+  [
+   "MAX: Link Stereo Amounts",
+   19
+  ]
+ ]
+}
