@@ -102,6 +102,13 @@ _BANDS_KEY = "~bands"
 _NUMBER_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*(k?)", re.I)
 
 
+def _display_number(text: Any) -> float | None:
+    """The number a parameter display starts with: "+16.90 dB" (Pro-L 2 writes the plus),
+    "15.40  dB", "-0.30 dBTP", "700.00 Hz" — None when there is none."""
+    match = re.match(r"^\s*([+-]?\d+(?:\.\d+)?)", str(text or ""))
+    return float(match.group(1)) if match else None
+
+
 def _strip_number(param: dict[str, Any]) -> float | None:
     """A Channel parameter's value in its own units (Hz, dB, ms, %, 0/1). Linear dials are
     Live's raw value (the display rounds: -15.5 showed "-16 dB" and read as set by hand);
@@ -1324,8 +1331,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 if chain_kind == "livebridge" and name not in _HZ_PARAMS and \
                         _num(got.get("value")) is not None:
                     return _num(got.get("value")), display
-                parsed = re.match(r"^\s*(-?\d+(?:\.\d+)?)", display)
-                return (float(parsed.group(1)) if parsed else _num(got.get("value"))), display
+                # the plug-in's 0..1 raw value only when the display has no number at all
+                # (a "+16.90 dB" read as 0.56 broke the reset and the resume)
+                number = _display_number(display)
+                return (number if number is not None else _num(got.get("value"))), display
             return None, None
 
         reset: dict[str, float] = {}
@@ -1452,8 +1461,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     "track": "master", "device": target["path"], "parameter": gain_name(param)})
                 if isinstance(got, dict) and not _is_error(got):
                     shown = str(got.get("display", ""))
-                    parsed = re.match(r"^\s*([+-]?\d+(?:\.\d+)?)", shown)
-                    return (float(parsed.group(1)) if parsed else None), shown
+                    return _display_number(shown), shown
                 return None, None
 
             settings: dict[str, tuple[float, float | None]] = {}
@@ -1470,14 +1478,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     if abs(setting) < abs(current) + 0.5:
                         if abs(current) >= 5.9:
                             notes.append(
-                                f"{param} already at {current:+.1f} dB and the master still "
-                                f"reads {delta:+.1f} dB in that band: more master EQ would "
+                                f"{param} already at {current:+.1f} dB and that band is still "
+                                f"{delta:+.1f} dB off: more master EQ would "
                                 "thin the whole mix — the rest is in the parts (the balance's "
                                 "`bands` names the tracks that carry it), fix it there.")
                         else:
                             notes.append(
-                                f"{param} kept at {current:+.1f} dB: the band still reads "
-                                f"{delta:+.1f} dB with it in place, and a run deepens a cut "
+                                f"{param} kept at {current:+.1f} dB: the band is still "
+                                f"{delta:+.1f} dB off with it in place, and a run deepens a cut "
                                 f"only when half the reading ({abs(setting):.1f} dB) is more "
                                 "than the cut there — a bell cut moves a wide band little, so "
                                 "adding up runs would walk it to the -6 dB limit. The "

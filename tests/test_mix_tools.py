@@ -1242,3 +1242,11 @@ def test_master_eq_plugin_that_cannot_load_falls_back_to_advice(app, song, mix_s
     assert result["applied"] and "eq" not in result, result
     assert any("Ozone 12 Equalizer could not be loaded" in n for n in result["notes"])
     assert any(m.startswith("Master EQ") for m in result["manual"])
+
+
+def test_display_numbers_keep_their_sign():
+    """Pro-L 2 shows its gain as "+16.90 dB": read as 16.9, not as the 0..1 raw value."""
+    assert mix_tools._display_number("+16.90 dB") == 16.9
+    assert mix_tools._display_number("15.40  dB") == 15.4
+    assert mix_tools._display_number("-0.30 dBTP") == -0.3
+    assert mix_tools._display_number("Off") is None
