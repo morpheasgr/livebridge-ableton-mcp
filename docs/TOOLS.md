@@ -1651,6 +1651,7 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `section_bars` | list[int] \| null | `null` |
 | `strips` | str | `"set"` |
 | `master_eq_plugin` | str \| null | `null` |
+| `strip_plugins` | list[str] \| null | `null` |
 
 Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 

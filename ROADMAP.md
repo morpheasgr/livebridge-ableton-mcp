@@ -92,8 +92,9 @@ The releases taught more than any rule of thumb. Turn that into the method:
 Started: the master limiter role drives FabFilter Pro-L 2 and the iZotope Ozone 12 Maximizer
 (`chain="plugin"`), and the master EQ role puts the band fixes on LiveBridge's own instance of
 Pro-Q 4 or Ozone 12 Equalizer (`eq_plugin`). The measured maps of these five plug-ins ship with
-LiveBridge. Next: the strip roles (EQ and compressor per track, Pro-Q 4 / Pro-C 3), once the
-master roles have run on a real machine.
+LiveBridge, and the strip roles do each track's EQ and compression on LiveBridge's own Pro-Q 4 /
+Pro-C 3 instances (`strip_plugins`). Next: more plug-ins in the same tables, contributed by their
+owners (maps plus a short spec).
 
 Today a user can keep their own processing (`strips="measure"`) or drive any plug-in by hand. Next,
 the automatic steps drive the user's plug-ins too:

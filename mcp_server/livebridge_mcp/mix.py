@@ -239,6 +239,129 @@ def plugin_eq_parameters(spec: dict[str, Any]) -> list[str]:
     return names
 
 
+#: Plug-ins live_mix_auto(strip_plugins=[...]) can do a channel strip's EQ or compression with:
+#: LiveBridge loads its own instance per track (in front of the LiveBridge Channel, which keeps
+#: the meters, trim, width, bass mono and saturation) and translates the strip plan's controls.
+#: ``handles``: the Channel controls the plug-in takes over (the Channel's own stay at rest).
+STRIP_PLUGINS: dict[str, dict[str, Any]] = {
+    "pro-q 4": {"kind": "eq", "label": "FabFilter Pro-Q 4", "plugin": "Pro-Q 4",
+                "rack": "LB Strip EQ (Pro-Q 4)",
+                "handles": ("HP Freq", "Low", "Mid", "Mid Freq", "High")},
+    "pro-c 3": {"kind": "comp", "label": "FabFilter Pro-C 3", "plugin": "Pro-C 3",
+                "rack": "LB Strip Comp (Pro-C 3)",
+                "handles": ("Comp Threshold", "Comp Ratio", "Comp Attack", "Comp Release",
+                            "Comp Makeup")},
+}
+#: Pro-Q 4 bands of the strip: band -> (Channel control, shape, fixed frequency)
+_PROQ_STRIP = {1: ("HP Freq", "Low Cut", None), 2: ("Low", "Low Shelf", 100.0),
+               3: ("Mid", "Bell", None), 4: ("High", "High Shelf", 8000.0)}
+
+
+def strip_plugin(name: Any) -> dict[str, Any] | None:
+    """The STRIP_PLUGINS entry for "Pro-Q 4" / "Pro-C 3" (any case), or None."""
+    text = str(name or "").lower()
+    return next((spec for key, spec in STRIP_PLUGINS.items() if key in text), None)
+
+
+def strip_plugin_parameters(spec: dict[str, Any]) -> list[str]:
+    """What LiveBridge's instance exposes for the strip."""
+    if spec["kind"] == "eq":
+        names = []
+        for n in _PROQ_STRIP:
+            names += [f"Band {n} {field}" for field in
+                      ("Used", "Enabled", "Frequency", "Gain", "Q", "Shape")]
+        return names + ["Band 1 Slope"]
+    return ["Threshold", "Ratio", "Attack", "Release", "Wet Gain", "Mix", "Auto Gain"]
+
+
+def strip_plugin_values(spec: dict[str, Any], values: dict[str, float]
+                        ) -> tuple[dict[str, str], dict[str, str]]:
+    """Channel controls -> the plug-in's parameters as display text: ``(essential, optional)``
+    — optional are shape/slope/Q/ratio/auto-gain choices whose wording can differ between
+    versions (set apart, so a refusal there leaves the rest set)."""
+    essential: dict[str, str] = {}
+    optional: dict[str, str] = {}
+    if spec["kind"] == "eq":
+        for n, (control, shape, fixed) in _PROQ_STRIP.items():
+            if control not in values and not (n == 3 and "Mid Freq" in values):
+                continue
+            if n == 1:
+                hp = float(values.get("HP Freq", CHANNEL_NEUTRAL["HP Freq"]))
+                active, freq, gain = hp > 20.5, hp, None
+            else:
+                gain = float(values.get(control, 0.0))
+                active = abs(gain) >= 0.05
+                freq = fixed if fixed else float(values.get("Mid Freq", 1000.0))
+            essential[f"Band {n} Used"] = "Used" if active else "Unused"
+            if not active:
+                continue
+            essential[f"Band {n} Enabled"] = "Enabled"
+            essential[f"Band {n} Frequency"] = f"{freq:g} Hz"
+            if gain is not None:
+                essential[f"Band {n} Gain"] = f"{gain:.1f} dB"
+            optional[f"Band {n} Shape"] = shape
+            if n == 1:
+                optional["Band 1 Slope"] = "24 dB/oct"
+            elif n == 3:
+                optional["Band 3 Q"] = "1.000"
+        return essential, optional
+    ratio = float(values.get("Comp Ratio", CHANNEL_NEUTRAL["Comp Ratio"]))
+    active = ratio > 1.01
+    # at rest it is fully dry (Mix 0 %): whether 1:1 exists differs between versions
+    essential["Mix"] = "100 %" if active else "0 %"
+    for control, param, unit in (("Comp Threshold", "Threshold", "dB"),
+                                 ("Comp Attack", "Attack", "ms"),
+                                 ("Comp Release", "Release", "ms"),
+                                 ("Comp Makeup", "Wet Gain", "dB")):
+        if control in values:
+            value = float(values[control])
+            essential[param] = f"{value:.1f} dB" if unit == "dB" else f"{value:g} ms"
+    if active:
+        optional["Ratio"] = f"{ratio:.2f}:1"
+    optional["Auto Gain"] = "Off"         # on by default: it would fight the balance
+    return essential, optional
+
+
+def _display_value(text: Any) -> float | None:
+    match = re.match(r"^\s*([+-]?\d+(?:\.\d+)?)\s*(k?)(\w*)", str(text or ""), re.I)
+    if not match:
+        return None
+    value = float(match.group(1)) * (1000.0 if match.group(2).lower() == "k" else 1.0)
+    if match.group(3).lower() == "s" and not match.group(2):     # "1.20 s" release
+        value *= 1000.0
+    return value
+
+
+def strip_plugin_read(spec: dict[str, Any], displays: dict[str, str]) -> dict[str, float]:
+    """The plug-in's displays -> the Channel controls it handles (rest values for an unused
+    band or a dry compressor), so the strip memory and `changes` work as with the Channel."""
+    out: dict[str, float] = {}
+    if spec["kind"] == "eq":
+        for n, (control, _shape, _fixed) in _PROQ_STRIP.items():
+            used = str(displays.get(f"Band {n} Used", "")).strip().lower() == "used"
+            if n == 1:
+                freq = _display_value(displays.get("Band 1 Frequency"))
+                out["HP Freq"] = freq if used and freq is not None else \
+                    CHANNEL_NEUTRAL["HP Freq"]
+                continue
+            gain = _display_value(displays.get(f"Band {n} Gain"))
+            out[control] = gain if used and gain is not None else 0.0
+            if n == 3:
+                freq = _display_value(displays.get("Band 3 Frequency"))
+                out["Mid Freq"] = freq if used and freq is not None else \
+                    CHANNEL_NEUTRAL["Mid Freq"]
+        return out
+    mix = _display_value(displays.get("Mix"))
+    if mix is None or mix < 50.0:
+        return {k: CHANNEL_NEUTRAL[k] for k in spec["handles"]}
+    for control, param in (("Comp Threshold", "Threshold"), ("Comp Ratio", "Ratio"),
+                           ("Comp Attack", "Attack"), ("Comp Release", "Release"),
+                           ("Comp Makeup", "Wet Gain")):
+        value = _display_value(displays.get(param))
+        out[control] = value if value is not None else CHANNEL_NEUTRAL[control]
+    return out
+
+
 #: master loudness targets: destination -> (integrated LUFS, limiter ceiling dB, min crest dB)
 DESTINATIONS: dict[str, tuple[float, float, float]] = {
     "streaming": (-14.0, -1.0, 9.0), "spotify": (-14.0, -1.0, 9.0),

@@ -1250,3 +1250,111 @@ def test_display_numbers_keep_their_sign():
     assert mix_tools._display_number("15.40  dB") == 15.4
     assert mix_tools._display_number("-0.30 dBTP") == -0.3
     assert mix_tools._display_number("Off") is None
+
+
+def _strip_plugin_racks(mix_set):
+    """LiveBridge's own Pro-Q 4 and Pro-C 3 per track, in front of the Channel (as a first run
+    leaves them), with the controls the strip roles expose."""
+    shapes = ("Bell", "Low Shelf", "Low Cut", "High Shelf", "High Cut", "Notch")
+    devices = {}
+    for name in ("Kick", "Sub", "Pad", "Hats"):
+        track = mix_set.track(name)
+        channel_at = [d.name for d in track.devices].index("LiveBridge Channel")
+        eq_rack = factory.add_rack(track, "LB Strip EQ (Pro-Q 4)", kind="audio_effect",
+                                   chains=1, index=channel_at)
+        params = []
+        for n in (1, 2, 3, 4):
+            params += [
+                {"name": f"Band {n} Used", "value": 0, "min": 0, "max": 1,
+                 "is_quantized": True, "value_items": ("Unused", "Used")},
+                {"name": f"Band {n} Enabled", "value": 1, "min": 0, "max": 1,
+                 "is_quantized": True, "value_items": ("Disabled", "Enabled")},
+                {"name": f"Band {n} Frequency", "value": 1000.0, "min": 10.0, "max": 30000.0,
+                 "unit": "Hz"},
+                {"name": f"Band {n} Gain", "value": 0.0, "min": -30.0, "max": 30.0,
+                 "unit": "dB"},
+                {"name": f"Band {n} Q", "value": 1.0, "min": 0.025, "max": 40.0},
+                {"name": f"Band {n} Shape", "value": 0, "min": 0, "max": len(shapes) - 1,
+                 "is_quantized": True, "value_items": shapes}]
+        params.append({"name": "Band 1 Slope", "value": 0, "min": 0, "max": 2,
+                       "is_quantized": True,
+                       "value_items": ("12 dB/oct", "24 dB/oct", "48 dB/oct")})
+        eq = factory.add_device(eq_rack.chains[0], "Pro-Q 4", "PluginDevice", params=params)
+        comp_rack = factory.add_rack(track, "LB Strip Comp (Pro-C 3)", kind="audio_effect",
+                                     chains=1, index=channel_at + 1)
+        comp = factory.add_device(comp_rack.chains[0], "Pro-C 3", "PluginDevice", params=[
+            {"name": "Threshold", "value": -16.0, "min": -60.0, "max": 0.0, "unit": "dB"},
+            {"name": "Ratio", "value": 3.5, "min": 1.0, "max": 100.0, "unit": ":1"},
+            {"name": "Attack", "value": 0.7, "min": 0.005, "max": 250.0, "unit": "ms"},
+            {"name": "Release", "value": 100.0, "min": 10.0, "max": 2500.0, "unit": "ms"},
+            {"name": "Wet Gain", "value": 0.0, "min": -36.0, "max": 36.0, "unit": "dB"},
+            {"name": "Mix", "value": 100.0, "min": 0.0, "max": 100.0, "unit": "%"},
+            {"name": "Auto Gain", "value": 1, "min": 0, "max": 1, "is_quantized": True,
+             "value_items": ("Off", "On")}])
+        devices[name] = (eq, comp)
+    return devices
+
+
+def test_mix_auto_does_the_strip_eq_and_compression_with_plugins(app, song, mix_set,
+                                                                 monkeypatch, tmp_path):
+    """strip_plugins=["Pro-Q 4", "Pro-C 3"]: the strip plan's EQ goes on LiveBridge's own
+    Pro-Q 4 per track, the compression on its Pro-C 3; the Channel's own stay at rest."""
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    _strips(mix_set, monkeypatch)
+    plugins = _strip_plugin_racks(mix_set)
+    assert call_tool(app, "live_mix_auto", {"strip_plugins": ["Pro-Q 9"]})["type"] == "bad_args"
+    assert call_tool(app, "live_mix_auto", {"strip_plugins": ["Pro-Q 4"],
+                                            "strips": "measure"})["type"] == "bad_args"
+    args = {"seconds": 3, "balance": False, "place_devices": False, "detail": "full",
+            "strip_plugins": ["Pro-Q 4", "Pro-C 3"]}
+    result = call_tool(app, "live_mix_auto", args)
+    assert result["applied"], result
+    hats_eq, hats_comp = plugins["Hats"]
+    q = {p.name: p.value for p in hats_eq.parameters}
+    assert q["Band 1 Used"] == 1 and q["Band 1 Frequency"] == pytest.approx(300, rel=0.01)
+    assert q["Band 1 Shape"] == 2 and q["Band 1 Slope"] == 1                 # low cut, 24 dB
+    hats = next(t for t in result["tracks"] if t["name"] == "Hats")
+    assert hats["changes"]["HP Freq"].endswith("300")
+    channel = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
+    assert {p.name: p.value for p in channel.parameters}["HP Freq"] == pytest.approx(20)
+    kick_eq, kick_comp = plugins["Kick"]
+    kick = next(t for t in result["tracks"] if t["name"] == "Kick")
+    c = {p.name: p.value for p in kick_comp.parameters}
+    # the kick's crest asks for compression; Pro-C 3's own default (3.5:1) on LiveBridge's new
+    # instance is not taken for the user's setting
+    assert "Comp Ratio" in kick["values"] and not kick.get("kept"), kick
+    assert c["Mix"] == pytest.approx(100) and c["Ratio"] == pytest.approx(
+        kick["values"]["Comp Ratio"], abs=0.05)
+    assert c["Threshold"] == pytest.approx(kick["values"]["Comp Threshold"], abs=0.1)
+    assert c["Auto Gain"] == 0
+    for name, (_eq, comp) in plugins.items():           # no compression asked: dry
+        entry = next(t for t in result["tracks"] if t["name"] == name)
+        if "Comp Ratio" not in entry["values"]:
+            assert {p.name: p.value for p in comp.parameters}["Mix"] == pytest.approx(0)
+    # a rerun on the same mix reads the plug-ins back and changes nothing
+    again = call_tool(app, "live_mix_auto", args)
+    assert all(not t.get("changes") for t in again["tracks"]), \
+        [(t["name"], t.get("changes")) for t in again["tracks"]]
+    assert not any(t.get("kept") for t in again["tracks"])
+
+
+def test_strip_plugin_translation_round_trips():
+    eq, comp = mix.STRIP_PLUGINS["pro-q 4"], mix.STRIP_PLUGINS["pro-c 3"]
+    essential, optional = mix.strip_plugin_values(eq, {"HP Freq": 150.0, "Mid": -3.0,
+                                                       "Mid Freq": 350.0, "Low": 0.0})
+    assert essential["Band 1 Frequency"] == "150 Hz" and essential["Band 2 Used"] == "Unused"
+    assert essential["Band 3 Gain"] == "-3.0 dB" and optional["Band 3 Shape"] == "Bell"
+    shown = {"Band 1 Used": "Used", "Band 1 Frequency": "150.0 Hz", "Band 3 Used": "Used",
+             "Band 3 Gain": "-3.00 dB", "Band 3 Frequency": "350.0 Hz", "Band 2 Used": "Unused"}
+    back = mix.strip_plugin_read(eq, shown)
+    assert back["HP Freq"] == 150.0 and back["Mid"] == -3.0 and back["Mid Freq"] == 350.0
+    assert back["Low"] == 0.0 and back["High"] == 0.0
+    essential, optional = mix.strip_plugin_values(comp, {"Comp Ratio": 4.0, "Comp Threshold": -12.0,
+                                                         "Comp Release": 1200.0})
+    assert essential["Mix"] == "100 %" and optional["Ratio"] == "4.00:1"
+    back = mix.strip_plugin_read(comp, {"Mix": "100.0%", "Ratio": "4.00:1", "Threshold": "-12.00 dB",
+                                        "Attack": "20.0 ms", "Release": "1.20 s",
+                                        "Wet Gain": "+2.00 dB"})
+    assert back == {"Comp Threshold": -12.0, "Comp Ratio": 4.0, "Comp Attack": 20.0,
+                    "Comp Release": 1200.0, "Comp Makeup": 2.0}
+    assert mix.strip_plugin_read(comp, {"Mix": "0.0%"})["Comp Ratio"] == 1.0   # dry = at rest

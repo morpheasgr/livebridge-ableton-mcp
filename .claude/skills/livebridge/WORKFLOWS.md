@@ -651,7 +651,9 @@ Long runs answer `{job, status: "running"}` past ~40 s and go on in Live: poll
    `live_device_set_parameter(device="LiveBridge Channel", parameter=..., value=...)`.
    The user's own processing on the tracks (Pro-Q, Pro-C, a channel-strip plug-in)?
    `live_mix_auto(strips="measure")`: no Channels — LiveBridge only measures (Engines),
-   balances and masters, and changes none of the user's devices.
+   balances and masters, and changes none of the user's devices. Or the strip's EQ and
+   compression on the user's plug-ins: `strip_plugins=["Pro-Q 4", "Pro-C 3"]` — LiveBridge's
+   own instances per track, in front of the Channel.
 1b2. **Clashes** (kick and bass, vocal and pad on the same band): `live_mix_unmask(track="Bass",
    against="Kick")` measures both, picks the band where both are strong, and puts a LiveBridge
    Unmask (side-chained dynamic EQ) on the bass: it cuts that band only while the kick plays

@@ -1909,6 +1909,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         section_bars: list[int] | None = None,
         strips: str = "set",
         master_eq_plugin: str | None = None,
+        strip_plugins: list[str] | None = None,
     ) -> Any:
         """Mix (and master) the song by measurement in one call — the devices it needs are put
         in place by the tool itself. On each track with a LiveBridge Channel (a channel
@@ -1939,6 +1940,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             master_chain: "livebridge" (default: the LiveBridge Master device before the
                 master's Engine), "native" (EQ Eight -> Glue Compressor -> Limiter) or
                 "plugin" (your own Pro-L 2 / Ozone 12 Maximizer already on the master).
+            strip_plugins: do each strip's EQ and/or compression with your plug-ins:
+                ["Pro-Q 4"] (high-pass, low shelf, bell, high shelf on bands 1-4) and/or
+                ["Pro-C 3"] (threshold, ratio, attack, release, Wet Gain as makeup; Auto Gain
+                off). LiveBridge loads its own instance per track ("LB Strip EQ (Pro-Q 4)",
+                "LB Strip Comp (Pro-C 3)") in front of the Channel — your own plug-ins stay
+                untouched — and reuses them; the Channel keeps the meters, trim, width, bass
+                mono and saturation, its own EQ/compressor stay at rest. Same plan, memory and
+                `changes` as without them.
             master_eq_plugin: the master band fixes on LiveBridge's own instance of "Pro-Q 4"
                 or "Ozone 12 Equalizer" (see live_master_auto's eq_plugin) instead of
                 LiveBridge Master's EQ or advice.
@@ -1998,6 +2007,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               cmd=cmd)
         if strips not in ("set", "measure"):
             return tool_error("strips must be 'set' or 'measure'", cmd=cmd)
+        strip_specs = [mix.strip_plugin(n) for n in (strip_plugins or [])]
+        if any(spec is None for spec in strip_specs) or len(
+                {spec["kind"] for spec in strip_specs if spec}) != len(strip_specs):
+            return tool_error("strip_plugins: at most one of each — " + ", ".join(
+                v["plugin"] for v in mix.STRIP_PLUGINS.values()), cmd=cmd)
+        if strip_specs and strips == "measure":
+            return tool_error("strip_plugins needs strips='set' (measure-only changes no strip)",
+                              cmd=cmd)
+        handled = {k for spec in strip_specs for k in spec["handles"]}
         if master_eq_plugin and mix.plugin_eq(master_eq_plugin) is None:
             return tool_error("master_eq_plugin must be one of " + ", ".join(
                 v["plugin"] for v in mix.PLUGIN_EQS.values()), cmd=cmd)
@@ -2061,6 +2079,87 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return bridge_call(bridge, "devices.set_parameters",
                                {"track": name, "device": index, "values": _for_live(values)})
 
+        #: per track: plug-in kind -> path of LiveBridge's own instance inside its rack
+        strip_paths: dict[str, dict[str, str]] = {}
+
+        def place_strip_plugins(name: str) -> str | None:
+            """LiveBridge's own strip plug-ins on ``name``, in front of the Channel (loaded
+            the first time, reused after); an error text when one cannot be loaded."""
+            def listed() -> list[dict[str, Any]]:
+                got = bridge_call(bridge, "devices.list", {"track": name})
+                return list(got.get("devices") or []) if isinstance(got, dict) else []
+            for spec in strip_specs:
+                found = next((d for d in listed() if d.get("name") == spec["rack"]), None)
+                if found is None:
+                    args = {"track": name, "plugin": spec["plugin"], "replace": False,
+                            "parameters": mix.strip_plugin_parameters(spec),
+                            "name": spec["rack"], "editor_open": False}
+                    end = time.time() + 30.0
+                    while True:
+                        loaded = bridge_call(bridge, "plugin_racks.expose", args, timeout=60.0)
+                        if _is_error(loaded) or not isinstance(loaded, dict):
+                            return f"{spec['label']}: {(loaded or {}).get('error')}"
+                        if loaded.get("status") != "indexing" or time.time() > end:
+                            break
+                        time.sleep(1.0)
+                    found = next((d for d in listed() if d.get("name") == spec["rack"]), None)
+                    channel = strip_index(name)
+                    if found is None:
+                        return f"{spec['rack']} did not appear on the track"
+                    if channel is not None and found.get("index", 0) > channel:
+                        bridge_call(bridge, "devices.move", {"track": name,
+                                                             "device": found["index"],
+                                                             "position": channel})
+                        found = next((d for d in listed() if d.get("name") == spec["rack"]),
+                                     found)
+                strip_paths.setdefault(name, {})[spec["kind"]] = \
+                    f"{found['path']}.chains[0].devices[0]"
+            indexes[name] = strip_index(name)       # the Channel moved one place on
+            return None
+
+        def read_strip_plugins(name: str) -> dict[str, float]:
+            out: dict[str, float] = {}
+            for spec in strip_specs:
+                path = strip_paths.get(name, {}).get(spec["kind"])
+                if path is None:
+                    continue
+                page = bridge_call(bridge, "devices.parameters", {
+                    "track": name, "device": path, "detail": "minimal", "limit": 64})
+                displays = {str(p.get("name")): str(p.get("display"))
+                            for p in (page.get("parameters") or [])} \
+                    if isinstance(page, dict) else {}
+                out.update(mix.strip_plugin_read(spec, displays))
+            return out
+
+        def write_strip(name: str, index: int, values: dict[str, float],
+                        rest: bool = False) -> Any:
+            """Channel controls to the Channel, the ones a strip plug-in handles to it (the
+            Channel's own stay at rest)."""
+            chan = {k: v for k, v in values.items() if k not in handled}
+            if rest:
+                chan.update({k: mix.CHANNEL_NEUTRAL[k] for k in handled})
+            answer = set_strip(name, index, chan) if chan else {}
+            if _is_error(answer):
+                return answer
+            for spec in strip_specs:
+                part = {k: v for k, v in values.items() if k in spec["handles"]}
+                path = strip_paths.get(name, {}).get(spec["kind"])
+                if not part or path is None:
+                    continue
+                essential, optional = mix.strip_plugin_values(spec, part)
+                if essential:
+                    answer = bridge_call(bridge, "devices.set_parameters", {
+                        "track": name, "device": path, "values": essential})
+                    if _is_error(answer):
+                        return answer
+                if optional:
+                    extra = bridge_call(bridge, "devices.set_parameters", {
+                        "track": name, "device": path, "values": optional})
+                    if _is_error(extra):
+                        notes.append(f"{name}: {spec['rack']} — {', '.join(optional)} not set "
+                                     f"({extra.get('error')}); check them in its window.")
+            return answer
+
         indexes = {} if measure_only else {name: strip_index(name) for name in names}
         missing = [n for n, i in indexes.items() if i is None]
         if missing:
@@ -2099,24 +2198,40 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         if apply and not measure_only:
             for _device, name in pairs:          # at rest: measure the raw part
                 rest = dict(mix.CHANNEL_NEUTRAL)
+                if strip_specs:
+                    failed = place_strip_plugins(name)
+                    if failed:
+                        notes.append(f"{name}: strip plug-in not loaded ({failed}) — the "
+                                     "Channel does its EQ/compression.")
                 page = bridge_call(bridge, "devices.parameters", {
                     "track": name, "device": indexes[name], "detail": "minimal", "limit": 64})
                 last = remembered.get(name) or {}
-                for param in (page.get("parameters") or []) if isinstance(page, dict) \
-                        else []:
+                # the controls a strip plug-in handles are read from it, the Channel's own
+                # stay at rest
+                plugin_now = read_strip_plugins(name) if strip_specs else {}
+                params = [p for p in (page.get("parameters") or [])
+                          if p.get("name") not in plugin_now] \
+                    if isinstance(page, dict) else []
+                params += [{"name": k, "value": v, "display": _fmt(v)}
+                           for k, v in plugin_now.items()]
+                for param in params:
                     pname = param.get("name")
                     if pname not in rest:
                         continue
-                    now = _strip_number(param)
+                    now = _num(param.get("value")) if pname in plugin_now else \
+                        _strip_number(param)
                     was.setdefault(name, {})[pname] = now
-                    if keep_manual:
+                    # LiveBridge's own strip plug-in: what it holds before LiveBridge ever set
+                    # that control is the plug-in's default (Pro-C 3 starts at 3.5:1), not the
+                    # user's choice
+                    if keep_manual and not (pname in plugin_now and pname not in last):
                         if _same(now, rest[pname]):
                             continue
                         if pname in last and _same(now, last[pname]):
                             continue            # LiveBridge's own last setting
                         kept.setdefault(name, {})[pname] = str(param.get("display"))
                         del rest[pname]         # the user's: measure with it in place
-                answer = set_strip(name, indexes[name], rest)
+                answer = write_strip(name, indexes[name], rest, rest=True)
                 if _is_error(answer):
                     return answer
             time.sleep(_SETTLE_S)
@@ -2150,7 +2265,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         f"{k} {v}" for k, v in own.items()))
                 entry.update(values=values, reasons=reasons)
                 if apply and values:
-                    answer = set_strip(name, indexes[name], values)
+                    answer = write_strip(name, indexes[name], values)
                     if _is_error(answer):
                         entry["error"] = answer.get("error")
                 if apply and "error" not in entry:
