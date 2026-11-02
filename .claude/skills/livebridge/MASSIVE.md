@@ -7,7 +7,7 @@ for LiveBridge from Massive's documented architecture and common sound-design pr
 
 - **The map ships with LiveBridge** (`massive_vst3.json`, 202 parameters measured on Live
   12.4.7, Windows), so `live_plugin_expose` works at once. At most 128 controls per exposure;
-  the `sound_design` group (126) is the default working set. Other groups: `osc`, `osc 1|2|3`,
+  the `sound_design` group (122) is the default working set. Other groups: `osc`, `osc 1|2|3`,
   `noise`, `feedback`, `mod osc`, `filter`, `filter 1|2`, `env`, `env 1..4`, `lfo`,
   `mod 5..8`, `fx`, `insert`, `master fx`, `voice`, `unison`, `output`, `routing`, `macros`.
 - **Exposed:** oscillators 1-3 (on/off, wavetable, mode, position, the mode's second control,
@@ -16,18 +16,22 @@ for LiveBridge from Massive's documented architecture and common sound-design pr
   (delay, attack, decay, sustain and release times and levels, loop morph, velocity, key
   tracking), mod slots 5-8 (rate, amplitude, sync and its fraction, restart,
   crossfade/glide), inserts, master effects, EQ, unison, voice/trigger mode, glide, vibrato,
-  pan, master volume, macros 1-8.
+  pan, master volume, macros 1-8 (not in `sound_design`: Live shows them under their labels,
+  "2".."8", so name them that way if needed).
 - **Not exposed to the host:** modulation routings (Massive's drag-and-drop) and their
   amounts, LFO waveshapes, stepper steps, performer curves, macro assignments. They live in
   the patch: start from a preset that holds them (below) and drive them through the sources'
   own levels (`MODn-AMP`, the envelope levels).
 - **Envelope 4 is the amp envelope**: it shapes every note without a routing. Envelopes 1-3
   and slots 5-8 only do something when the patch routes them somewhere.
-- **Names of choices** (wavetables, filter, insert and effect types, voice modes): read them,
-  do not guess — `live_device_get_parameter(parameter="OSC1-WAVETABLE", track=..., device=...)`
-  lists the choices of a stepped control, `live_device_parameters(track=..., device=...,
-  filter="FILTER1")` shows the current display of a group. Set a choice or a value by its
-  display text ("800 Hz", a wavetable's name) with `live_device_set_parameters`.
+- **Setting values** (measured on the user's Massive): the knobs display 0-100 without a unit.
+  Pass them as text (`"45"`) or with `normalized=true` (`0.45`) in
+  `live_device_set_parameters` — a bare number is Live's internal 0-1 value, so `45` means the
+  maximum. Types, wavetables, modes and the voice mode are not stepped for Live (no choice
+  list to read): set them by name (`"Lowpass 4"` worked) and read the current one with
+  `live_device_parameters(track=..., device=..., filter="FILTER1")`. The filter and master
+  effect names are listed below; wavetable names: read the current display, or step through
+  `OSC1-WAVETABLE` with normalized values and read each display.
 
 ## Starting points (templates)
 
@@ -132,11 +136,18 @@ numbers below are what to aim for, not raw values.
   effects.
 - **Lead**: mono with glide (`GLIDE-TIME` short), vibrato depth small, filter 1 more open,
   unison 2 for width, Delay Synced as a master effect.
+- **Pitch drop (laser zap, kick-like bass)**: routed template. Envelope 3: attack time 0,
+  attack level full, decay 50-300 ms, decay level 0, sustain level 0 — the note starts up to
+  12 semitones high and falls to its pitch. A sustain level above 0 holds the pitch up for the
+  whole note (it is an offset, not a drop: measured on the user's Massive).
 
 ## When something sounds wrong
 
 - **Silent:** an oscillator off or at level 0, all oscillators routed to a filter that is off,
   `MASTER-VOLUME` down, or envelope 4 at zero sustain on a long note.
+- **Checking movement with the Engine:** its timeline has one reading per second, so a
+  faster LFO averages out (a cutoff wobble then shows as a level swing, not in the bands). To
+  confirm a routing, slow the LFO to one cycle every few seconds, then set the real rate.
 - **Nothing moves although a source is up:** that routing is not in the patch — use the routed
   template, or ask the user to drag the routing in Massive.
 - **A preset loads the wrong sound, or Massive's Save / Save As are greyed out:** Massive's

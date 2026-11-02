@@ -86,7 +86,7 @@ For another big VST3 plug-in, call `live_plugin_param_map` once, then expose it.
   `arp`, `global`, `clip`. Any words that start several names act as a group for any map:
   "filter 1" gives every "Filter 1 …" parameter.
 - **Massive** (Native Instruments, classic; `massive_vst3.json`, measured on Live 12.4.7,
-  Windows): 202 parameters, groups `sound_design` (126), `osc`, `osc 1|2|3`, `noise`, `feedback`, `mod osc`, `filter`, `filter 1|2`, `env`, `env 1..4`, `lfo`, `mod 5..8`, `fx`, `insert`, `master fx`, `voice`, `unison`, `output`, `routing`, `macros`. Modulation
+  Windows): 202 parameters, groups `sound_design` (122), `osc`, `osc 1|2|3`, `noise`, `feedback`, `mod osc`, `filter`, `filter 1|2`, `env`, `env 1..4`, `lfo`, `mod 5..8`, `fx`, `insert`, `master fx`, `voice`, `unison`, `output`, `routing`, `macros`. Modulation
   routings, LFO shapes, stepper steps and performer curves are not exposed to the host: start
   from a preset that holds the routings (`preset_file=`) and drive them through the sources'
   levels and the macros (see the skill's Massive section). No template state: without

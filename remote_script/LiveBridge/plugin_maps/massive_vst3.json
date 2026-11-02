@@ -831,7 +831,9 @@
  "notes": [
   "Massive (classic). Modulation routings (drag-and-drop), LFO shapes, stepper steps and performer curves are not exposed to the host: start from a preset that holds the routings (live_plugin_expose preset_file=) and drive them through the sources' levels (ENVELOPEn-*.LEV, MODn-AMP) and the macros.",
   "ENVELOPE4 is the amp envelope. MOD5..MOD8 are the LFO / performer / stepper slots (what each is depends on the patch).",
-  "SD.LN/SD.LD/SD.RN/SD.RD on a master effect: its sync delay's left/right numerator and denominator."
+  "SD.LN/SD.LD/SD.RN/SD.RD on a master effect: its sync delay's left/right numerator and denominator.",
+  "Live shows Massive's macro controls under their labels (\"2\"..\"8\" on the user's machine, not \"MACRO 2\"..), so an exposure that names them reports them missing; the sound-design set leaves the macros out.",
+  "Massive's knobs display 0-100 without a unit, and its type/wavetable/mode controls are not stepped for Live (no value_items): set knobs as text (\"45\") or normalized (0.45 = 45), types and wavetables by their names (\"Lowpass 4\")."
  ],
  "groups": {
   "macros": [
@@ -1259,14 +1261,6 @@
    "INSERT2-POSITION"
   ],
   "sound_design": [
-   "MACRO 1",
-   "MACRO 2",
-   "MACRO 3",
-   "MACRO 4",
-   "MACRO 5",
-   "MACRO 6",
-   "MACRO 7",
-   "MACRO 8",
    "OSC1-ON OFF",
    "OSC1-WAVETABLE",
    "OSC1-MODE",
@@ -1348,18 +1342,22 @@
    "MOD5-AMP",
    "MOD5-SYNC",
    "MOD5-RESTART",
+   "MOD5-CROSSF./GLIDE",
    "MOD6-RATE",
    "MOD6-AMP",
    "MOD6-SYNC",
    "MOD6-RESTART",
+   "MOD6-CROSSF./GLIDE",
    "MOD7-RATE",
    "MOD7-AMP",
    "MOD7-SYNC",
    "MOD7-RESTART",
+   "MOD7-CROSSF./GLIDE",
    "MOD8-RATE",
    "MOD8-AMP",
    "MOD8-SYNC",
    "MOD8-RESTART",
+   "MOD8-CROSSF./GLIDE",
    "INSERT1-ON OFF",
    "INSERT1-TYPE",
    "INSERT1-DW/PRM.1",

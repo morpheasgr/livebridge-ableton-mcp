@@ -476,9 +476,11 @@ def test_shipped_massive_map_has_consistent_sections():
         assert set(members) <= set(names), group
     design = data["groups"]["sound_design"]
     for wanted in ("OSC1-WAVETABLE", "OSC1-POSITION", "FILTER1-CUT/PRM.1", "FILTER1-TYPE",
-                   "ENVELOPE4-REL. TME", "MOD5-RATE", "MOD5-AMP", "MACRO 8", "UNISONO",
-                   "MASTER-VOLUME"):
+                   "ENVELOPE4-REL. TME", "MOD5-RATE", "MOD5-AMP", "MOD8-CROSSF./GLIDE",
+                   "UNISONO", "MASTER-VOLUME"):
         assert wanted in design
+    # Live shows the macros under their labels ("2".."8"): named, they would read as missing
+    assert not any(name.startswith("MACRO ") for name in design)
     grouped = {m for members in data["groups"].values() for m in members}
     assert set(names) == grouped
     assert any("not exposed to the host" in note for note in data["notes"])

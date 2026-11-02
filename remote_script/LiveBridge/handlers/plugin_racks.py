@@ -778,7 +778,7 @@ def plugin_racks_expose(ctx, track=None, plugin=None, parameters=None, macros=No
             keywords from the map — Serum 2: "sound_design" (120 curated sound-design
             controls), "osc", "osc a|b|c", "sub", "noise", "filter", "filter 1|2", "env",
             "lfo", "macros", "fx", "unison", "routing", "mod", "arp", "global";
-            Massive: "sound_design" (126), "osc", "osc 1|2|3", "noise", "feedback", "mod osc", "filter", "filter 1|2", "env", "env 1..4", "lfo", "mod 5..8", "fx", "insert", "master fx", "voice", "unison", "output", "routing", "macros".
+            Massive: "sound_design" (122), "osc", "osc 1|2|3", "noise", "feedback", "mod osc", "filter", "filter 1|2", "env", "env 1..4", "lfo", "mod 5..8", "fx", "insert", "master fx", "voice", "unison", "output", "routing", "macros".
             Any other words that start several names expose all of them
             ("filter 1" -> every "Filter 1 ..." parameter; works for any map).
             Default: "sound_design" when the map has it.  At most 128 in total.
