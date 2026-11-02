@@ -34,7 +34,7 @@ These held through the whole build and stay:
    macOS, Windows and Linux).
 6. **Clean-room towards non-permissive projects.** Ideas from GPL / AGPL / BSL tools are fine,
    their code is not. MIT-licensed code may be ported with its notice.
-7. **Tested without Live.** A fake `Live` package runs the whole suite (about 1,770 tests);
+7. **Tested without Live.** A fake `Live` package runs the whole suite (about 1,790 tests);
    real-Live checks are scripted and repeatable.
 
 ## Where it stands (October 2026)

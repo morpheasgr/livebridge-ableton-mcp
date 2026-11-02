@@ -2389,7 +2389,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             elif measure_only:
                 entry.update(values={}, reasons=["measured only: its own processing stays"])
             else:
-                plan = mix.channel_plan(role, reading, remembered.get(name))
+                # no memory of this strip (a set saved under a new name: the memory is per set
+                # path): what is on it now decides what counts as "on" for the hysteresis — a
+                # compressor running there stays down to its keep limit instead of needing a
+                # new compressor's case (it went off at crest 11.1 on a saved-as copy)
+                previous = remembered.get(name)
+                if previous is None and was.get(name):
+                    previous = {k: v for k, v in was[name].items() if v is not None}
+                plan = mix.channel_plan(role, reading, previous)
                 own = kept.get(name) or {}
                 values = {k: v for k, v in plan["values"].items() if k not in own}
                 reasons = list(plan["reasons"])

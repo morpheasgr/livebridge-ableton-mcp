@@ -1005,6 +1005,27 @@ def test_mix_auto_all_silent_puts_the_strips_back_and_stops(app, song, mix_set, 
     assert not any(inst == "m" for inst, _cmd in mix_set.requests)        # no master step
 
 
+def test_a_strip_without_memory_keeps_its_running_compressor(app, song, mix_set, monkeypatch,
+                                                             tmp_path):
+    """A set saved under a new name has no strip memory (it is per set path): a compressor on
+    the strip still counts as on, so it stays inside the hold band (a kick at crest 12.5:
+    starting one needs > 13.5, keeping one > 11.5). It went off on a saved-as copy with
+    keep_manual=false."""
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "fresh-library"))
+    _strips(mix_set, monkeypatch)
+    lufs, _crest, share = mix_set.parts["Kick"]
+    mix_set.parts["Kick"] = (lufs, 12.5, share)
+    kick = next(d for d in mix_set.track("Kick").devices if d.name == "LiveBridge Channel")
+    params = {p.name: p for p in kick.parameters}
+    params["Comp Ratio"].value = 4.0
+    params["Comp Threshold"].value = -10.0
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "balance": False,
+                                              "place_devices": False, "keep_manual": False})
+    entry = next(t for t in result["tracks"] if t["name"] == "Kick")
+    assert params["Comp Ratio"].value == pytest.approx(4.0), entry
+    assert "Comp Ratio" not in (entry.get("changes") or {})
+
+
 def test_a_capped_move_is_final_until_the_fader_is_touched(app, song, mix_set):
     """A part that keeps reading quiet got +3 dB on every rerun (DR Tom +3, +3, ...): the raise
     limit counts over runs while the fader stays where the balance left it."""

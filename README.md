@@ -116,7 +116,11 @@ More in the [prompt library](examples/prompts.md). Scripting Live without Claude
   `live_mix_auto` puts a LiveBridge Channel (a channel strip from Ableton's own DSP plus the
   meters, Max 9) on every track and the Engine and LiveBridge Master on the master by itself,
   EQs, compresses and high-passes every part for its role (with a reason for each move), fixes
-  kick against bass, balances the faders and masters to a loudness target.
+  kick against bass, balances the faders and masters to a loudness target. Or on your own
+  plug-ins: the master through FabFilter Pro-L 2 or the iZotope Ozone 12 Maximizer
+  (`chain="plugin"`), its EQ fixes on Pro-Q 4 or the Ozone 12 Equalizer, each track's EQ and
+  compression on Pro-Q 4 and Pro-C 3 (`strip_plugins`) — or just measure, balance and master
+  around your own processing (`strips="measure"`).
 - **Production know-how and memory:** genre recipes, every Serum 2 control, melody craft with a
   checker for flat, scale-walking lines, moods turned into notes, transitions per genre,
   workflows, a sound library, generative rhythms and note chance, and project notes Claude
