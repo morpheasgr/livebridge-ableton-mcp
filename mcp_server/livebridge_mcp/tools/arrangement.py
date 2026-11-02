@@ -109,7 +109,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return result
         plan = result.pop("automation")
         runner = arrange_automation.runner_for(
-            lambda cmd, args: bridge_call(bridge, cmd, args), id(bridge))
+            lambda cmd, args: bridge_call(bridge, cmd, args), bridge)
         if "sample" in plan:
             sample = plan["sample"]
             lanes = sample.get("lanes") or []

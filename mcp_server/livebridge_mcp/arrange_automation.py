@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import itertools
 import threading
+import weakref
 import time
 from typing import Any, Callable
 
@@ -297,11 +298,15 @@ class Runner:
         return lanes
 
 
-_RUNNERS: dict[int, Runner] = {}
+#: one runner per bridge, held weakly: keyed by id() a freed bridge's runner (with its jobs and
+#: its dead connection) was handed to a later bridge that got the same id — tests that built a
+#: bridge each saw "recording rec1 is still running" from an earlier test
+_RUNNERS: "weakref.WeakKeyDictionary[Any, Runner]" = weakref.WeakKeyDictionary()
 
 
-def runner_for(call: Call, key: int) -> Runner:
-    """The runner of one bridge (``key``: id of the BridgeClient)."""
-    if key not in _RUNNERS:
-        _RUNNERS[key] = Runner(call)
-    return _RUNNERS[key]
+def runner_for(call: Call, owner: Any) -> Runner:
+    """The runner of one bridge (``owner``: the BridgeClient object itself)."""
+    runner = _RUNNERS.get(owner)
+    if runner is None:
+        runner = _RUNNERS[owner] = Runner(call)
+    return runner

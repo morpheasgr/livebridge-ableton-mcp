@@ -38,6 +38,21 @@ for _path in (STUB_DIR, REMOTE_SCRIPT_DIR, TESTS_DIR):
 import Live  # noqa: E402  (must come after the sys.path juggling)
 from live_stub import factory  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _fresh_recorders():
+    """Every test starts with no automation recording or resampling running, as after Live
+    loads the script: the module-level recorders outlive a test, and a recording the
+    tool-wide smoke test started (the fake song never finishes) refused every later one —
+    "recording rec1 is still running" failed whichever recording test ran after it."""
+    from LiveBridge.handlers import automation as automation_handlers
+    from LiveBridge.handlers import record as record_handlers
+    for state in (automation_handlers._RECORDER, record_handlers._RESAMPLER):
+        state.update(current=None, last=None)
+    yield
+    for state in (automation_handlers._RECORDER, record_handlers._RESAMPLER):
+        state.update(current=None, last=None)
+
 from LiveBridge import config as config_module  # noqa: E402
 from LiveBridge import log as log_module  # noqa: E402
 from LiveBridge import registry  # noqa: E402

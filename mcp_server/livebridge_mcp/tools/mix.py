@@ -1478,10 +1478,27 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     return _display_number(shown), shown
                 return None, None
 
+            def bell_freq() -> float | None:
+                if spec is None:
+                    return mix._display_value(read_param(target["index"], "EQ Mid Freq")[1])
+                got = bridge_call(bridge, "devices.get_parameter", {
+                    "track": "master", "device": target["path"],
+                    "parameter": spec["freq"].format(n=spec["bands"]["EQ Mid"])})
+                return mix._display_value(got.get("display")) \
+                    if isinstance(got, dict) and not _is_error(got) else None
+
             settings: dict[str, tuple[float, float | None]] = {}
             was: dict[str, float] = {}
             for param, (delta, freq) in wanted.items():
                 current = read(param)[0] or 0.0
+                if param == "EQ Mid" and current and freq:
+                    # one bell: a cut at 700 Hz is not the fix for 2-5 kHz — the bell moves
+                    # to the band that asks now (more than a third of an octave away)
+                    at = bell_freq()
+                    if at and max(at, freq) / min(at, freq) > 1.26:
+                        notes.append(f"EQ Mid moved from {at:g} Hz ({current:+.1f} dB) to "
+                                     f"{freq:g} Hz: that band is {delta:+.1f} dB off now.")
+                        current = 0.0
                 setting = -math.copysign(min(abs(delta) / 2.0, 4.0), delta)
                 # the bands are measured after this EQ: a cut already in place that is as
                 # deep as the excess asks for stays (adding to it on every run walked an
@@ -2336,8 +2353,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                for k, v in remembered[name].items()
                                if k in before_values and not _same(before_values.get(k), v)}
                     comp_kind = next((sp for sp in strip_specs if sp["kind"] == "comp"), None)
-                    if comp_kind and float(remembered[name].get("Comp Ratio", 1.0)) <= 1.01 \
-                            and any(k.startswith("Comp ") for k in changes):
+                    if comp_kind and comp_kind["kind"] in strip_paths.get(name, {}) and \
+                            float(remembered[name].get("Comp Ratio", 1.0)) <= 1.01 and \
+                            any(k.startswith("Comp ") for k in changes):
                         # a dry compressor: one line, not threshold/ratio moves that the
                         # plug-in does not even show (only its Mix moves)
                         for k in [k for k in changes if k.startswith("Comp ")]:

@@ -74,7 +74,7 @@ def app(tcp_bridge, tmp_path, monkeypatch):
     bridge = BridgeClient(host="127.0.0.1", port=tcp_bridge.port, timeout=10.0)
     application = create_app(bridge)
     yield application
-    runner = arrange_automation.runner_for(None, id(bridge))
+    runner = arrange_automation.runner_for(None, bridge)
     runner.cancel()
     runner.wait(10)
 

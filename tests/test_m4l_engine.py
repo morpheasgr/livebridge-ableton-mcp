@@ -1206,7 +1206,7 @@ def test_arrangement_automation_jobs_through_the_engine(engines, tcp_bridge, son
         clock.stop()
         uninstall()
         from livebridge_mcp import arrange_automation
-        arrange_automation.runner_for(None, id(bridge)).cancel()
+        arrange_automation.runner_for(None, bridge).cancel()
     (job,) = status["arrangement_jobs"]
     assert job["phase"] == "done", job
     assert [(p["mode"], p["writer"], p["tempo_during_pass"]) for p in job["passes"]] == [

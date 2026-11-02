@@ -174,9 +174,15 @@ def test_bank_end_to_end(engines, monkeypatch, tmp_path):  # noqa: F811
         {"name": "Fake Bank", "path": "song.tracks[0].devices[1]"}]})
     bridge.set_result("devices.delete", {"deleted": True})
 
-    # what Live does when the bank device loads: a second host starts with its config
+    # what Live does when the bank device loads: a second host starts with its config — once
+    # the tool asked for the load (a fixed 1 s head start lost the race on a busy machine: the
+    # new host already existed when the tool listed the hosts before loading, so it was never
+    # seen as new — "the bank device did not report its plug-in")
     def live_loads_the_bank():
-        time.sleep(1.0)
+        end = time.time() + 60.0
+        while time.time() < end and not any(
+                r.get("cmd") == "browser.load" for r in list(bridge.requests)):
+            time.sleep(0.05)
         monkeypatch.setenv("LIVEBRIDGE_HOST_CONFIG", _config(
             kind="instrument", autoload={"file": "FakeSynth", "sub": "Fake", "name": "Fake"},
             bank=[{"name": "Cutoff", "index": 1}]))

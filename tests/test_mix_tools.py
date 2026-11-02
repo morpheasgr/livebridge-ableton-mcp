@@ -1229,6 +1229,14 @@ def test_master_band_fixes_go_on_the_users_eq_plugin(app, song, mix_set):
         "eq_bands": {"mid": 6.2}})
     assert {q.name: q.value for q in eq.parameters}["Band 2 Gain"] == pytest.approx(-3.5)
     assert "eq" not in again
+    # a 2-5 kHz excess is not covered by the 700 Hz cut: the bell moves there
+    moved = call_tool(app, "live_master_auto", {
+        "destination": "club", "seconds": 3, "chain": "plugin", "eq_plugin": "Pro-Q 4",
+        "eq_bands": {"high_mid": 5.0}})
+    p = {q.name: q.value for q in eq.parameters}
+    assert p["Band 2 Frequency"] == pytest.approx(3500, rel=0.01)
+    assert p["Band 2 Gain"] == pytest.approx(-2.5)
+    assert any("EQ Mid moved from 700 Hz" in n for n in moved["notes"]), moved["notes"]
 
 
 def test_master_eq_plugin_that_cannot_load_falls_back_to_advice(app, song, mix_set):

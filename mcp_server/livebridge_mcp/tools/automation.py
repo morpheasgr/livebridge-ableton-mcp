@@ -495,7 +495,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         read back through the API. For clip-level automation use live_automation_write/shape.
         """
         runner = arrange_automation.runner_for(
-            lambda c, a: bridge_call(bridge, c, a), id(bridge))
+            lambda c, a: bridge_call(bridge, c, a), bridge)
         if action == "status":
             status = with_engine(bridge_call(bridge, "automation.record_status", {}))
             jobs = runner.status()
