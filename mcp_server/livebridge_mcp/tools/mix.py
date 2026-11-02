@@ -52,9 +52,10 @@ _MASTER_DEVICE = "LiveBridge Master"
 _MAKEUP_MAX_DB = 12.0
 _SQUASH_DB = 12.0
 #: strip plug-ins (Pro-Q 4 / Pro-C 3): new instances per live_mix_auto run, and the pause after
-#: each — Live crashed loading ~22 VST3 instances back to back; 8 one after another worked
+#: each before its window is closed — Live crashed in Pro-C 3's OpenGL thread (NVIDIA driver)
+#: when auto-opened windows were closed at once, ~3 new instances into a run
 _MAX_NEW_STRIP_PLUGINS = 8
-_STRIP_LOAD_PAUSE_S = 2.0
+_STRIP_LOAD_PAUSE_S = 3.0
 #: band of live_mix_balance's `bands` -> (LiveBridge Master EQ control, mid frequency in Hz)
 _MASTER_EQ_BANDS: dict[str, tuple[str, float | None]] = {
     "sub": ("EQ Low", None), "bass": ("EQ Low", None), "low_mid": ("EQ Mid", 180.0),
@@ -226,6 +227,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         for device in devices:
             bridge_call(bridge, "devices.set_state", {"track": "master",
                                                       "device": device["index"], "active": on})
+
+    def close_plugin_window(track: str, path: str) -> None:
+        """Close a just-loaded plug-in's window (Live auto-opens them when its preference says
+        so) — after a pause: a FabFilter Pro-C 3 crashed Live in its OpenGL thread (NVIDIA
+        driver) when its window was closed while it was still being set up."""
+        time.sleep(_STRIP_LOAD_PAUSE_S)
+        bridge_call(bridge, "plugins.set", {"track": track, "device": path,
+                                            "editor_open": False})
 
     def current_set() -> str:
         """The open set's key for per-set memories: its path, else its name, else "unsaved"."""
@@ -1404,9 +1413,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 return next((d for d in chain() if d.get("name") == name), None)
             found = placed()
             if found is None:
+                # the window is left as Live opens it and closed after a pause below
                 args = {"track": "master", "plugin": spec["plugin"], "replace": False,
-                        "parameters": mix.plugin_eq_parameters(spec), "name": name,
-                        "editor_open": False}
+                        "parameters": mix.plugin_eq_parameters(spec), "name": name}
                 end = time.time() + 30.0
                 while True:
                     loaded = bridge_call(bridge, "plugin_racks.expose", args, timeout=60.0)
@@ -1421,6 +1430,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 if found is None:
                     notes.append(f"{name} did not appear on the master: band fixes as advice.")
                     return None
+                close_plugin_window("master", f"{found['path']}.chains[0].devices[0]")
                 if found.get("index") != at:
                     bridge_call(bridge, "devices.move", {"track": "master",
                                                          "device": found["index"],
@@ -2106,9 +2116,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         continue
                     new_strip_loads[0] += 1
                     jobs.note(f"loading {spec['rack']} on {name}")
+                    # the window is left as Live opens it and closed after the pause below
                     args = {"track": name, "plugin": spec["plugin"], "replace": False,
                             "parameters": mix.strip_plugin_parameters(spec),
-                            "name": spec["rack"], "editor_open": False}
+                            "name": spec["rack"]}
                     end = time.time() + 30.0
                     while True:
                         loaded = bridge_call(bridge, "plugin_racks.expose", args, timeout=60.0)
@@ -2123,8 +2134,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         return f"{spec['rack']} did not appear on the track"
                     if name not in loaded_strips:
                         loaded_strips.append(name)
-                    # let Live finish this instance before the next one arrives
-                    time.sleep(_STRIP_LOAD_PAUSE_S)
+                    # let Live and the plug-in finish this instance (its graphics too)
+                    # before its window closes and the next one arrives
+                    close_plugin_window(name, f"{found['path']}.chains[0].devices[0]")
                     if channel is not None and found.get("index", 0) > channel:
                         bridge_call(bridge, "devices.move", {"track": name,
                                                              "device": found["index"],

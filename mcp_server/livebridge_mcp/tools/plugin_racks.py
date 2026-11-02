@@ -30,6 +30,8 @@ from ..client import BridgeClient
 _STEP_SECONDS = 4.0
 _CALL_TIMEOUT = 45.0
 _POLL_SECONDS = 1.0
+#: seconds before a just-loaded plug-in's window is closed (editor_open=false)
+_CLOSE_DELAY_S = 2.0
 _MAX_WAIT = 600.0
 _FORMATS = ("VST3", "AU", "VST2", "vst3", "au", "vst2")
 
@@ -144,7 +146,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 return result
             await asyncio.sleep(_POLL_SECONDS)
         if editor_open is not None and result.get("device"):
-            # Live auto-opens plug-in windows on the tick after a load: set it again now
+            # Live auto-opens plug-in windows on the tick after a load: set it again now — a
+            # window is closed only after the plug-in had time to set up its graphics (closing
+            # at once crashed a FabFilter Pro-C 3 in the graphics driver)
+            if not editor_open:
+                await asyncio.sleep(_CLOSE_DELAY_S)
             window = await asyncio.to_thread(bridge_call, bridge, "plugins.set",
                                              {"device": result["device"],
                                               "editor_open": editor_open})

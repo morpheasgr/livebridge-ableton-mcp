@@ -906,9 +906,12 @@ def plugin_racks_expose(ctx, track=None, plugin=None, parameters=None, macros=No
     except Exception:
         pass
     plugin_device = _plugin_in_rack(rack)
-    if editor_open is not None and compat.has(plugin_device, "is_editor_open"):
+    # open on request at once; never CLOSE in the tick the plug-in is created: a FabFilter
+    # Pro-C 3 crashed Live in its OpenGL thread (NVIDIA driver) when its window, auto-opened
+    # by Live, was closed while it was still being set up — the MCP side closes it later
+    if editor_open and compat.has(plugin_device, "is_editor_open"):
         try:
-            plugin_device.is_editor_open = editor_open
+            plugin_device.is_editor_open = True
         except Exception:
             pass
     params = parameters_of(plugin_device)
