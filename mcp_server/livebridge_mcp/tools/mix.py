@@ -2106,6 +2106,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     channel = strip_index(name)
                     if found is None:
                         return f"{spec['rack']} did not appear on the track"
+                    if name not in loaded_strips:
+                        loaded_strips.append(name)
                     if channel is not None and found.get("index", 0) > channel:
                         bridge_call(bridge, "devices.move", {"track": name,
                                                              "device": found["index"],
@@ -2192,6 +2194,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             set(v) & set(mix.CHANNEL_NEUTRAL))} if isinstance(strips_file, dict) else {}
         strip_set = current_set()
         remembered = dict(strips_file.get(strip_set) or {})
+        #: what LiveBridge had set before this run (a strip plug-in control it never set holds
+        #: the plug-in's factory default: reported as "new", not as a previous setting)
+        prior = {k: dict(v) for k, v in remembered.items() if isinstance(v, dict)}
+        #: tracks that got LiveBridge's strip plug-ins in this run
+        loaded_strips: list[str] = []
         kept: dict[str, dict[str, str]] = {}
         #: each strip's controls before this run, for the before -> after report
         was: dict[str, dict[str, float | None]] = {}
@@ -2234,6 +2241,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 answer = write_strip(name, indexes[name], rest, rest=True)
                 if _is_error(answer):
                     return answer
+            if strip_specs and loaded_strips:
+                notes.append(" and ".join(sp["rack"] for sp in strip_specs) + " in front of the "
+                             "LiveBridge Channel on: " + ", ".join(loaded_strips) + " (reused on "
+                             "later runs; your own plug-ins are untouched).")
             time.sleep(_SETTLE_S)
         elif not measure_only:
             notes.append("apply=false: the plan is based on the strips as they are now — if "
@@ -2274,9 +2285,21 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     # what this run changed on the strip (rest counts: a control LiveBridge
                     # set before and does not want now goes back to rest)
                     before_values = was.get(name) or {}
-                    changes = {k: f"{_fmt(before_values.get(k))} -> {_fmt(v)}"
+                    def before_text(k: str) -> str:
+                        if k in handled and k not in prior.get(name, {}):
+                            return "new"
+                        return _fmt(before_values.get(k))
+                    changes = {k: f"{before_text(k)} -> {_fmt(v)}"
                                for k, v in remembered[name].items()
                                if k in before_values and not _same(before_values.get(k), v)}
+                    comp_kind = next((sp for sp in strip_specs if sp["kind"] == "comp"), None)
+                    if comp_kind and float(remembered[name].get("Comp Ratio", 1.0)) <= 1.01 \
+                            and any(k.startswith("Comp ") for k in changes):
+                        # a dry compressor: one line, not threshold/ratio moves that the
+                        # plug-in does not even show (only its Mix moves)
+                        for k in [k for k in changes if k.startswith("Comp ")]:
+                            del changes[k]
+                        changes[comp_kind["plugin"]] = "off (Mix 0 %)"
                     entry["changes"] = changes
                     # a control going back to rest gets a reason too (the kick's compressor
                     # went off with none)

@@ -1314,7 +1314,10 @@ def test_mix_auto_does_the_strip_eq_and_compression_with_plugins(app, song, mix_
     assert q["Band 1 Used"] == 1 and q["Band 1 Frequency"] == pytest.approx(300, rel=0.01)
     assert q["Band 1 Shape"] == 2 and q["Band 1 Slope"] == 1                 # low cut, 24 dB
     hats = next(t for t in result["tracks"] if t["name"] == "Hats")
-    assert hats["changes"]["HP Freq"].endswith("300")
+    assert hats["changes"]["HP Freq"] == "new -> 300"     # a fresh instance, not "1000 -> 300"
+    if "Comp Ratio" not in hats["values"]:                 # dry: one line, not -16 -> 0 etc.
+        assert hats["changes"]["Pro-C 3"] == "off (Mix 0 %)"
+        assert not any(k.startswith("Comp ") for k in hats["changes"])
     channel = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
     assert {p.name: p.value for p in channel.parameters}["HP Freq"] == pytest.approx(20)
     kick_eq, kick_comp = plugins["Kick"]
