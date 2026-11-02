@@ -1541,6 +1541,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
             settings: dict[str, tuple[float, float | None]] = {}
             was: dict[str, float] = {}
+            #: a bell that moved: its gain and frequency before (the report shows both)
+            moved: dict[str, tuple[float, float]] = {}
             for param, (delta, freq) in wanted.items():
                 current = read(param)[0] or 0.0
                 if param == "EQ Mid" and current and freq:
@@ -1550,6 +1552,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     if at and max(at, freq) / min(at, freq) > 1.26:
                         notes.append(f"EQ Mid moved from {at:g} Hz ({current:+.1f} dB) to "
                                      f"{freq:g} Hz: that band is {delta:+.1f} dB off now.")
+                        moved[param] = (current, at)
                         current = 0.0
                 setting = -math.copysign(min(abs(delta) / 2.0, 4.0), delta)
                 # the bands are measured after this EQ: a cut already in place that is as
@@ -1624,7 +1627,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             for param in settings:
                 shown = read(param)[1]
                 label = f"{param} ({gain_name(param)})" if spec else param
-                done[label] = (f"{_fmt(was[param])} -> {shown}" if param in was else str(shown))
+                if param in moved:
+                    old, at = moved[param]
+                    done[label] = f"{_fmt(old)} @ {at:g} Hz -> {shown} @ {settings[param][1]:g} Hz"
+                else:
+                    done[label] = f"{_fmt(was[param])} -> {shown}" if param in was else str(shown)
             if spec is None and any(f is not None for _g, f in settings.values()):
                 done["EQ Mid Freq"] = str(read_param(target["index"], "EQ Mid Freq")[1])
             return done

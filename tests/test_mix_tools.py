@@ -1294,6 +1294,9 @@ def test_master_band_fixes_go_on_the_users_eq_plugin(app, song, mix_set):
     assert p["Band 2 Frequency"] == pytest.approx(3500, rel=0.01)
     assert p["Band 2 Gain"] == pytest.approx(-2.5)
     assert any("EQ Mid moved from 700 Hz" in n for n in moved["notes"]), moved["notes"]
+    change = moved["eq"]["EQ Mid (Band 2 Gain)"]                  # both ends, with the bell
+    assert change.startswith("-3.5") and "@ 700 Hz -> " in change and \
+        change.endswith("@ 3500 Hz"), change
 
 
 def test_master_eq_plugin_that_cannot_load_falls_back_to_advice(app, song, mix_set):
