@@ -139,5 +139,9 @@ numbers below are what to aim for, not raw values.
   `MASTER-VOLUME` down, or envelope 4 at zero sustain on a long note.
 - **Nothing moves although a source is up:** that routing is not in the patch — use the routed
   template, or ask the user to drag the routing in Massive.
+- **A preset loads the wrong sound, or Massive's Save / Save As are greyed out:** Massive's
+  sound database is broken — the user rebuilds it in Massive's Browser (fixed it on the
+  user's machine: `.vstpreset` files then loaded the designed sound again). LiveBridge's
+  templates load the same way, so fix this before anything else.
 - **Harsh or clipping:** resonance plus feedback plus a clipper insert stack up — lower one,
   then check the level with `live_engine_listen`.
