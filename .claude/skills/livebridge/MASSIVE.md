@@ -20,7 +20,7 @@ for LiveBridge from Massive's documented architecture and common sound-design pr
 - **Not exposed to the host:** modulation routings (Massive's drag-and-drop) and their
   amounts, LFO waveshapes, stepper steps, performer curves, macro assignments. They live in
   the patch: start from a preset that holds them (below) and drive them through the sources'
-  own levels (`MODn-AMP`, the envelope levels) and the macros.
+  own levels (`MODn-AMP`, the envelope levels).
 - **Envelope 4 is the amp envelope**: it shapes every note without a routing. Envelopes 1-3
   and slots 5-8 only do something when the patch routes them somewhere.
 - **Names of choices** (wavetables, filter, insert and effect types, voice modes): read them,
@@ -47,8 +47,15 @@ Two Live presets of Massive, made once by the user and kept in the User Library:
 | Slot 5 (LFO) | Filter 1 cutoff | `MOD5-AMP` | wobble, filter movement |
 | Slot 6 (LFO) | Oscillator 1-3 position | `MOD6-AMP` | evolving pads and basses |
 | Slot 7 (LFO) | Filter path pan | `MOD7-AMP` | auto-pan |
-| Macro 1 | Filter 1 + 2 cutoff | `MACRO 1` | one brightness knob for automation |
-| Macro 2 | Oscillator 1-3 position | `MACRO 2` | one timbre knob for automation |
+
+Amounts in the template (the most each routing can do, measured from the knob's own position):
+envelope 1 and 2 about half the knob's travel, envelope 3 about +12 semitones (pitch spans
+±64), slot 5 about a quarter, slot 6 about 30 %, slot 7 full. Envelope levels and LFO depth
+only scale them down. The LFOs: curve A sine, curve B saw down, `MODn-CROSSF./GLIDE` blends
+between them; their internal envelope (attack 0, decay inf) is fixed by the template. Each
+Massive knob has two modulation slots plus an SC slot, so a knob takes at most two routings:
+the template uses both on the cutoffs and positions, and no macros (cutoff and position are
+exposed and can be automated directly).
 
 **Massive's own presets** (`.nmsv`, in `%CommonProgramFiles(x86)%\Native Instruments\Massive\Sounds`
 and `Documents\Native Instruments\Massive\Sounds`; on macOS under Application Support and
