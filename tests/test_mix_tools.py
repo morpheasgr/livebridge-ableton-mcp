@@ -24,6 +24,9 @@ from test_consistency import call_tool  # noqa: E402
 
 from live_stub import factory  # noqa: E402
 
+#: the real playhead check (conftest replaces it: the fake playhead never moves)
+_real_playhead_moves = mix_tools._playhead_moves
+
 BANDS = ("sub", "bass", "low_mid", "mud", "mid", "presence", "high", "air")
 
 
@@ -946,6 +949,60 @@ def test_bars_plays_the_section_and_stops_again(app, song, mix_set):
     assert song.is_playing is False and song.loop is False
     bad = call_tool(app, "live_mix_balance", {"seconds": 3, "section_bars": [4, 1]})
     assert bad["type"] == "bad_args"
+
+
+def test_a_still_playhead_aborts_and_undoes_the_start(app, song, mix_set, monkeypatch):
+    """No audio device (the interface switched off): Live says "playing" but the playhead
+    stands still and every meter reads silence. The run stops at once, says why, and leaves
+    the transport, the start marker and the loop as they were."""
+    monkeypatch.setattr(mix_tools, "_playhead_moves",
+                        lambda bridge, wait=0.0: _real_playhead_moves(bridge, 0.3))
+    song.is_playing = False
+    song.loop = False
+    song.start_time = 4.0
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "section_bars": [3, 4]})
+    assert result["type"] == "invalid_state", result
+    assert "playback didn't start" in result["error"] and "audio device" in result["error"]
+    assert "transport is stopped" not in result["error"]
+    assert song.is_playing is False and song.loop is False and song.start_time == 4.0
+    assert not mix_set.requests                               # nothing was measured
+
+
+def test_stopped_with_section_bars_says_playback_did_not_start(app, song, mix_set,
+                                                               monkeypatch):
+    """The tool pressed play itself: "the transport is stopped: pass section_bars" was
+    wrong advice when section_bars had been passed."""
+    real = mix_tools.bridge_call
+
+    def stopped_song(bridge, cmd, args=None, **kw):
+        answer = real(bridge, cmd, args, **kw)
+        if cmd == "transport.get" and isinstance(answer, dict):
+            answer = {**answer, "is_playing": False}
+        return answer
+    monkeypatch.setattr(mix_tools, "bridge_call", stopped_song)
+    result = call_tool(app, "live_mix_balance", {"seconds": 3, "section_bars": [1, 4]})
+    assert result["type"] == "invalid_state"
+    assert "playback didn't start" in result["error"], result
+    plain = call_tool(app, "live_mix_balance", {"seconds": 3})
+    assert plain["error"].startswith("the transport is stopped: pass section_bars")
+
+
+def test_mix_auto_all_silent_puts_the_strips_back_and_stops(app, song, mix_set, monkeypatch,
+                                                            tmp_path):
+    """Every part silent (no audio device): no plan, no master step, and the strips the run
+    put at rest to measure are back as they were (they were all reset)."""
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    _strips(mix_set, monkeypatch)
+    kick = next(d for d in mix_set.track("Kick").devices if d.name == "LiveBridge Channel")
+    high = next(p for p in kick.parameters if p.name == "High")
+    high.value = -4.0                                          # set by hand
+    for name, (_lufs, crest, share) in list(mix_set.parts.items()):
+        mix_set.parts[name] = (None, crest, share)
+    result = call_tool(app, "live_mix_auto", {"seconds": 3, "place_devices": False})
+    assert result["type"] == "invalid_state", result
+    assert "nothing plays" in result["error"] and "back as they were" in result["error"]
+    assert high.value == pytest.approx(-4.0)
+    assert not any(inst == "m" for inst, _cmd in mix_set.requests)        # no master step
 
 
 def test_a_capped_move_is_final_until_the_fader_is_touched(app, song, mix_set):

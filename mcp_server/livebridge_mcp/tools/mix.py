@@ -39,6 +39,36 @@ def _num(value: Any) -> float | None:
     return None
 
 
+#: How long a run that pressed play waits for Live's playhead to move. With no audio device
+#: (the interface switched off) Live reports "playing" while the playhead stands still, and
+#: every meter reads silence.
+_PLAYHEAD_WAIT_S = 3.0
+#: What to check when nothing plays although LiveBridge pressed play.
+_NO_AUDIO = ("check that Live has an audio device and its audio engine is on (Preferences > "
+             "Audio: the interface connected, switched on and selected), then run again")
+
+
+def _playhead_moves(bridge: BridgeClient, wait: float = _PLAYHEAD_WAIT_S) -> bool | None:
+    """True once Live's playhead moves; False when it stands still for ``wait`` s (no audio
+    device or audio engine off: Live then says "playing" but nothing advances); None when the
+    transport cannot be read."""
+    first = None
+    end = time.time() + wait
+    while True:
+        state = bridge_call(bridge, "transport.get")
+        if not isinstance(state, dict) or _is_error(state):
+            return None
+        beats = _num((state.get("position") or {}).get("beats"))
+        if state.get("is_playing") and beats is not None:
+            if first is None:
+                first = beats
+            elif abs(beats - first) > 1e-3:
+                return True
+        if time.time() >= end:
+            return False
+        time.sleep(0.2)
+
+
 def _reading(result: Any) -> dict[str, Any]:
     loud = (result or {}).get("loudness") or {}
     return {"lufs": loud.get("lufs"), "peak_db": loud.get("peak_db"),
@@ -191,6 +221,15 @@ def _background(tool: str):
 
 def register(mcp: Any, bridge: BridgeClient) -> None:
     """Register the mix tools on the MCP app."""
+
+    def stopped(cmd: str, section_bars: Any, hint: str) -> dict[str, Any]:
+        """The error for a run that finds the transport stopped: with ``section_bars`` the
+        tool pressed play itself, so playback did not start (no audio device?)."""
+        if section_bars is not None and not jobs.nested():
+            return tool_error("playback didn't start: LiveBridge pressed play at bars "
+                              f"{section_bars[0]}-{section_bars[-1]}, but Live is not playing "
+                              "— " + _NO_AUDIO, type="invalid_state", cmd=cmd)
+        return tool_error("the transport is stopped: " + hint, type="invalid_state", cmd=cmd)
 
     def playing() -> bool | None:
         state = bridge_call(bridge, "transport.get")
@@ -352,21 +391,34 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 "start_bar": first, "bars": last - first + 1, "enabled": True})
             if _is_error(held):
                 return held
-            played = bridge_call(bridge, "transport.play", {"position": f"{first}.1.1"})
-            if _is_error(played):
-                return played
-            time.sleep(1.0)                    # let the section sound before listening
-            return {"stop": not was_playing, "loop": {
+            started = {"stop": not was_playing, "loop": {
                 "start": loop.get("start"), "length": loop.get("length"),
                 "on": bool(loop.get("on"))}, "bars": f"bars {first}-{last}",
                 "marker": marker}
+            played = bridge_call(bridge, "transport.play", {"position": f"{first}.1.1"})
+            if _is_error(played):
+                stop_section({**started, "stop": False})
+                return played
+            return sounding(started)
         if was_playing or not loop.get("on"):
             return None
         played = bridge_call(bridge, "transport.play", {"position": loop.get("start") or 0.0})
         if _is_error(played):
             return None
-        time.sleep(1.0)
-        return {"stop": True, "bars": "the arrangement loop", "marker": marker}
+        return sounding({"stop": True, "bars": "the arrangement loop", "marker": marker})
+
+    def sounding(started: dict[str, Any]) -> dict[str, Any]:
+        """``started`` once the playhead moves (and the section had a second to sound); else
+        everything :func:`start_section` did is undone — the transport stopped (Live may say
+        "playing" while it stands still), the start marker and the loop back — and the
+        error says playback did not start."""
+        if _playhead_moves(bridge) is False:
+            stop_section({**started, "stop": True})
+            return tool_error(f"playback didn't start: LiveBridge pressed play at "
+                              f"{started['bars']}, but Live's playhead does not move — "
+                              + _NO_AUDIO, type="invalid_state", cmd="mix.section")
+        time.sleep(1.0)                        # let the section sound before listening
+        return started
 
     def put_marker_back(marker: float | None) -> None:
         """The start marker back where it was, once Live has applied the stop (a marker
@@ -837,9 +889,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("balancing needs LiveBridge Engine devices at the end of at "
                               "least 2 tracks. " + _HOW_TO_ADD, type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: pass section_bars=[first, last] of the "
-                              "fullest section (the tool plays it), or loop it and start "
-                              "playback (live_transport_play)", type="invalid_state", cmd=cmd)
+            return stopped(cmd, section_bars, "pass section_bars=[first, last] of the "
+                           "fullest section (the tool plays it), or loop it and start "
+                           "playback (live_transport_play)")
         notes: list[str] = []
         names = [str(d.get("track") or "") for d in chosen]
         state = faders(names)
@@ -2093,9 +2145,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                    "installed in the User Library and Max 9 available?)"),
                 type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: pass section_bars=[first, last] of the "
-                              "fullest section (the tool plays it), or loop it and start "
-                              "playback (live_transport_play)", type="invalid_state", cmd=cmd)
+            return stopped(cmd, section_bars, "pass section_bars=[first, last] of the "
+                           "fullest section (the tool plays it), or loop it and start "
+                           "playback (live_transport_play)")
         notes: list[str] = []
         names = [str(d.get("track") or "") for d in channels]
 
@@ -2300,6 +2352,21 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                          "they already process, it is not a plan for the raw parts.")
         jobs.note(f"listening to {len(pairs)} parts at rest")
         before = listen_all([d for d, _n in pairs], seconds)
+        heard = [r for r in before if isinstance(r, dict)]
+        if heard and all(r.get("silent") for r in heard):
+            # nothing plays (no audio device, audio engine off, an empty section): no plan
+            # can come of it, and the strips were just put at rest to measure — back as they
+            # were, and no master step
+            if apply and not measure_only:
+                for _device, name in pairs:
+                    back = {k: v for k, v in (was.get(name) or {}).items() if v is not None}
+                    if back:
+                        write_strip(name, indexes[name], back)
+            return tool_error("nothing plays: every track read silent, so nothing was "
+                              "measured or changed" + (" (the strips are back as they were)"
+                                                       if apply and not measure_only else "")
+                              + " — play the fullest section, and " + _NO_AUDIO,
+                              type="invalid_state", cmd=cmd)
         results: list[dict[str, Any]] = []
         for (device, name), reading in zip(pairs, before):
             if isinstance(reading, engine.EngineError):
@@ -2576,9 +2643,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error("no LiveBridge Engine on the master track. " + _HOW_TO_ADD,
                               type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: pass section_bars=[first, last] (a "
-                              "bar where both parts play), or loop one and start playback",
-                              type="invalid_state", cmd=cmd)
+            return stopped(cmd, section_bars, "pass section_bars=[first, last] (a "
+                           "bar where both parts play), or loop one and start playback")
 
         def phase_index() -> int | None:
             listing = bridge_call(bridge, "devices.list", {"track": track})
@@ -2757,9 +2823,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                               + " (it measures the parts). " + _HOW_TO_ADD,
                               type="not_found", cmd=cmd)
         if playing() is False:
-            return tool_error("the transport is stopped: pass section_bars=[first, last] "
-                              "where both parts play, or loop it and start playback",
-                              type="invalid_state", cmd=cmd)
+            return stopped(cmd, section_bars, "pass section_bars=[first, last] "
+                           "where both parts play, or loop it and start playback")
         pair = [meters[track.strip().lower()], meters[against.strip().lower()]]
         mine, theirs = listen_all(pair, seconds)
         for reading in (mine, theirs):

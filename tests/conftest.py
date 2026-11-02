@@ -40,6 +40,23 @@ from live_stub import factory  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def _moving_playhead(monkeypatch):
+    """The fake song's playhead never moves; a mix run that pressed play waits for it to move
+    (with no audio device Live says "playing" while it stands still). Here it moves; a test
+    that wants the still playhead puts ``_playhead_moves`` back."""
+    mcp_dir = os.path.join(REPO_ROOT, "mcp_server")
+    if mcp_dir not in sys.path:
+        sys.path.insert(0, mcp_dir)
+    try:
+        from livebridge_mcp.tools import mix as mix_tools
+    except ImportError:              # the MCP side's dependencies are not installed
+        yield
+        return
+    monkeypatch.setattr(mix_tools, "_playhead_moves", lambda bridge, wait=0.0: True)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _fresh_recorders():
     """Every test starts with no automation recording or resampling running, as after Live
     loads the script: the module-level recorders outlive a test, and a recording the
