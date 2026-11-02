@@ -1627,7 +1627,7 @@ Master the song to a loudness target by measurement: uses (or builds) EQ Eight -
 | `eq_bands` | object \| null | `null` |
 | `eq_plugin` | str \| null | `null` |
 
-Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.set_parameters`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `plugins.set`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_auto`
 
@@ -1653,7 +1653,7 @@ Mix (and master) the song by measurement in one call — the devices it needs ar
 | `master_eq_plugin` | str \| null | `null` |
 | `strip_plugins` | list[str] \| null | `null` |
 
-Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
+Bridge: `automation.state`, `browser.cache`, `browser.load`, `devices.delete`, `devices.get_parameter`, `devices.insert`, `devices.list`, `devices.move`, `devices.parameters`, `devices.set_parameters`, `devices.set_state`, `mixer.get`, `mixer.set_many`, `plugin_racks.expose`, `plugins.set`, `routing.route`, `song.summary`, `tracks.list`, `transport.get`, `transport.play`, `transport.stop`
 
 #### `live_mix_phase`
 
@@ -3657,7 +3657,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `plugins.list` |  | include_nested=true, resolve_format=true | `live_plugin_list` | Every third-party plug-in in the set with format, vendor and parameter counts |
 | `plugins.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, detail="summary", scope="exposed" | `live_plugin_parameters` | A plug-in's exposed (Configure) parameters — or all its parameters — paged |
 | `plugins.presets` |  | track=null, device=null, filter=null, offset=0, limit=100 | `live_plugin_presets` | A plug-in's preset/program list (paged, filterable) |
-| `plugins.set` | M | track=null, device=null, preset=null, editor_open=null | `live_browser_load`, `live_plugin_configure`, `live_plugin_expose`, `live_plugin_set` | Select a plug-in preset and/or open/close its window |
+| `plugins.set` | M | track=null, device=null, preset=null, editor_open=null | `live_browser_load`, `live_master_auto`, `live_mix_auto`, `live_plugin_configure`, `live_plugin_expose`, `live_plugin_set` | Select a plug-in preset and/or open/close its window |
 | `racks.chains` |  | track=null, device=null, include_return_chains=true, detail="summary" | `live_rack_chains` | List a rack's chains with mixer, mute/solo and devices |
 | `racks.convert` | M | action, track=null, device=null, note=null, select=false | `live_drumrack_convert` | Drum pad -> its own MIDI track, or a track's devices -> a new Drum Rack pad |
 | `racks.drum_pads` |  | track=null, device=null, include_empty=false, full_paths=false | `live_drumrack_overview` | Drum Rack pad map: note, name, devices, sample, mute/solo/choke |
