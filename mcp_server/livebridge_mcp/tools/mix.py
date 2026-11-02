@@ -51,6 +51,10 @@ _MASTER_DEVICE = "LiveBridge Master"
 #: and the total drive above which the report warns that the transients are being flattened
 _MAKEUP_MAX_DB = 12.0
 _SQUASH_DB = 12.0
+#: strip plug-ins (Pro-Q 4 / Pro-C 3): new instances per live_mix_auto run, and the pause after
+#: each — Live crashed loading ~22 VST3 instances back to back; 8 one after another worked
+_MAX_NEW_STRIP_PLUGINS = 8
+_STRIP_LOAD_PAUSE_S = 2.0
 #: band of live_mix_balance's `bands` -> (LiveBridge Master EQ control, mid frequency in Hz)
 _MASTER_EQ_BANDS: dict[str, tuple[str, float | None]] = {
     "sub": ("EQ Low", None), "bass": ("EQ Low", None), "low_mid": ("EQ Mid", 180.0),
@@ -2082,15 +2086,26 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         #: per track: plug-in kind -> path of LiveBridge's own instance inside its rack
         strip_paths: dict[str, dict[str, str]] = {}
 
-        def place_strip_plugins(name: str) -> str | None:
-            """LiveBridge's own strip plug-ins on ``name``, in front of the Channel (loaded
-            the first time, reused after); an error text when one cannot be loaded."""
+        def place_strip_plugins(name: str, load: bool = False,
+                                kinds: set[str] | None = None) -> str | None:
+            """LiveBridge's own strip plug-ins on ``name``, in front of the Channel: the ones
+            an earlier run left are found and reused; with ``load`` the missing ones of
+            ``kinds`` are loaded — one at a time with a pause, at most
+            :data:`_MAX_NEW_STRIP_PLUGINS` per run (Live crashed loading ~22 VST3 instances
+            back to back). An error text when one cannot be loaded."""
             def listed() -> list[dict[str, Any]]:
                 got = bridge_call(bridge, "devices.list", {"track": name})
                 return list(got.get("devices") or []) if isinstance(got, dict) else []
             for spec in strip_specs:
                 found = next((d for d in listed() if d.get("name") == spec["rack"]), None)
                 if found is None:
+                    if not load or (kinds is not None and spec["kind"] not in kinds):
+                        continue
+                    if new_strip_loads[0] >= _MAX_NEW_STRIP_PLUGINS:
+                        capped_strips.add(name)
+                        continue
+                    new_strip_loads[0] += 1
+                    jobs.note(f"loading {spec['rack']} on {name}")
                     args = {"track": name, "plugin": spec["plugin"], "replace": False,
                             "parameters": mix.strip_plugin_parameters(spec),
                             "name": spec["rack"], "editor_open": False}
@@ -2108,6 +2123,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         return f"{spec['rack']} did not appear on the track"
                     if name not in loaded_strips:
                         loaded_strips.append(name)
+                    # let Live finish this instance before the next one arrives
+                    time.sleep(_STRIP_LOAD_PAUSE_S)
                     if channel is not None and found.get("index", 0) > channel:
                         bridge_call(bridge, "devices.move", {"track": name,
                                                              "device": found["index"],
@@ -2137,7 +2154,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         rest: bool = False) -> Any:
             """Channel controls to the Channel, the ones a strip plug-in handles to it (the
             Channel's own stay at rest)."""
-            chan = {k: v for k, v in values.items() if k not in handled}
+            here = {k for sp in strip_specs if sp["kind"] in strip_paths.get(name, {})
+                    for k in sp["handles"]}
+            # a plug-in not on this track (not needed so far, or over the per-run cap): the
+            # Channel does that part
+            chan = {k: v for k, v in values.items() if k not in here}
             if rest:
                 chan.update({k: mix.CHANNEL_NEUTRAL[k] for k in handled})
             answer = set_strip(name, index, chan) if chan else {}
@@ -2199,6 +2220,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         prior = {k: dict(v) for k, v in remembered.items() if isinstance(v, dict)}
         #: tracks that got LiveBridge's strip plug-ins in this run
         loaded_strips: list[str] = []
+        #: new strip plug-in instances this run, and tracks that waited for the next run
+        new_strip_loads = [0]
+        capped_strips: set[str] = set()
         kept: dict[str, dict[str, str]] = {}
         #: each strip's controls before this run, for the before -> after report
         was: dict[str, dict[str, float | None]] = {}
@@ -2206,7 +2230,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             for _device, name in pairs:          # at rest: measure the raw part
                 rest = dict(mix.CHANNEL_NEUTRAL)
                 if strip_specs:
-                    failed = place_strip_plugins(name)
+                    failed = place_strip_plugins(name, load=False)
                     if failed:
                         notes.append(f"{name}: strip plug-in not loaded ({failed}) — the "
                                      "Channel does its EQ/compression.")
@@ -2241,10 +2265,6 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 answer = write_strip(name, indexes[name], rest, rest=True)
                 if _is_error(answer):
                     return answer
-            if strip_specs and loaded_strips:
-                notes.append(" and ".join(sp["rack"] for sp in strip_specs) + " in front of the "
-                             "LiveBridge Channel on: " + ", ".join(loaded_strips) + " (reused on "
-                             "later runs; your own plug-ins are untouched).")
             time.sleep(_SETTLE_S)
         elif not measure_only:
             notes.append("apply=false: the plan is based on the strips as they are now — if "
@@ -2275,6 +2295,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                     reasons.append("kept what you set by hand: " + ", ".join(
                         f"{k} {v}" for k, v in own.items()))
                 entry.update(values=values, reasons=reasons)
+                if apply and values and strip_specs:
+                    # load a strip plug-in only where this plan needs it
+                    needed = {sp["kind"] for sp in strip_specs
+                              if sp["kind"] not in strip_paths.get(name, {}) and any(
+                                  k in sp["handles"] and not _same(v, mix.CHANNEL_NEUTRAL[k])
+                                  for k, v in values.items())}
+                    if needed:
+                        failed = place_strip_plugins(name, load=True, kinds=needed)
+                        if failed:
+                            notes.append(f"{name}: strip plug-in not loaded ({failed}) — the "
+                                         "Channel does its EQ/compression.")
                 if apply and values:
                     answer = write_strip(name, indexes[name], values)
                     if _is_error(answer):
@@ -2315,6 +2346,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                         entry["reasons"].append(", ".join(resting) + " back to rest: this "
                                                 "reading does not call for it" + why)
             results.append(entry)
+        if loaded_strips:
+            notes.append("Strip plug-ins loaded in front of the LiveBridge Channel on: "
+                         + ", ".join(loaded_strips) + " — only where the plan needs them, one "
+                         "at a time (reused on later runs; your own plug-ins are untouched).")
+        if capped_strips:
+            notes.append(f"At most {_MAX_NEW_STRIP_PLUGINS} new plug-in instances per run: "
+                         + ", ".join(sorted(capped_strips)) + " used the Channel's own EQ/"
+                         "compression this time — run again to load theirs.")
         result: dict[str, Any] = {"applied": bool(apply), "tracks": results, "notes": notes}
         if measure_only:
             result["strips"] = "measure"

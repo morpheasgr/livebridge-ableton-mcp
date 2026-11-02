@@ -1361,3 +1361,35 @@ def test_strip_plugin_translation_round_trips():
     assert back == {"Comp Threshold": -12.0, "Comp Ratio": 4.0, "Comp Attack": 20.0,
                     "Comp Release": 1200.0, "Comp Makeup": 2.0}
     assert mix.strip_plugin_read(comp, {"Mix": "0.0%"})["Comp Ratio"] == 1.0   # dry = at rest
+
+
+def test_strip_plugins_load_only_where_needed_and_never_too_many(app, song, mix_set,
+                                                                 monkeypatch, tmp_path):
+    """Live crashed loading ~22 VST3 instances back to back: new strip plug-ins load only where
+    the plan needs them, one at a time, at most _MAX_NEW_STRIP_PLUGINS per run; the rest of the
+    tracks use the Channel's own EQ/compression this run."""
+    monkeypatch.setenv("LIVEBRIDGE_LIBRARY", str(tmp_path / "library"))
+    monkeypatch.setattr(mix_tools, "_STRIP_LOAD_PAUSE_S", 0.0)
+    monkeypatch.setattr(mix_tools, "_MAX_NEW_STRIP_PLUGINS", 0)
+    _strips(mix_set, monkeypatch)
+    loads = []
+    real_call = mix_tools.bridge_call
+
+    def counting(bridge, cmd, args=None, *a, **k):
+        if cmd == "plugin_racks.expose":
+            loads.append(args["track"])
+        return real_call(bridge, cmd, args, *a, **k)
+    monkeypatch.setattr(mix_tools, "bridge_call", counting)
+    result = call_tool(app, "live_mix_auto", {
+        "seconds": 3, "balance": False, "place_devices": False, "detail": "full",
+        "strip_plugins": ["Pro-Q 4", "Pro-C 3"]})
+    assert loads == [], loads                                     # the cap: nothing loaded
+    assert any("At most 0 new plug-in instances" in n for n in result["notes"])
+    hats = next(d for d in mix_set.track("Hats").devices if d.name == "LiveBridge Channel")
+    assert {p.name: p.value for p in hats.parameters}["HP Freq"] == pytest.approx(300,
+                                                                                rel=0.01)
+    # with room: loads happen only after the plan, only where it changes EQ or compression
+    monkeypatch.setattr(mix_tools, "_MAX_NEW_STRIP_PLUGINS", 8)
+    call_tool(app, "live_mix_auto", {"seconds": 3, "balance": False, "place_devices": False,
+                                     "strip_plugins": ["Pro-Q 4", "Pro-C 3"]})
+    assert loads and len(loads) <= 8
