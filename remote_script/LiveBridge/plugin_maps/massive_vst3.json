@@ -1,0 +1,1390 @@
+{
+ "plugin": "Massive",
+ "vendor": "Native Instruments",
+ "format": "VST3",
+ "class_id": "5653544E694D616D6173736976650000",
+ "plugin_version": "1.7.0 (R0)",
+ "source": "probed by plugin_racks.map on Live 12.4.7 (Windows); sections by LiveBridge",
+ "created": "2026-10-28 11:21:45",
+ "count": 202,
+ "plugin_parameter_count": 207,
+ "missing": [
+  "Default",
+  "Pitchbend",
+  "Aftertouch",
+  "Hold Pedal",
+  "Sustenuto Pedal"
+ ],
+ "probed": 390,
+ "loads": 16,
+ "seconds": 8.3,
+ "parameters": [
+  [
+   "MACRO 1",
+   0
+  ],
+  [
+   "MACRO 2",
+   1
+  ],
+  [
+   "MACRO 3",
+   2
+  ],
+  [
+   "MACRO 4",
+   3
+  ],
+  [
+   "MACRO 5",
+   4
+  ],
+  [
+   "MACRO 6",
+   5
+  ],
+  [
+   "MACRO 7",
+   6
+  ],
+  [
+   "MACRO 8",
+   7
+  ],
+  [
+   "OSC1-PITCH",
+   8
+  ],
+  [
+   "OSC1-POSITION",
+   9
+  ],
+  [
+   "OSC1-PARAM2",
+   10
+  ],
+  [
+   "OSC1-AMP",
+   11
+  ],
+  [
+   "OSC1-FLT.ROUTING",
+   12
+  ],
+  [
+   "OSC2-PITCH",
+   13
+  ],
+  [
+   "OSC2-POSITION",
+   14
+  ],
+  [
+   "OSC2-PARAM2",
+   15
+  ],
+  [
+   "OSC2-AMP",
+   16
+  ],
+  [
+   "OSC2-FLT.ROUTING",
+   17
+  ],
+  [
+   "OSC3-PITCH",
+   18
+  ],
+  [
+   "OSC3-POSITION",
+   19
+  ],
+  [
+   "OSC3-PARAM2",
+   20
+  ],
+  [
+   "OSC3-AMP",
+   21
+  ],
+  [
+   "OSC3-FLT.ROUTING",
+   22
+  ],
+  [
+   "NOISE-COLOR",
+   23
+  ],
+  [
+   "NOISE-AMP",
+   24
+  ],
+  [
+   "NOISE-FLTR. ROUTING",
+   25
+  ],
+  [
+   "FEEDBACK-AMP",
+   26
+  ],
+  [
+   "FEEDBACK-FLT.ROUTING",
+   27
+  ],
+  [
+   "MOD.OSC-PITCH",
+   28
+  ],
+  [
+   "MOD.OSC-RNGMOD",
+   29
+  ],
+  [
+   "MOD.OSC-PHASE",
+   30
+  ],
+  [
+   "MOD.OSC-POSITION",
+   31
+  ],
+  [
+   "MOD.OSC-FLTR.FM",
+   32
+  ],
+  [
+   "FILTER1-CUT/PRM.1",
+   33
+  ],
+  [
+   "FILTER1-BW/PRM.2",
+   34
+  ],
+  [
+   "FILTER1-RES/PRM.3",
+   35
+  ],
+  [
+   "FILTER2-CUT/PRM.1",
+   36
+  ],
+  [
+   "FILTER2-BW/PRM.2",
+   37
+  ],
+  [
+   "FILTER2-RES/PRM.3",
+   38
+  ],
+  [
+   "SERIELL-PARALLEL",
+   39
+  ],
+  [
+   "INSERT1-DW/PRM.1",
+   40
+  ],
+  [
+   "INSERT1-PRM.2",
+   41
+  ],
+  [
+   "INSERT2-DW/PRM.1",
+   42
+  ],
+  [
+   "INSERT2-PRM.2",
+   43
+  ],
+  [
+   "MASTER FX1-DRY WET",
+   44
+  ],
+  [
+   "MASTER FX1-PRM.2",
+   45
+  ],
+  [
+   "MASTER FX1-PRM.3",
+   46
+  ],
+  [
+   "MASTER FX1-PRM.4",
+   47
+  ],
+  [
+   "MASTER FX2-DRY WET",
+   48
+  ],
+  [
+   "MASTER FX2-PRM.2",
+   49
+  ],
+  [
+   "MASTER FX2-PRM.3",
+   50
+  ],
+  [
+   "MASTER FX2-PRM.4",
+   51
+  ],
+  [
+   "FILTER1-OUT GAIN",
+   52
+  ],
+  [
+   "FILTER2-OUT GAIN",
+   53
+  ],
+  [
+   "FILTER-1/2-CROSSFADE",
+   54
+  ],
+  [
+   "BYPASS-GAIN",
+   55
+  ],
+  [
+   "PAN (Fltr-Path)",
+   56
+  ],
+  [
+   "MASTER-VOLUME",
+   57
+  ],
+  [
+   "MOD5-RATE",
+   58
+  ],
+  [
+   "MOD6-RATE",
+   59
+  ],
+  [
+   "MOD7-RATE",
+   60
+  ],
+  [
+   "MOD8-RATE",
+   61
+  ],
+  [
+   "MOD5-AMP",
+   62
+  ],
+  [
+   "MOD6-AMP",
+   63
+  ],
+  [
+   "MOD7-AMP",
+   64
+  ],
+  [
+   "MOD8-AMP",
+   65
+  ],
+  [
+   "MOD5-CROSSF./GLIDE",
+   66
+  ],
+  [
+   "MOD6-CROSSF./GLIDE",
+   67
+  ],
+  [
+   "MOD7-CROSSF./GLIDE",
+   68
+  ],
+  [
+   "MOD8-CROSSF./GLIDE",
+   69
+  ],
+  [
+   "MOD5-IND.LEV",
+   70
+  ],
+  [
+   "MOD6-IND.LEV",
+   71
+  ],
+  [
+   "MOD7-IND.LEV",
+   72
+  ],
+  [
+   "MOD8-IND.LEV",
+   73
+  ],
+  [
+   "MOD5-SYNC",
+   74
+  ],
+  [
+   "MOD6-SYNC",
+   75
+  ],
+  [
+   "MOD7-SYNC",
+   76
+  ],
+  [
+   "MOD8-SYNC",
+   77
+  ],
+  [
+   "MOD5-RESTART",
+   78
+  ],
+  [
+   "MOD6-RESTART",
+   79
+  ],
+  [
+   "MOD7-RESTART",
+   80
+  ],
+  [
+   "MOD8-RESTART",
+   81
+  ],
+  [
+   "ENVELOPE1-VELOCITY",
+   82
+  ],
+  [
+   "ENVELOPE2-VELOCITY",
+   83
+  ],
+  [
+   "ENVELOPE3-VELOCITY",
+   84
+  ],
+  [
+   "ENVELOPE4-VELOCITY",
+   85
+  ],
+  [
+   "ENVELOPE1-KEYTRACKING",
+   86
+  ],
+  [
+   "ENVELOPE2-KEYTRACKING",
+   87
+  ],
+  [
+   "ENVELOPE3-KEYTRACKING",
+   88
+  ],
+  [
+   "ENVELOPE4-KEYTRACKING",
+   89
+  ],
+  [
+   "ENVELOPE1-DELAY",
+   90
+  ],
+  [
+   "ENVELOPE2-DELAY",
+   91
+  ],
+  [
+   "ENVELOPE3-DELAY",
+   92
+  ],
+  [
+   "ENVELOPE4-DELAY",
+   93
+  ],
+  [
+   "ENVELOPE1-ATT.TME",
+   94
+  ],
+  [
+   "ENVELOPE2-ATT.TME",
+   95
+  ],
+  [
+   "ENVELOPE3-ATT.TME",
+   96
+  ],
+  [
+   "ENVELOPE4-ATT.TME",
+   97
+  ],
+  [
+   "ENVELOPE1-ATT.LEV",
+   98
+  ],
+  [
+   "ENVELOPE2-ATT.LEV",
+   99
+  ],
+  [
+   "ENVELOPE3-ATT.LEV",
+   100
+  ],
+  [
+   "ENVELOPE4-ATT.LEV",
+   101
+  ],
+  [
+   "ENVELOPE1-DEC.TME",
+   102
+  ],
+  [
+   "ENVELOPE2-DEC.TME",
+   103
+  ],
+  [
+   "ENVELOPE3-DEC.TME",
+   104
+  ],
+  [
+   "ENVELOPE4-DEC.TME",
+   105
+  ],
+  [
+   "ENVELOPE1-DEC.LEV",
+   106
+  ],
+  [
+   "ENVELOPE2-DEC.LEV",
+   107
+  ],
+  [
+   "ENVELOPE3-DEC.LEV",
+   108
+  ],
+  [
+   "ENVELOPE4-DEC.LEV",
+   109
+  ],
+  [
+   "ENVELOPE1-SUST.TME",
+   110
+  ],
+  [
+   "ENVELOPE2-SUST.TME",
+   111
+  ],
+  [
+   "ENVELOPE3-SUST.TME",
+   112
+  ],
+  [
+   "ENVELOPE4-SUST.TME",
+   113
+  ],
+  [
+   "ENVELOPE1-SUST.LEV",
+   114
+  ],
+  [
+   "ENVELOPE2-SUST.LEV",
+   115
+  ],
+  [
+   "ENVELOPE3-SUST.LEV",
+   116
+  ],
+  [
+   "ENVELOPE4-SUST.LEV",
+   117
+  ],
+  [
+   "ENVELOPE1-LOOP.MORPH",
+   118
+  ],
+  [
+   "ENVELOPE2-LOOP.MORPH",
+   119
+  ],
+  [
+   "ENVELOPE3-LOOP.MORPH",
+   120
+  ],
+  [
+   "ENVELOPE4-LOOP.MORPH",
+   121
+  ],
+  [
+   "ENVELOPE1-REL. TME",
+   122
+  ],
+  [
+   "ENVELOPE2-REL. TME",
+   123
+  ],
+  [
+   "ENVELOPE3-REL. TME",
+   124
+  ],
+  [
+   "ENVELOPE4-REL. TME",
+   125
+  ],
+  [
+   "GLIDE-TIME",
+   126
+  ],
+  [
+   "VIBRATO-RATE",
+   127
+  ],
+  [
+   "VIBRATO-DEPTH",
+   128
+  ],
+  [
+   "UNI PITCH-CROSSFADE",
+   129
+  ],
+  [
+   "UNI WT.POS-CROSSFADE",
+   130
+  ],
+  [
+   "UNI PAN-CROSSFADE",
+   131
+  ],
+  [
+   "EQ-LoShelf.BOOST",
+   132
+  ],
+  [
+   "EQ-Peak.BOOST",
+   133
+  ],
+  [
+   "EQ-Peak.FREQ",
+   134
+  ],
+  [
+   "EQ-HiShelf.BOOST",
+   135
+  ],
+  [
+   "Env.Hold Reset",
+   136
+  ],
+  [
+   "MOD5-NUM",
+   137
+  ],
+  [
+   "MOD6-NUM",
+   138
+  ],
+  [
+   "MOD7-NUM",
+   139
+  ],
+  [
+   "MOD8-NUM",
+   140
+  ],
+  [
+   "MOD5-DEN",
+   141
+  ],
+  [
+   "MOD6-DEN",
+   142
+  ],
+  [
+   "MOD7-DEN",
+   143
+  ],
+  [
+   "MOD8-DEN",
+   144
+  ],
+  [
+   "MOD5-POS-SYNC",
+   145
+  ],
+  [
+   "MOD6-POS-SYNC",
+   146
+  ],
+  [
+   "MOD7-POS-SYNC",
+   147
+  ],
+  [
+   "MOD8-POS-SYNC",
+   148
+  ],
+  [
+   "AMP-ON OFF",
+   149
+  ],
+  [
+   "EQ-ON OFF",
+   150
+  ],
+  [
+   "BYPASS-ON OFF",
+   151
+  ],
+  [
+   "BYPASS-SOURCE",
+   152
+  ],
+  [
+   "BYPASS-TARGET",
+   153
+  ],
+  [
+   "MASTER FX1-ON OFF",
+   154
+  ],
+  [
+   "MASTER FX1-TYPE",
+   155
+  ],
+  [
+   "MASTER FX2-ON OFF",
+   156
+  ],
+  [
+   "MASTER FX2-TYPE",
+   157
+  ],
+  [
+   "OSC1-ON OFF",
+   158
+  ],
+  [
+   "OSC1-WAVETABLE",
+   159
+  ],
+  [
+   "OSC1-MODE",
+   160
+  ],
+  [
+   "OSC2-ON OFF",
+   161
+  ],
+  [
+   "OSC2-WAVETABLE",
+   162
+  ],
+  [
+   "OSC2-MODE",
+   163
+  ],
+  [
+   "OSC3-ON OFF",
+   164
+  ],
+  [
+   "OSC3-WAVETABLE",
+   165
+  ],
+  [
+   "OSC3-MODE",
+   166
+  ],
+  [
+   "MOD.OSC-ON OFF",
+   167
+  ],
+  [
+   "MOD.OSC-RM-OSC",
+   168
+  ],
+  [
+   "MOD.OSC-PHASE-OSC",
+   169
+  ],
+  [
+   "MOD.OSC-POSITION-OSC",
+   170
+  ],
+  [
+   "MOD.OSC-FILTER-FM-OSC",
+   171
+  ],
+  [
+   "NOISE-ON OFF",
+   172
+  ],
+  [
+   "NOISE-TYPE",
+   173
+  ],
+  [
+   "FEEDBACK-ON OFF",
+   174
+  ],
+  [
+   "FEEDBACK-POSITION",
+   175
+  ],
+  [
+   "FILTER1-ON OFF",
+   176
+  ],
+  [
+   "FILTER1-TYPE",
+   177
+  ],
+  [
+   "FILTER2-ON OFF",
+   178
+  ],
+  [
+   "FILTER2-TYPE",
+   179
+  ],
+  [
+   "INSERT1-ON OFF",
+   180
+  ],
+  [
+   "INSERT1-TYPE",
+   181
+  ],
+  [
+   "INSERT1-POSITION",
+   182
+  ],
+  [
+   "INSERT2-ON OFF",
+   183
+  ],
+  [
+   "INSERT2-TYPE",
+   184
+  ],
+  [
+   "INSERT2-POSITION",
+   185
+  ],
+  [
+   "MAX-VOICES",
+   186
+  ],
+  [
+   "UNISONO",
+   187
+  ],
+  [
+   "UNISONO SPREAD PITCH-ON OFF",
+   188
+  ],
+  [
+   "UNISONO SPREAD WT POS-ON OFF",
+   189
+  ],
+  [
+   "UNISONO SPREAD PAN-ON OFF",
+   190
+  ],
+  [
+   "VOICEMODE",
+   191
+  ],
+  [
+   "TRIGGERMODE",
+   192
+  ],
+  [
+   "VIBRATO MONO-ON OFF",
+   193
+  ],
+  [
+   "MASTER FX1-SD.LN",
+   194
+  ],
+  [
+   "MASTER FX1-SD.LD",
+   195
+  ],
+  [
+   "MASTER FX1-SD.RN",
+   196
+  ],
+  [
+   "MASTER FX1-SD.RD",
+   197
+  ],
+  [
+   "MASTER FX2-SD.LN",
+   198
+  ],
+  [
+   "MASTER FX2-SD.LD",
+   199
+  ],
+  [
+   "MASTER FX2-SD.RN",
+   200
+  ],
+  [
+   "MASTER FX2-SD.RD",
+   201
+  ]
+ ],
+ "notes": [
+  "Massive (classic). Modulation routings (drag-and-drop), LFO shapes, stepper steps and performer curves are not exposed to the host: start from a preset that holds the routings (live_plugin_expose preset_file=) and drive them through the sources' levels (ENVELOPEn-*.LEV, MODn-AMP) and the macros.",
+  "ENVELOPE4 is the amp envelope. MOD5..MOD8 are the LFO / performer / stepper slots (what each is depends on the patch).",
+  "SD.LN/SD.LD/SD.RN/SD.RD on a master effect: its sync delay's left/right numerator and denominator."
+ ],
+ "groups": {
+  "macros": [
+   "MACRO 1",
+   "MACRO 2",
+   "MACRO 3",
+   "MACRO 4",
+   "MACRO 5",
+   "MACRO 6",
+   "MACRO 7",
+   "MACRO 8"
+  ],
+  "osc": [
+   "OSC1-ON OFF",
+   "OSC1-WAVETABLE",
+   "OSC1-MODE",
+   "OSC1-PITCH",
+   "OSC1-POSITION",
+   "OSC1-PARAM2",
+   "OSC1-AMP",
+   "OSC1-FLT.ROUTING",
+   "OSC2-ON OFF",
+   "OSC2-WAVETABLE",
+   "OSC2-MODE",
+   "OSC2-PITCH",
+   "OSC2-POSITION",
+   "OSC2-PARAM2",
+   "OSC2-AMP",
+   "OSC2-FLT.ROUTING",
+   "OSC3-ON OFF",
+   "OSC3-WAVETABLE",
+   "OSC3-MODE",
+   "OSC3-PITCH",
+   "OSC3-POSITION",
+   "OSC3-PARAM2",
+   "OSC3-AMP",
+   "OSC3-FLT.ROUTING"
+  ],
+  "osc 1": [
+   "OSC1-ON OFF",
+   "OSC1-WAVETABLE",
+   "OSC1-MODE",
+   "OSC1-PITCH",
+   "OSC1-POSITION",
+   "OSC1-PARAM2",
+   "OSC1-AMP",
+   "OSC1-FLT.ROUTING"
+  ],
+  "osc 2": [
+   "OSC2-ON OFF",
+   "OSC2-WAVETABLE",
+   "OSC2-MODE",
+   "OSC2-PITCH",
+   "OSC2-POSITION",
+   "OSC2-PARAM2",
+   "OSC2-AMP",
+   "OSC2-FLT.ROUTING"
+  ],
+  "osc 3": [
+   "OSC3-ON OFF",
+   "OSC3-WAVETABLE",
+   "OSC3-MODE",
+   "OSC3-PITCH",
+   "OSC3-POSITION",
+   "OSC3-PARAM2",
+   "OSC3-AMP",
+   "OSC3-FLT.ROUTING"
+  ],
+  "noise": [
+   "NOISE-COLOR",
+   "NOISE-AMP",
+   "NOISE-FLTR. ROUTING",
+   "NOISE-ON OFF",
+   "NOISE-TYPE"
+  ],
+  "feedback": [
+   "FEEDBACK-AMP",
+   "FEEDBACK-FLT.ROUTING",
+   "FEEDBACK-ON OFF",
+   "FEEDBACK-POSITION"
+  ],
+  "mod osc": [
+   "MOD.OSC-PITCH",
+   "MOD.OSC-RNGMOD",
+   "MOD.OSC-PHASE",
+   "MOD.OSC-POSITION",
+   "MOD.OSC-FLTR.FM",
+   "MOD.OSC-ON OFF",
+   "MOD.OSC-RM-OSC",
+   "MOD.OSC-PHASE-OSC",
+   "MOD.OSC-POSITION-OSC",
+   "MOD.OSC-FILTER-FM-OSC"
+  ],
+  "filter": [
+   "FILTER1-ON OFF",
+   "FILTER1-TYPE",
+   "FILTER1-CUT/PRM.1",
+   "FILTER1-BW/PRM.2",
+   "FILTER1-RES/PRM.3",
+   "FILTER1-OUT GAIN",
+   "FILTER2-ON OFF",
+   "FILTER2-TYPE",
+   "FILTER2-CUT/PRM.1",
+   "FILTER2-BW/PRM.2",
+   "FILTER2-RES/PRM.3",
+   "FILTER2-OUT GAIN",
+   "SERIELL-PARALLEL",
+   "FILTER-1/2-CROSSFADE"
+  ],
+  "filter 1": [
+   "FILTER1-ON OFF",
+   "FILTER1-TYPE",
+   "FILTER1-CUT/PRM.1",
+   "FILTER1-BW/PRM.2",
+   "FILTER1-RES/PRM.3",
+   "FILTER1-OUT GAIN"
+  ],
+  "filter 2": [
+   "FILTER2-ON OFF",
+   "FILTER2-TYPE",
+   "FILTER2-CUT/PRM.1",
+   "FILTER2-BW/PRM.2",
+   "FILTER2-RES/PRM.3",
+   "FILTER2-OUT GAIN"
+  ],
+  "env": [
+   "ENVELOPE1-VELOCITY",
+   "ENVELOPE1-KEYTRACKING",
+   "ENVELOPE1-DELAY",
+   "ENVELOPE1-ATT.TME",
+   "ENVELOPE1-ATT.LEV",
+   "ENVELOPE1-DEC.TME",
+   "ENVELOPE1-DEC.LEV",
+   "ENVELOPE1-SUST.TME",
+   "ENVELOPE1-SUST.LEV",
+   "ENVELOPE1-LOOP.MORPH",
+   "ENVELOPE1-REL. TME",
+   "ENVELOPE2-VELOCITY",
+   "ENVELOPE2-KEYTRACKING",
+   "ENVELOPE2-DELAY",
+   "ENVELOPE2-ATT.TME",
+   "ENVELOPE2-ATT.LEV",
+   "ENVELOPE2-DEC.TME",
+   "ENVELOPE2-DEC.LEV",
+   "ENVELOPE2-SUST.TME",
+   "ENVELOPE2-SUST.LEV",
+   "ENVELOPE2-LOOP.MORPH",
+   "ENVELOPE2-REL. TME",
+   "ENVELOPE3-VELOCITY",
+   "ENVELOPE3-KEYTRACKING",
+   "ENVELOPE3-DELAY",
+   "ENVELOPE3-ATT.TME",
+   "ENVELOPE3-ATT.LEV",
+   "ENVELOPE3-DEC.TME",
+   "ENVELOPE3-DEC.LEV",
+   "ENVELOPE3-SUST.TME",
+   "ENVELOPE3-SUST.LEV",
+   "ENVELOPE3-LOOP.MORPH",
+   "ENVELOPE3-REL. TME",
+   "ENVELOPE4-VELOCITY",
+   "ENVELOPE4-KEYTRACKING",
+   "ENVELOPE4-DELAY",
+   "ENVELOPE4-ATT.TME",
+   "ENVELOPE4-ATT.LEV",
+   "ENVELOPE4-DEC.TME",
+   "ENVELOPE4-DEC.LEV",
+   "ENVELOPE4-SUST.TME",
+   "ENVELOPE4-SUST.LEV",
+   "ENVELOPE4-LOOP.MORPH",
+   "ENVELOPE4-REL. TME",
+   "Env.Hold Reset"
+  ],
+  "env 1": [
+   "ENVELOPE1-VELOCITY",
+   "ENVELOPE1-KEYTRACKING",
+   "ENVELOPE1-DELAY",
+   "ENVELOPE1-ATT.TME",
+   "ENVELOPE1-ATT.LEV",
+   "ENVELOPE1-DEC.TME",
+   "ENVELOPE1-DEC.LEV",
+   "ENVELOPE1-SUST.TME",
+   "ENVELOPE1-SUST.LEV",
+   "ENVELOPE1-LOOP.MORPH",
+   "ENVELOPE1-REL. TME"
+  ],
+  "env 2": [
+   "ENVELOPE2-VELOCITY",
+   "ENVELOPE2-KEYTRACKING",
+   "ENVELOPE2-DELAY",
+   "ENVELOPE2-ATT.TME",
+   "ENVELOPE2-ATT.LEV",
+   "ENVELOPE2-DEC.TME",
+   "ENVELOPE2-DEC.LEV",
+   "ENVELOPE2-SUST.TME",
+   "ENVELOPE2-SUST.LEV",
+   "ENVELOPE2-LOOP.MORPH",
+   "ENVELOPE2-REL. TME"
+  ],
+  "env 3": [
+   "ENVELOPE3-VELOCITY",
+   "ENVELOPE3-KEYTRACKING",
+   "ENVELOPE3-DELAY",
+   "ENVELOPE3-ATT.TME",
+   "ENVELOPE3-ATT.LEV",
+   "ENVELOPE3-DEC.TME",
+   "ENVELOPE3-DEC.LEV",
+   "ENVELOPE3-SUST.TME",
+   "ENVELOPE3-SUST.LEV",
+   "ENVELOPE3-LOOP.MORPH",
+   "ENVELOPE3-REL. TME"
+  ],
+  "env 4": [
+   "ENVELOPE4-VELOCITY",
+   "ENVELOPE4-KEYTRACKING",
+   "ENVELOPE4-DELAY",
+   "ENVELOPE4-ATT.TME",
+   "ENVELOPE4-ATT.LEV",
+   "ENVELOPE4-DEC.TME",
+   "ENVELOPE4-DEC.LEV",
+   "ENVELOPE4-SUST.TME",
+   "ENVELOPE4-SUST.LEV",
+   "ENVELOPE4-LOOP.MORPH",
+   "ENVELOPE4-REL. TME"
+  ],
+  "lfo": [
+   "MOD5-RATE",
+   "MOD5-AMP",
+   "MOD5-CROSSF./GLIDE",
+   "MOD5-IND.LEV",
+   "MOD5-SYNC",
+   "MOD5-RESTART",
+   "MOD5-NUM",
+   "MOD5-DEN",
+   "MOD5-POS-SYNC",
+   "MOD6-RATE",
+   "MOD6-AMP",
+   "MOD6-CROSSF./GLIDE",
+   "MOD6-IND.LEV",
+   "MOD6-SYNC",
+   "MOD6-RESTART",
+   "MOD6-NUM",
+   "MOD6-DEN",
+   "MOD6-POS-SYNC",
+   "MOD7-RATE",
+   "MOD7-AMP",
+   "MOD7-CROSSF./GLIDE",
+   "MOD7-IND.LEV",
+   "MOD7-SYNC",
+   "MOD7-RESTART",
+   "MOD7-NUM",
+   "MOD7-DEN",
+   "MOD7-POS-SYNC",
+   "MOD8-RATE",
+   "MOD8-AMP",
+   "MOD8-CROSSF./GLIDE",
+   "MOD8-IND.LEV",
+   "MOD8-SYNC",
+   "MOD8-RESTART",
+   "MOD8-NUM",
+   "MOD8-DEN",
+   "MOD8-POS-SYNC"
+  ],
+  "mod 5": [
+   "MOD5-RATE",
+   "MOD5-AMP",
+   "MOD5-CROSSF./GLIDE",
+   "MOD5-IND.LEV",
+   "MOD5-SYNC",
+   "MOD5-RESTART",
+   "MOD5-NUM",
+   "MOD5-DEN",
+   "MOD5-POS-SYNC"
+  ],
+  "mod 6": [
+   "MOD6-RATE",
+   "MOD6-AMP",
+   "MOD6-CROSSF./GLIDE",
+   "MOD6-IND.LEV",
+   "MOD6-SYNC",
+   "MOD6-RESTART",
+   "MOD6-NUM",
+   "MOD6-DEN",
+   "MOD6-POS-SYNC"
+  ],
+  "mod 7": [
+   "MOD7-RATE",
+   "MOD7-AMP",
+   "MOD7-CROSSF./GLIDE",
+   "MOD7-IND.LEV",
+   "MOD7-SYNC",
+   "MOD7-RESTART",
+   "MOD7-NUM",
+   "MOD7-DEN",
+   "MOD7-POS-SYNC"
+  ],
+  "mod 8": [
+   "MOD8-RATE",
+   "MOD8-AMP",
+   "MOD8-CROSSF./GLIDE",
+   "MOD8-IND.LEV",
+   "MOD8-SYNC",
+   "MOD8-RESTART",
+   "MOD8-NUM",
+   "MOD8-DEN",
+   "MOD8-POS-SYNC"
+  ],
+  "insert": [
+   "INSERT1-DW/PRM.1",
+   "INSERT1-PRM.2",
+   "INSERT2-DW/PRM.1",
+   "INSERT2-PRM.2",
+   "INSERT1-ON OFF",
+   "INSERT1-TYPE",
+   "INSERT1-POSITION",
+   "INSERT2-ON OFF",
+   "INSERT2-TYPE",
+   "INSERT2-POSITION"
+  ],
+  "master fx": [
+   "MASTER FX1-DRY WET",
+   "MASTER FX1-PRM.2",
+   "MASTER FX1-PRM.3",
+   "MASTER FX1-PRM.4",
+   "MASTER FX2-DRY WET",
+   "MASTER FX2-PRM.2",
+   "MASTER FX2-PRM.3",
+   "MASTER FX2-PRM.4",
+   "MASTER FX1-ON OFF",
+   "MASTER FX1-TYPE",
+   "MASTER FX2-ON OFF",
+   "MASTER FX2-TYPE",
+   "MASTER FX1-SD.LN",
+   "MASTER FX1-SD.LD",
+   "MASTER FX1-SD.RN",
+   "MASTER FX1-SD.RD",
+   "MASTER FX2-SD.LN",
+   "MASTER FX2-SD.LD",
+   "MASTER FX2-SD.RN",
+   "MASTER FX2-SD.RD"
+  ],
+  "fx": [
+   "INSERT1-DW/PRM.1",
+   "INSERT1-PRM.2",
+   "INSERT2-DW/PRM.1",
+   "INSERT2-PRM.2",
+   "MASTER FX1-DRY WET",
+   "MASTER FX1-PRM.2",
+   "MASTER FX1-PRM.3",
+   "MASTER FX1-PRM.4",
+   "MASTER FX2-DRY WET",
+   "MASTER FX2-PRM.2",
+   "MASTER FX2-PRM.3",
+   "MASTER FX2-PRM.4",
+   "MASTER FX1-ON OFF",
+   "MASTER FX1-TYPE",
+   "MASTER FX2-ON OFF",
+   "MASTER FX2-TYPE",
+   "INSERT1-ON OFF",
+   "INSERT1-TYPE",
+   "INSERT1-POSITION",
+   "INSERT2-ON OFF",
+   "INSERT2-TYPE",
+   "INSERT2-POSITION",
+   "MASTER FX1-SD.LN",
+   "MASTER FX1-SD.LD",
+   "MASTER FX1-SD.RN",
+   "MASTER FX1-SD.RD",
+   "MASTER FX2-SD.LN",
+   "MASTER FX2-SD.LD",
+   "MASTER FX2-SD.RN",
+   "MASTER FX2-SD.RD"
+  ],
+  "voice": [
+   "GLIDE-TIME",
+   "VIBRATO-RATE",
+   "VIBRATO-DEPTH",
+   "VIBRATO MONO-ON OFF",
+   "UNISONO",
+   "UNI PITCH-CROSSFADE",
+   "UNI WT.POS-CROSSFADE",
+   "UNI PAN-CROSSFADE",
+   "UNISONO SPREAD PITCH-ON OFF",
+   "UNISONO SPREAD WT POS-ON OFF",
+   "UNISONO SPREAD PAN-ON OFF",
+   "MAX-VOICES",
+   "VOICEMODE",
+   "TRIGGERMODE"
+  ],
+  "unison": [
+   "UNISONO",
+   "UNI PITCH-CROSSFADE",
+   "UNI WT.POS-CROSSFADE",
+   "UNI PAN-CROSSFADE",
+   "UNISONO SPREAD PITCH-ON OFF",
+   "UNISONO SPREAD WT POS-ON OFF",
+   "UNISONO SPREAD PAN-ON OFF"
+  ],
+  "output": [
+   "AMP-ON OFF",
+   "EQ-ON OFF",
+   "EQ-LoShelf.BOOST",
+   "EQ-Peak.BOOST",
+   "EQ-Peak.FREQ",
+   "EQ-HiShelf.BOOST",
+   "BYPASS-ON OFF",
+   "BYPASS-SOURCE",
+   "BYPASS-TARGET",
+   "BYPASS-GAIN",
+   "PAN (Fltr-Path)",
+   "MASTER-VOLUME"
+  ],
+  "routing": [
+   "OSC1-FLT.ROUTING",
+   "OSC2-FLT.ROUTING",
+   "OSC3-FLT.ROUTING",
+   "NOISE-FLTR. ROUTING",
+   "FEEDBACK-FLT.ROUTING",
+   "SERIELL-PARALLEL",
+   "FILTER-1/2-CROSSFADE",
+   "BYPASS-ON OFF",
+   "BYPASS-SOURCE",
+   "BYPASS-TARGET",
+   "BYPASS-GAIN",
+   "INSERT1-POSITION",
+   "INSERT2-POSITION"
+  ],
+  "sound_design": [
+   "MACRO 1",
+   "MACRO 2",
+   "MACRO 3",
+   "MACRO 4",
+   "MACRO 5",
+   "MACRO 6",
+   "MACRO 7",
+   "MACRO 8",
+   "OSC1-ON OFF",
+   "OSC1-WAVETABLE",
+   "OSC1-MODE",
+   "OSC1-PITCH",
+   "OSC1-POSITION",
+   "OSC1-PARAM2",
+   "OSC1-AMP",
+   "OSC1-FLT.ROUTING",
+   "OSC2-ON OFF",
+   "OSC2-WAVETABLE",
+   "OSC2-MODE",
+   "OSC2-PITCH",
+   "OSC2-POSITION",
+   "OSC2-PARAM2",
+   "OSC2-AMP",
+   "OSC2-FLT.ROUTING",
+   "OSC3-ON OFF",
+   "OSC3-WAVETABLE",
+   "OSC3-MODE",
+   "OSC3-PITCH",
+   "OSC3-POSITION",
+   "OSC3-PARAM2",
+   "OSC3-AMP",
+   "OSC3-FLT.ROUTING",
+   "NOISE-ON OFF",
+   "NOISE-TYPE",
+   "NOISE-COLOR",
+   "NOISE-AMP",
+   "NOISE-FLTR. ROUTING",
+   "MOD.OSC-PITCH",
+   "MOD.OSC-RNGMOD",
+   "MOD.OSC-PHASE",
+   "MOD.OSC-POSITION",
+   "MOD.OSC-FLTR.FM",
+   "MOD.OSC-ON OFF",
+   "MOD.OSC-RM-OSC",
+   "MOD.OSC-PHASE-OSC",
+   "MOD.OSC-POSITION-OSC",
+   "MOD.OSC-FILTER-FM-OSC",
+   "FILTER1-ON OFF",
+   "FILTER1-TYPE",
+   "FILTER1-CUT/PRM.1",
+   "FILTER1-BW/PRM.2",
+   "FILTER1-RES/PRM.3",
+   "FILTER1-OUT GAIN",
+   "FILTER2-ON OFF",
+   "FILTER2-TYPE",
+   "FILTER2-CUT/PRM.1",
+   "FILTER2-BW/PRM.2",
+   "FILTER2-RES/PRM.3",
+   "FILTER2-OUT GAIN",
+   "SERIELL-PARALLEL",
+   "FILTER-1/2-CROSSFADE",
+   "ENVELOPE1-ATT.TME",
+   "ENVELOPE1-DEC.TME",
+   "ENVELOPE1-DEC.LEV",
+   "ENVELOPE1-SUST.LEV",
+   "ENVELOPE1-REL. TME",
+   "ENVELOPE1-ATT.LEV",
+   "ENVELOPE2-ATT.TME",
+   "ENVELOPE2-DEC.TME",
+   "ENVELOPE2-DEC.LEV",
+   "ENVELOPE2-SUST.LEV",
+   "ENVELOPE2-REL. TME",
+   "ENVELOPE2-ATT.LEV",
+   "ENVELOPE3-ATT.TME",
+   "ENVELOPE3-DEC.TME",
+   "ENVELOPE3-DEC.LEV",
+   "ENVELOPE3-SUST.LEV",
+   "ENVELOPE3-REL. TME",
+   "ENVELOPE3-ATT.LEV",
+   "ENVELOPE4-ATT.TME",
+   "ENVELOPE4-DEC.TME",
+   "ENVELOPE4-DEC.LEV",
+   "ENVELOPE4-SUST.LEV",
+   "ENVELOPE4-REL. TME",
+   "ENVELOPE4-ATT.LEV",
+   "MOD5-RATE",
+   "MOD5-AMP",
+   "MOD5-SYNC",
+   "MOD5-RESTART",
+   "MOD6-RATE",
+   "MOD6-AMP",
+   "MOD6-SYNC",
+   "MOD6-RESTART",
+   "MOD7-RATE",
+   "MOD7-AMP",
+   "MOD7-SYNC",
+   "MOD7-RESTART",
+   "MOD8-RATE",
+   "MOD8-AMP",
+   "MOD8-SYNC",
+   "MOD8-RESTART",
+   "INSERT1-ON OFF",
+   "INSERT1-TYPE",
+   "INSERT1-DW/PRM.1",
+   "INSERT1-PRM.2",
+   "INSERT2-ON OFF",
+   "INSERT2-TYPE",
+   "INSERT2-DW/PRM.1",
+   "INSERT2-PRM.2",
+   "MASTER FX1-ON OFF",
+   "MASTER FX1-TYPE",
+   "MASTER FX1-DRY WET",
+   "MASTER FX1-PRM.2",
+   "MASTER FX2-ON OFF",
+   "MASTER FX2-TYPE",
+   "MASTER FX2-DRY WET",
+   "MASTER FX2-PRM.2",
+   "GLIDE-TIME",
+   "UNISONO",
+   "UNI PITCH-CROSSFADE",
+   "UNI WT.POS-CROSSFADE",
+   "VOICEMODE",
+   "VIBRATO-RATE",
+   "VIBRATO-DEPTH",
+   "MASTER-VOLUME",
+   "PAN (Fltr-Path)"
+  ]
+ }
+}

@@ -438,6 +438,28 @@ def test_shipped_serum2_map_is_complete_and_consistent():
     assert "template_state" not in fx and fx["groups"] == SHIPPED["groups"]
 
 
+def test_shipped_massive_map_has_consistent_sections():
+    """Massive (classic) as measured on a real Live: every section names real parameters, the
+    sound-design set fits one exposure, and every parameter sits in some section."""
+    data = lib.load_map(os.path.join(lib.shipped_maps_dir(), "massive_vst3.json"))
+    assert data["plugin"] == "Massive" and data["format"] == "VST3"
+    assert lib.map_key({"name": "Massive", "format": "VST3"}) == "massive_vst3"
+    names = [n for n, _i in data["parameters"]]
+    ids = [i for _n, i in data["parameters"]]
+    assert len(names) == data["count"] == 202 == len(set(names)) == len(set(ids))
+    for group, members in data["groups"].items():
+        assert len(members) == len(set(members)) <= lib.MAX_PARAMETERS, group
+        assert set(members) <= set(names), group
+    design = data["groups"]["sound_design"]
+    for wanted in ("OSC1-WAVETABLE", "OSC1-POSITION", "FILTER1-CUT/PRM.1", "FILTER1-TYPE",
+                   "ENVELOPE4-REL. TME", "MOD5-RATE", "MOD5-AMP", "MACRO 8", "UNISONO",
+                   "MASTER-VOLUME"):
+        assert wanted in design
+    grouped = {m for members in data["groups"].values() for m in members}
+    assert set(names) == grouped
+    assert any("not exposed to the host" in note for note in data["notes"])
+
+
 # --------------------------------------------------------------------------- handlers
 
 def test_map_returns_the_shipped_serum2_map_at_once(bridge, env):

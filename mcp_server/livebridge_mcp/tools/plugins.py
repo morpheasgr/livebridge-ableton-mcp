@@ -7,7 +7,7 @@ every parameter *name* the plug-in has, but values only for the parameters in th
 **Configure** list — and for big plug-ins (Serum 2 VST3 and AU: 0 of ~2600) that list starts
 empty. Nothing in Live's API can add to a loaded device's list, but live_plugin_expose
 (tools/plugin_racks.py) loads a VST3 plug-in in a generated rack that exposes up to 128 chosen
-parameters without any user click — Serum 2 / Serum 2 FX are fully mapped. The manual Configure
+parameters without any user click — Serum 2 / Serum 2 FX and Massive are mapped. The manual Configure
 route (live_plugin_configure) is the fallback for AU / VST2. Exposed values are set with
 live_device_set_parameter(s) — display strings like "-6 dB" work there too — and automated with
 the automation tools.

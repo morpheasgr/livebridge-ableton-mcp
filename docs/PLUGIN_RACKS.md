@@ -85,6 +85,20 @@ For another big VST3 plug-in, call `live_plugin_param_map` once, then expose it.
   `noise`, `filter`, `filter 1|2`, `env`, `lfo`, `macros`, `fx`, `unison`, `routing`, `mod`,
   `arp`, `global`, `clip`. Any words that start several names act as a group for any map:
   "filter 1" gives every "Filter 1 …" parameter.
+- **Massive** (Native Instruments, classic; `massive_vst3.json`, measured on Live 12.4.7,
+  Windows): 202 parameters, groups `sound_design` (126), `osc`, `osc 1|2|3`, `noise`, `feedback`, `mod osc`, `filter`, `filter 1|2`, `env`, `env 1..4`, `lfo`, `mod 5..8`, `fx`, `insert`, `master fx`, `voice`, `unison`, `output`, `routing`, `macros`. Modulation
+  routings, LFO shapes, stepper steps and performer curves are not exposed to the host: start
+  from a preset that holds the routings (`preset_file=`) and drive them through the sources'
+  levels and the macros (see the skill's Massive section). No template state: without
+  `preset_file` Massive starts from its own default.
+- **Adding another instrument** (how Massive was done): measure its map once with
+  `live_plugin_param_map` on the user's machine; give the map `groups` (a `sound_design` set of
+  at most 128, plus sections by name) and `notes` on what the host cannot reach; ship it in
+  `remote_script/LiveBridge/plugin_maps/` with a test like
+  `test_shipped_massive_map_has_consistent_sections`; write a guide next to the skill (layout,
+  what is exposed, templates for what is not, recipes) and list it in `server.COMPANIONS` and
+  the table in `SKILL.md`. A map probed later on the user's machine keeps the shipped groups and
+  notes.
 - **Template state.** `template_state` in the map is Serum's "- Init -" patch (the `Comp` /
   `Cont` chunks of a Live-saved Serum 2 rack). An exposure without `preset_file` starts from
   it.

@@ -24,7 +24,7 @@ The spec is in [ARCHITECTURE.md](ARCHITECTURE.md) and [PROTOCOL.md](PROTOCOL.md)
 | Unit and integration tests | **1505** tests in 32 test files, run against a fake `Live` package | `tests/`, `tests/live_stub`, `tests/live_stub_ext` |
 | Installers | `install.py` / `uninstall.py` (macOS + Windows), `install.sh`, `install.ps1`, `bundle.py`, `gen_tools_doc.py` | `installers/` |
 | Claude skill | a production-workflow skill for Claude Code and a ZIP for Claude Desktop; also served as the MCP resource `livebridge://skill` and the prompt `livebridge_workflow` | `.claude/skills/livebridge/SKILL.md` |
-| Shipped plug-in maps | Serum 2 and Serum 2 FX (VST3): 541 parameters each | `remote_script/LiveBridge/plugin_maps/` |
+| Shipped plug-in maps | Serum 2 and Serum 2 FX (VST3): 541 parameters each; Massive (202); Pro-Q 4, Pro-L 2, Pro-C 3, Ozone 12 Maximizer and Equalizer | `remote_script/LiveBridge/plugin_maps/` |
 
 Code size, roughly: Remote Script 31k lines, MCP server 12k, installers 2.6k, tests 29k.
 

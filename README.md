@@ -370,7 +370,7 @@ These are limits of Live's Python API, not of LiveBridge (details and alternativ
   time (`live_automation_record`). Clip envelopes survive the copy to the arrangement only on
   tracks without an instrument (Live 12.4.5) — LiveBridge reports it.
 - Third-party plug-ins expose only the parameters in their Configure list (at most 128). For
-  VST3 plug-ins `live_plugin_expose` builds that list without a click (Serum 2 fully mapped);
+  VST3 plug-ins `live_plugin_expose` builds that list without a click (Serum 2 and Massive mapped);
   AU / VST2 plug-ins need the device's **Configure** button once. The experimental LiveBridge
   Host (Max for Live, VST3) reaches every parameter; hosted parameters are not Live parameters
   until handed over (`live_plugin_host_expose`) or banked, and Live's undo covers a hosted

@@ -164,6 +164,9 @@ COMPANIONS = (
     ("OMNISPHERE.md", "livebridge://omnisphere", "livebridge_omnisphere",
      "LiveBridge Omnisphere 2/3 reference (OMNISPHERE.md): sources, filters, modulation, Orb, "
      "effects and recipes, and what Live can reach"),
+    ("MASSIVE.md", "livebridge://massive", "livebridge_massive",
+     "LiveBridge Massive sound design (MASSIVE.md): what the shipped map exposes, the routed "
+     "template, how Massive is laid out, recipes (sub, Reese, wobble, pluck, pad, lead)"),
     ("WORKFLOWS.md", "livebridge://workflows", "livebridge_workflows",
      "LiveBridge workflows (WORKFLOWS.md): extend an arrangement, co-write parts, start a "
      "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit, "

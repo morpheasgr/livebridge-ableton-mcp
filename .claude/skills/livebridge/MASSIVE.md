@@ -1,0 +1,118 @@
+# Massive sound design for agents
+
+Companion to `SKILL.md` for Native Instruments **Massive** (classic, 1.x; not Massive X). Written
+for LiveBridge from Massive's documented architecture and common sound-design practice.
+
+## What LiveBridge can reach
+
+- **The map ships with LiveBridge** (`massive_vst3.json`, 202 parameters measured on Live
+  12.4.7, Windows), so `live_plugin_expose` works at once. At most 128 controls per exposure;
+  the `sound_design` group (126) is the default working set. Other groups: `osc`, `osc 1|2|3`,
+  `noise`, `feedback`, `mod osc`, `filter`, `filter 1|2`, `env`, `env 1..4`, `lfo`,
+  `mod 5..8`, `fx`, `insert`, `master fx`, `voice`, `unison`, `output`, `routing`, `macros`.
+- **Exposed:** oscillators 1-3 (on/off, wavetable, mode, position, the mode's second control,
+  pitch, level, filter 1/2 balance), noise, feedback, the modulation oscillator, both filters
+  (type, cutoff, bandwidth, resonance, output gain, serial/parallel, crossfade), envelopes 1-4
+  (delay, attack, decay, sustain and release times and levels, loop morph, velocity, key
+  tracking), mod slots 5-8 (rate, amplitude, sync and its fraction, restart,
+  crossfade/glide), inserts, master effects, EQ, unison, voice/trigger mode, glide, vibrato,
+  pan, master volume, macros 1-8.
+- **Not exposed to the host:** modulation routings (Massive's drag-and-drop) and their
+  amounts, LFO waveshapes, stepper steps, performer curves, macro assignments. They live in
+  the patch: start from a preset that holds them (below) and drive them through the sources'
+  own levels (`MODn-AMP`, the envelope levels) and the macros.
+- **Envelope 4 is the amp envelope**: it shapes every note without a routing. Envelopes 1-3
+  and slots 5-8 only do something when the patch routes them somewhere.
+- **Names of choices** (wavetables, filter, insert and effect types, voice modes): read them,
+  do not guess — `live_device_get_parameter(parameter="OSC1-WAVETABLE", track=..., device=...)`
+  lists the choices of a stepped control, `live_device_parameters(track=..., device=...,
+  filter="FILTER1")` shows the current display of a group. Set a choice or a value by its
+  display text ("800 Hz", a wavetable's name) with `live_device_set_parameters`.
+
+## Starting points (templates)
+
+Two Live presets of Massive, made once by the user and kept in the User Library:
+
+- **"Massive Init"**: the user's plain init. For static sounds — bass, lead, sub, keys with a
+  fixed tone.
+- **"Massive Init (LB routed)"**: the same init plus the routings below, every source at
+  rest (level or amplitude 0) so it sounds exactly like the plain init until a source is
+  turned up. For anything that moves.
+
+| Source | Routed to | Turn it up with | For |
+|---|---|---|---|
+| Envelope 1 | Filter 1 and filter 2 cutoff | envelope 1 levels | filter envelope: plucks, zaps, stabs |
+| Envelope 2 | Oscillator 1-3 position | envelope 2 levels | wavetable sweeps per note |
+| Envelope 3 | Oscillator 1-3 pitch | envelope 3 levels | pitch drops (kick-like bass, laser zap) |
+| Slot 5 (LFO) | Filter 1 cutoff | `MOD5-AMP` | wobble, filter movement |
+| Slot 6 (LFO) | Oscillator 1-3 position | `MOD6-AMP` | evolving pads and basses |
+| Slot 7 (LFO) | Filter path pan | `MOD7-AMP` | auto-pan |
+| Macro 1 | Filter 1 + 2 cutoff | `MACRO 1` | one brightness knob for automation |
+| Macro 2 | Oscillator 1-3 position | `MACRO 2` | one timbre knob for automation |
+
+Load one with `live_plugin_expose(plugin="Massive", preset_file=<the preset's path>,
+parameters=["sound_design"], new_track=true, track_name="Bass")`; find the path with
+`live_plugin_preset_files(plugin="Massive")`.
+
+**Saving a sound.** `live_sound_save` keeps the exposed controls' values only, not the routings,
+so a saved Massive sound means "this template plus these values": say which template in the
+description (`description="from Massive Init (LB routed); Reese, macro 1 = brightness"`), and
+load it onto an exposure of that same template with `live_sound_load`. For a complete Massive
+preset, the user saves the device from Live (drag it into the User Library).
+
+## How Massive is laid out
+
+- **Oscillators 1-3**: wavetable oscillators. `POSITION` scans the wavetable; `MODE` picks how
+  it is read (Spectrum, Bend, Formant and others) and `PARAM2` is that mode's intensity. `PITCH`
+  is in semitones (a detune is a fraction of one). `FLT.ROUTING` sends each to filter 1, filter
+  2 or a blend.
+- **Noise** (type, colour, level) and **Feedback** (the output fed back into the filters, for
+  grit) have the same routing control.
+- **Modulation oscillator**: a fourth oscillator that only modulates — ring modulation, phase,
+  position or filter FM, each aimed at an oscillator (`MOD.OSC-RM-OSC` and the like).
+- **Filters 1 and 2**: `SERIELL-PARALLEL` sets serial or parallel; `FILTER-1/2-CROSSFADE` mixes
+  their outputs. What `CUT/PRM.1`, `BW/PRM.2` and `RES/PRM.3` do depends on the filter type —
+  read the display after choosing the type.
+- **Inserts 1 and 2** sit in the voice path (`INSERTn-POSITION`); **master effects 1 and 2**
+  after it. `DW/PRM.1` is the dry/wet or the first control, depending on the type.
+- **Envelopes 1-4**: multi-stage — delay, attack, decay to the decay level, a sustain stage
+  with its own time and level (`LOOP.MORPH` loops it), release. Velocity and key tracking per
+  envelope.
+- **Slots 5-8**: each is an LFO, performer or stepper, depending on the patch. `RATE`, or with
+  `SYNC` on, the fraction `NUM`/`DEN`; `AMP` is its depth; `RESTART` retriggers per note;
+  `CROSSF./GLIDE` blends LFO shapes or glides stepper steps.
+- **Voicing**: `VOICEMODE` (poly/mono), `TRIGGERMODE`, `GLIDE-TIME`, `UNISONO` (voices) with
+  spread switches and amounts for pitch, position and pan, `VIBRATO-RATE` / `-DEPTH`.
+
+## Recipes
+
+Starting values, then listen (`live_engine_listen`) and adjust. Read the displays first: the
+numbers below are what to aim for, not raw values.
+
+- **Sub**: plain init. Oscillator 1 on a sine-like wavetable, 2 and 3 off, no noise, filter 1
+  low-pass well open or off, mono, no unison, envelope 4 attack 0 / release short. Play it an
+  octave below the bass line.
+- **Reese**: plain init. Oscillators 1 and 2 on the same saw-like wavetable, oscillator 2
+  `PITCH` +0.1 to +0.2 semitones, mono, unison 2-4 with a small pitch spread, filter 1 low-pass
+  (4-pole) around 40-50 %, a tube or clipper insert for grit, envelope 4 sustain full. Movement:
+  the routed template with slot 5 slow (1-2 bars) and `MOD5-AMP` low.
+- **Wobble bass**: routed template. Filter 1 low-pass (or a characterful type) fairly closed,
+  slot 5 synced (1/4, 1/8 or 1/8 triplet), `MOD5-AMP` high, `MOD5-RESTART` on so every note
+  starts in phase. Automate `MOD5-NUM`/`DEN` for rate changes in the drop.
+- **Pluck**: routed template. Filter 1 low-pass closed, envelope 1 quick attack, decay 150-300
+  ms to level 0, no sustain level; envelope 4 decay 200-400 ms, sustain 0. Delay or reverb as a
+  master effect.
+- **Pad**: routed template. Oscillators 1-2 detuned slightly, unison 4+ with pitch and pan
+  spread, envelope 4 attack 300 ms+ and release 1-2 s, slot 6 slow on position with a low
+  `MOD6-AMP`, filter 1 half open, reverb and dimension/chorus as master effects.
+- **Lead**: mono with glide (`GLIDE-TIME` short), vibrato depth small, filter 1 more open,
+  unison 2 for width, a delay master effect.
+
+## When something sounds wrong
+
+- **Silent:** an oscillator off or at level 0, all oscillators routed to a filter that is off,
+  `MASTER-VOLUME` down, or envelope 4 at zero sustain on a long note.
+- **Nothing moves although a source is up:** that routing is not in the patch — use the routed
+  template, or ask the user to drag the routing in Massive.
+- **Harsh or clipping:** resonance plus feedback plus a clipper insert stack up — lower one,
+  then check the level with `live_engine_listen`.
