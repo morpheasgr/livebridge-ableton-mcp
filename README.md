@@ -171,7 +171,8 @@ Design and wire protocol: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 Requirements: Ableton Live 12 (any edition), Python 3.10+ for the MCP server
 ([python.org](https://www.python.org/downloads/); the installer itself runs on 3.9+ and can use
 [uv](https://docs.astral.sh/uv/) with `--uv` to fetch Python for you), and Claude Desktop and/or
-Claude Code. Node.js (`npx`) is only needed for Splice in Claude Desktop's JSON config.
+Claude Code. Node.js is not needed: Splice goes into Claude Desktop as a connector (or, with
+`--splice-npx`, through `npx mcp-remote` in its config).
 
 ### macOS
 
@@ -240,7 +241,10 @@ run the installer there ([details](docs/INSTALL.md#getting-livebridge-onto-the-o
 ## Splice
 
 LiveBridge does not reimplement Splice: the installer registers Splice's official remote MCP
-(`https://mcp.splice.com/mcp`) next to LiveBridge (disable with `--no-splice`). Claude searches and
+(`https://mcp.splice.com/mcp`) next to LiveBridge (disable with `--no-splice`): in Claude Code
+directly, in Claude Desktop as a connector you add in its Settings (the checklist says how; nothing
+from npm runs locally — `--splice-npx` puts it in the config through `npx mcp-remote` instead).
+Claude searches and
 downloads sounds with the Splice tools (search is free; downloads need a paid plan and are limited
 to 100 per 24 h), then `live_splice_import_downloaded(files=[<paths Splice reported>])` puts them
 into Live (session slot, arrangement, Simpler or a Drum Rack pad). When Live runs on another

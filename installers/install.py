@@ -19,7 +19,9 @@ What it does -- every step is idempotent, so run it again after ``git pull`` to 
    ``--uv``, ``--python``, ``--no-venv``) and locates the ``livebridge-mcp`` executable.
 6. Registers it in Claude Desktop (``claude_desktop_config.json``, merged -- other servers are
    never touched) and in Claude Code (``claude mcp add --scope user``), plus the official Splice
-   MCP (``https://mcp.splice.com/mcp``) unless ``--no-splice``.
+   MCP (``https://mcp.splice.com/mcp``) unless ``--no-splice``: in Claude Code directly over
+   HTTP; in Claude Desktop as a connector the checklist says how to add (nothing from npm runs
+   locally), or with ``--splice-npx`` through ``npx mcp-remote`` in its config.
 7. Installs the LiveBridge skill (``.claude/skills/livebridge``) for Claude Code in
    ``~/.claude/skills/livebridge`` and builds ``~/.livebridge/livebridge-skill.zip`` to upload
    in Claude Desktop (Settings -> Capabilities -> Skills), unless ``--no-skill``.
@@ -1483,10 +1485,17 @@ class Installer(Ops):
                            "it again.".format(a=self.arrow))
 
     def splice_desktop_entry(self) -> Optional[Dict[str, Any]]:
-        """Claude Desktop entry bridging the remote Splice MCP through ``npx mcp-remote``."""
+        """Claude Desktop entry bridging the remote Splice MCP through ``npx mcp-remote`` (only
+        with ``--splice-npx``); otherwise None and the checklist says how to add Splice as a
+        connector — Claude Desktop then talks to Splice itself and nothing from npm runs on
+        this machine (``npx -y`` runs the newest release of a package on every start)."""
         connector = ("Splice in Claude Desktop (optional; skip if it is already a connector "
                      "there): Settings {a} Connectors {a} Add custom connector {a} URL %s, then "
                      "sign in." % SPLICE_URL).format(a=self.arrow)
+        if not getattr(self.args, "splice_npx", False):
+            self.manual.append(connector + " (Or re-run the installer with --splice-npx to add it "
+                               "through npx mcp-remote instead; needs Node.js.)")
+            return None
         npx = self.host.which("npx")
         if not npx:
             # not an error: Splice as a Claude Desktop connector needs no Node.js
@@ -1830,6 +1839,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="do not register with Claude Code")
     claude.add_argument("--splice", action=argparse.BooleanOptionalAction, default=True,
                         help="also register the official Splice MCP (%s; default on)" % SPLICE_URL)
+    claude.add_argument("--splice-npx", action="store_true",
+                        help="Claude Desktop: add Splice to its config through `npx mcp-remote` "
+                             "(needs Node.js) instead of as a connector you add in its Settings "
+                             "(the default: nothing from npm runs locally)")
     claude.add_argument("--skill", action=argparse.BooleanOptionalAction, default=True,
                         help="install the LiveBridge skill in ~/.claude/skills and build "
                              "~/.livebridge/%s for Claude Desktop (default on)" % SKILL_ZIP_NAME)

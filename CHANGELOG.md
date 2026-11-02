@@ -3,6 +3,10 @@
 LiveBridge's version is the Remote Script's (`VERSION` in `remote_script/LiveBridge/LiveBridge.py`);
 the MCP server package and the installer have their own version numbers. `live_status` shows both.
 
+## Unreleased (after 1.1.6)
+
+- Installer: Splice goes into Claude Desktop as a connector by default (Settings → Connectors → Add custom connector; the checklist says how), so nothing from npm runs on the user's computer. It wrote `npx -y mcp-remote` into Claude Desktop's config whenever Node.js was installed, which runs the newest release of that package on every start. `--splice-npx` keeps the old way; an existing `splice` entry is left as it is.
+
 ## 0.4.0 (MCP server) / 1.1.6 (Remote Script) — 2026-11-02
 
 - A saved-as copy of a set has no strip memory (it is kept per set path): what is on a strip then counts for the on/off hysteresis, so a compressor running there stays inside its hold band — with `keep_manual=false` the lead's compressor went off at crest 11.1 on the copy (keeping one needs > 9.5, starting one > 11.5).

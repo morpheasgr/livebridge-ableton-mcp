@@ -220,10 +220,13 @@ loaded; commands of hidden modules still run through `live_command_call`, and `l
 
 - **Claude Code**: `claude mcp add --transport http --scope user splice https://mcp.splice.com/mcp`,
   then `/mcp` → `splice` → sign in with your Splice account.
-- **Claude Desktop**: the installer adds `"splice": {"command": "npx", "args": ["-y", "mcp-remote",
-  "https://mcp.splice.com/mcp"]}` when Node.js is installed (a browser opens for the Splice login on
-  first use). Without Node: **Settings → Connectors → Add custom connector**, URL
-  `https://mcp.splice.com/mcp`.
+- **Claude Desktop**: add it as a connector — **Settings → Connectors → Add custom connector**, URL
+  `https://mcp.splice.com/mcp`, then sign in (the installer's checklist says so). Claude Desktop
+  then talks to Splice itself and nothing from npm runs on your computer. Prefer it in the config
+  file? `--splice-npx` adds `"splice": {"command": "npx", "args": ["-y", "mcp-remote",
+  "https://mcp.splice.com/mcp"]}` (needs Node.js; a browser opens for the Splice login on first
+  use; `npx -y` runs the newest `mcp-remote` release on every start). An existing `splice` entry is
+  left as it is.
 - Searching is free; downloading needs a paid Splice plan (100 downloads per 24 h via MCP).
   Splice's MCP saves a download where you choose (the Splice desktop app is not needed). Pass the
   reported path(s) to `live_splice_import_downloaded(files=[...])`; when Live runs on another

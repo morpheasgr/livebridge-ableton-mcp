@@ -365,7 +365,7 @@ def test_full_install_on_macos(tmp_path):
         "globalShortcut": "Alt+Space",
         "mcpServers": {"filesystem": {"command": "npx", "args": ["fs"]}},
     })
-    code, out, runner = run_install(host)
+    code, out, runner = run_install(host, ["--splice-npx"])     # Splice through npx mcp-remote
     assert code == 0, out
 
     # Remote Script copied, clean
@@ -445,8 +445,9 @@ def test_full_install_on_windows(tmp_path):
     for path in (desktop,):
         servers = read(path)["mcpServers"]
         assert servers["livebridge"]["command"] == exe
-        assert servers["splice"] == {"command": "cmd", "args": ["/c", "npx", "-y", "mcp-remote",
-                                                                "https://mcp.splice.com/mcp"]}
+        # Splice in Claude Desktop: a connector by default — nothing from npm runs locally
+        assert "splice" not in servers
+    assert "Add custom connector" in out and "--splice-npx" in out
     assert read(desktop)["mcpServers"]["other"] == {"command": "other.exe"}
     # no `claude` on PATH: the exact commands are printed instead
     assert "claude mcp add --scope user livebridge -- " + exe in out
@@ -470,7 +471,7 @@ def test_rerun_is_idempotent_and_keeps_the_token(tmp_path):
     assert "unchanged: %s" % desktop in out
     assert "reusing" in out  # the venv is reused, not recreated
     assert not runner2.commands("-m venv")
-    assert list(read(desktop)["mcpServers"]) == ["x", "livebridge", "splice"]
+    assert list(read(desktop)["mcpServers"]) == ["x", "livebridge"]
 
 
 def test_rerun_does_not_readd_an_existing_splice_in_claude_code(tmp_path):
@@ -640,10 +641,19 @@ def test_existing_custom_splice_entry_is_left_alone(tmp_path):
     assert read(desktop)["mcpServers"]["splice"] == mine
 
 
+def test_splice_npx_on_windows_goes_through_cmd(tmp_path):
+    host = win_host(tmp_path, which={"npx": "C:/nodejs/npx.cmd"})
+    desktop = write_desktop_config(host, {})
+    code, out, _ = run_install(host, ["--splice-npx"])
+    assert code == 0, out
+    assert read(desktop)["mcpServers"]["splice"] == {
+        "command": "cmd", "args": ["/c", "npx", "-y", "mcp-remote", "https://mcp.splice.com/mcp"]}
+
+
 def test_no_splice_and_missing_npx(tmp_path):
     host = mac_host(tmp_path)  # no npx on PATH
     desktop = write_desktop_config(host, {})
-    code, out, _ = run_install(host, ["--no-claude-code"])
+    code, out, _ = run_install(host, ["--no-claude-code", "--splice-npx"])
     assert code == 0
     assert "splice" not in read(desktop)["mcpServers"]
     assert "Add custom connector" in out
@@ -1152,7 +1162,7 @@ def test_uninstall_reverses_the_install(tmp_path):
     host = mac_host(tmp_path, which={"claude": "/fake/claude", "npx": "/fake/npx"})
     desktop = write_desktop_config(host, {"mcpServers": {"other": {"command": "o"}}})
     runner = FakeRunner(host)
-    code, _, _ = run_install(host, runner=runner)
+    code, _, _ = run_install(host, ["--splice-npx"], runner=runner)
     assert code == 0
     code, out, runner = run_uninstall(host, runner=runner)
     assert code == 0, out
