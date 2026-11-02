@@ -1386,5 +1386,16 @@
    "MASTER-VOLUME",
    "PAN (Fltr-Path)"
   ]
+ },
+ "preset_folders": {
+  "windows": [
+   "%CommonProgramFiles(x86)%\\Native Instruments\\Massive\\Sounds",
+   "%USERPROFILE%\\Documents\\Native Instruments\\Massive\\Sounds",
+   "%USERPROFILE%\\Documents\\Documents\\Native Instruments\\Massive\\Sounds"
+  ],
+  "macos": [
+   "/Library/Application Support/Native Instruments/Massive/Sounds",
+   "~/Documents/Native Instruments/Massive/Sounds"
+  ]
  }
 }

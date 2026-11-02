@@ -667,7 +667,7 @@ def _expand(path, env=None):
 
     def repl(match):
         return env.get(match.group(1)) or match.group(0)
-    return re.sub(r"%([A-Za-z0-9_]+)%", repl, text)
+    return re.sub(r"%([A-Za-z0-9_()]+)%", repl, text)    # %CommonProgramFiles(x86)%
 
 
 def preset_folders(identity, library=None, extra=None, env=None):
@@ -702,7 +702,7 @@ def preset_folders(identity, library=None, extra=None, env=None):
     return out
 
 
-PRESET_EXTENSIONS = (".vstpreset", ".serumpreset", ".adv", ".adg", ".aupreset")
+PRESET_EXTENSIONS = (".vstpreset", ".serumpreset", ".adv", ".adg", ".aupreset", ".nmsv")
 
 
 def _preset_entry(path, identity, fields_text):
@@ -723,6 +723,10 @@ def _preset_entry(path, identity, fields_text):
         if norm(identity.get("name")) != "serum2":
             return None
         entry.update({"kind": "SerumPreset", "embeddable": False})
+    elif lowered.endswith(".nmsv"):    # Massive's own preset files (load them in Massive)
+        if norm(identity.get("name")) != "massive":
+            return None
+        entry.update({"kind": "nmsv", "embeddable": False})
     elif lowered.endswith(".aupreset"):
         if fmt != "AU":
             return None

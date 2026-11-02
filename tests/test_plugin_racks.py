@@ -402,6 +402,30 @@ def test_preset_listing(tmp_path):
     assert [e["name"] for e in lib.list_presets(folders, tiny)[0]] == ["Other"]
 
 
+def test_massive_presets_are_listed_from_nis_folders(tmp_path, monkeypatch):
+    """Massive's own .nmsv files are found in NI's folders (the map names them, with
+    %CommonProgramFiles(x86)%) and listed as not embeddable: they load in Massive itself."""
+    monkeypatch.setattr(lib, "is_windows", lambda: True)
+    massive = {"name": "Massive", "vendor": "Native Instruments", "format": "VST3",
+               "class_id": "5653544E694D616D6173736976650000", "kind": "instrument"}
+    shipped = lib.load_map(os.path.join(lib.shipped_maps_dir(), "massive_vst3.json"))
+    common = tmp_path / "Common Files"
+    sounds = common / "Native Instruments" / "Massive" / "Sounds" / "Bass"
+    sounds.mkdir(parents=True)
+    (sounds / "AdditionMOD.nmsv").write_bytes(b"\x00" * 16)
+    folders = lib.preset_folders(massive, None, shipped["preset_folders"],
+                                 env={"CommonProgramFiles(x86)": str(common),
+                                      "USERPROFILE": str(tmp_path / "me")})
+    assert folders[0] == str(common) + r"\Native Instruments\Massive\Sounds"
+    monkeypatch.setattr(lib, "is_windows", lambda: False)    # the listing on this machine
+    entries, _ = lib.list_presets([str(common / "Native Instruments" / "Massive" / "Sounds")],
+                                  massive)
+    assert [(e["name"], e["kind"], e["embeddable"]) for e in entries] == \
+        [("AdditionMOD", "nmsv", False)]
+    serum = dict(massive, name="Serum 2")                     # not offered for other plug-ins
+    assert lib.list_presets([str(sounds)], serum)[0] == []
+
+
 def test_preset_folders_expand_windows_variables(monkeypatch):
     monkeypatch.setattr(lib, "is_windows", lambda: True)
     folders = lib.preset_folders({"name": "Serum 2", "vendor": "Xfer Records"}, None,

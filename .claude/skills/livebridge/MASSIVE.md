@@ -50,6 +50,12 @@ Two Live presets of Massive, made once by the user and kept in the User Library:
 | Macro 1 | Filter 1 + 2 cutoff | `MACRO 1` | one brightness knob for automation |
 | Macro 2 | Oscillator 1-3 position | `MACRO 2` | one timbre knob for automation |
 
+**Massive's own presets** (`.nmsv`, in `%CommonProgramFiles(x86)%\Native Instruments\Massive\Sounds`
+and `Documents\Native Instruments\Massive\Sounds`; on macOS under Application Support and
+Documents) are listed by `live_plugin_preset_files(plugin="Massive")` as not embeddable: the user
+loads them in Massive's browser. A `.vstpreset` (what Live saves when the Massive device is
+dragged into the User Library) loads directly.
+
 Load one with `live_plugin_expose(plugin="Massive", preset_file=<the preset's path>,
 parameters=["sound_design"], new_track=true, track_name="Bass")`; find the path with
 `live_plugin_preset_files(plugin="Massive")`.
@@ -64,7 +70,7 @@ preset, the user saves the device from Live (drag it into the User Library).
 
 - **Oscillators 1-3**: wavetable oscillators. `POSITION` scans the wavetable; `MODE` picks how
   it is read (Spectrum, Bend, Formant and others) and `PARAM2` is that mode's intensity. `PITCH`
-  is in semitones (a detune is a fraction of one). `FLT.ROUTING` sends each to filter 1, filter
+  is in semitones, -64 to +64 (a detune is a fraction of one). `FLT.ROUTING` sends each to filter 1, filter
   2 or a blend.
 - **Noise** (type, colour, level) and **Feedback** (the output fed back into the filters, for
   grit) have the same routing control.
@@ -72,9 +78,15 @@ preset, the user saves the device from Live (drag it into the User Library).
   position or filter FM, each aimed at an oscillator (`MOD.OSC-RM-OSC` and the like).
 - **Filters 1 and 2**: `SERIELL-PARALLEL` sets serial or parallel; `FILTER-1/2-CROSSFADE` mixes
   their outputs. What `CUT/PRM.1`, `BW/PRM.2` and `RES/PRM.3` do depends on the filter type —
-  read the display after choosing the type.
+  read the display after choosing the type. Types (Massive 1.7): None, Lowpass 4, Lowpass 2,
+  Highpass 4, Highpass 2, Allpass, Double Notch, Bandpass, Bandreject, Scream, Daft, Comb,
+  Acid.
 - **Inserts 1 and 2** sit in the voice path (`INSERTn-POSITION`); **master effects 1 and 2**
-  after it. `DW/PRM.1` is the dry/wet or the first control, depending on the type.
+  after it. `DW/PRM.1` is the dry/wet or the first control, depending on the type. Master
+  effect types (Massive 1.7): None, Reverb, Small Reverb, Flanger Positive, Flanger Pos Mono,
+  Flanger Negative, Flanger Negative Mono, Chorus, Chorus Mono, Chorus Ensemble, Phaser, Phaser
+  Mono, Delay, Delay Synced, Dimension Expander, Classic Tube, Tele Tube, Brauner Tube. The
+  inserts have their own list — read it with `live_device_get_parameter`.
 - **Envelopes 1-4**: multi-stage — delay, attack, decay to the decay level, a sustain stage
   with its own time and level (`LOOP.MORPH` loops it), release. Velocity and key tracking per
   envelope.
@@ -94,19 +106,21 @@ numbers below are what to aim for, not raw values.
   octave below the bass line.
 - **Reese**: plain init. Oscillators 1 and 2 on the same saw-like wavetable, oscillator 2
   `PITCH` +0.1 to +0.2 semitones, mono, unison 2-4 with a small pitch spread, filter 1 low-pass
-  (4-pole) around 40-50 %, a tube or clipper insert for grit, envelope 4 sustain full. Movement:
+  (Lowpass 4) around 40-50 %, Classic Tube or Tele Tube as a master effect for grit,
+  envelope 4 sustain full. Movement:
   the routed template with slot 5 slow (1-2 bars) and `MOD5-AMP` low.
-- **Wobble bass**: routed template. Filter 1 low-pass (or a characterful type) fairly closed,
+- **Wobble bass**: routed template. Filter 1 Lowpass 4 (or Daft, Scream, Acid) fairly closed,
   slot 5 synced (1/4, 1/8 or 1/8 triplet), `MOD5-AMP` high, `MOD5-RESTART` on so every note
   starts in phase. Automate `MOD5-NUM`/`DEN` for rate changes in the drop.
 - **Pluck**: routed template. Filter 1 low-pass closed, envelope 1 quick attack, decay 150-300
-  ms to level 0, no sustain level; envelope 4 decay 200-400 ms, sustain 0. Delay or reverb as a
-  master effect.
+  ms to level 0, no sustain level; envelope 4 decay 200-400 ms, sustain 0. Delay Synced or
+  Small Reverb as a master effect.
 - **Pad**: routed template. Oscillators 1-2 detuned slightly, unison 4+ with pitch and pan
   spread, envelope 4 attack 300 ms+ and release 1-2 s, slot 6 slow on position with a low
-  `MOD6-AMP`, filter 1 half open, reverb and dimension/chorus as master effects.
+  `MOD6-AMP`, filter 1 half open, Reverb and Dimension Expander (or Chorus Ensemble) as master
+  effects.
 - **Lead**: mono with glide (`GLIDE-TIME` short), vibrato depth small, filter 1 more open,
-  unison 2 for width, a delay master effect.
+  unison 2 for width, Delay Synced as a master effect.
 
 ## When something sounds wrong
 
