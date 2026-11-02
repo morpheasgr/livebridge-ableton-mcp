@@ -41,7 +41,7 @@ Two Live presets of Massive, made once by the user and kept in the User Library:
 
 | Source | Routed to | Turn it up with | For |
 |---|---|---|---|
-| Envelope 1 | Filter 1 and filter 2 cutoff | envelope 1 levels | filter envelope: plucks, zaps, stabs |
+| Envelope 1 | Filter 1 and filter 2 cutoff | envelope 1 levels (`ATT.LEV`, `DEC.LEV`, `SUST.LEV`) | filter envelope: plucks, zaps, stabs |
 | Envelope 2 | Oscillator 1-3 position | envelope 2 levels | wavetable sweeps per note |
 | Envelope 3 | Oscillator 1-3 pitch | envelope 3 levels | pitch drops (kick-like bass, laser zap) |
 | Slot 5 (LFO) | Filter 1 cutoff | `MOD5-AMP` | wobble, filter movement |
@@ -87,9 +87,13 @@ preset, the user saves the device from Live (drag it into the User Library).
   Flanger Negative, Flanger Negative Mono, Chorus, Chorus Mono, Chorus Ensemble, Phaser, Phaser
   Mono, Delay, Delay Synced, Dimension Expander, Classic Tube, Tele Tube, Brauner Tube. The
   inserts have their own list — read it with `live_device_get_parameter`.
-- **Envelopes 1-4**: multi-stage — delay, attack, decay to the decay level, a sustain stage
-  with its own time and level (`LOOP.MORPH` loops it), release. Velocity and key tracking per
-  envelope.
+- **Envelopes 1-4**: Delay (`DELAY`); Attack — time (`ATT.TME`) and the **peak level it rises
+  to** (`ATT.LEV`); Decay — time (`DEC.TME`) and the level it falls to (`DEC.LEV`); a sustain
+  stage — its time ("S Loop", `SUST.TME`), Morph (`LOOP.MORPH`) and level (`SUST.LEV`); Release
+  (`REL. TME`). The Vel and KTR sliders are `VELOCITY` and `KEYTRACKING`. Not exposed: the two
+  Morph menus, the Loop switch, and the Linear / Gate / One Shot / Hold / Trg Zero Reset
+  switches. **All three levels at 0 = the envelope does nothing** (verified on the user's
+  Massive): that is how a routed envelope rests, and its levels are its depth.
 - **Slots 5-8**: each is an LFO, performer or stepper, depending on the patch. `RATE`, or with
   `SYNC` on, the fraction `NUM`/`DEN`; `AMP` is its depth; `RESTART` retriggers per note;
   `CROSSF./GLIDE` blends LFO shapes or glides stepper steps.
