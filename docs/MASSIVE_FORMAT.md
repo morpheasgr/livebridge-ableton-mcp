@@ -82,4 +82,22 @@ So a **routing slot is a float32 amount followed by an int32 source** (-1 = empt
 offsets of every modulatable knob is the next step, again by labelled pairs. Still unknown:
 the full source numbering, the wavetable ids, performer curves, the other switches.
 
+**Knob records are keyed by the map index.** Each modulatable knob has a record that starts
+with its index in `massive_vst3.json` as a byte (filter 1 cutoff 0x21 = 33, bandwidth 0x22,
+resonance 0x23, filter 2 cutoff 0x24), followed by fields (e.g. -3.0 / 10.0, purpose unknown)
+and its slots (amount f32 + source i32, -1 = empty, a couple of bytes between slots). Records
+are variable-length, so a writer finds a knob by its index and walks its slots rather than
+using fixed offsets.
+
+The template's own routings, found by scanning for amount + source pairs: envelope 2 (1) and
+slot 6 (5) on the oscillator positions (1419/1429, 1611/1621), envelope 3 (2) on pitch with
+amount 0.094 = 12 of the ±64-semitone range (1378, 1570), envelope 1 (0) and slot 5 (4) on the
+cutoffs (1770/1780, 1917/1927), slot 7 (6) on pan (2922). So **sources: envelopes 1-4 = 0-3
+(1, 2 confirmed), slots 5-8 = 4-7 (4, 5, 6 confirmed), macro 1 = 13**; 8-12 are probably KTr,
+Vel, AT, TrR and one more — to be confirmed. Pitch amounts are a fraction of 128 semitones.
+
+A writer does not need the wavetable ids: wavetables and every other exposed control are set
+through Live by name after the written patch is loaded; the file carries only what the host
+cannot reach (routings, LFO curves, stepper steps, slot types).
+
 Method: save two presets that differ in one known thing, unpack both, compare.
