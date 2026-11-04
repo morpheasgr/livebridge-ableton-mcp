@@ -84,7 +84,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 transpose, porta, mono/legato, bus volumes; FX Main Param 1-16), "osc",
                 "osc a", "osc b", "osc c", "sub", "noise", "filter", "filter 1", "filter 2",
                 "env", "lfo", "macros", "fx", "unison", "routing", "mod", "arp", "global",
-                "clip". Massive groups: "sound_design" (122 controls), "osc", "osc 1|2|3", "noise", "feedback", "mod osc", "filter", "filter 1|2", "env", "env 1..4", "lfo", "mod 5..8", "fx", "insert", "master fx", "voice", "unison", "output", "routing", "macros".
+                "clip". Massive groups: "sound_design" (126 controls), "osc", "osc 1|2|3", "noise", "feedback", "mod osc", "filter", "filter 1|2", "env", "env 1..4", "lfo", "mod 5..8", "fx", "insert", "master fx", "voice", "unison", "output", "routing", "macros".
                 Default: "sound_design". Max 128 parameters in total — more crashes Live.
             track: Target track (index, name, LOM path); omitted = selected track.
             plugin: Plug-in to load ("Serum 2", "Xfer Records/Serum 2"); omitted = the plug-in
