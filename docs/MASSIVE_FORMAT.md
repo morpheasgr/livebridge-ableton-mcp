@@ -92,9 +92,32 @@ using fixed offsets.
 The template's own routings, found by scanning for amount + source pairs: envelope 2 (1) and
 slot 6 (5) on the oscillator positions (1419/1429, 1611/1621), envelope 3 (2) on pitch with
 amount 0.094 = 12 of the ±64-semitone range (1378, 1570), envelope 1 (0) and slot 5 (4) on the
-cutoffs (1770/1780, 1917/1927), slot 7 (6) on pan (2922). So **sources: envelopes 1-4 = 0-3
-(1, 2 confirmed), slots 5-8 = 4-7 (4, 5, 6 confirmed), macro 1 = 13**; 8-12 are probably KTr,
-Vel, AT, TrR and one more — to be confirmed. Pitch amounts are a fraction of 128 semitones.
+cutoffs (1770/1780, 1917/1927), slot 7 (6) on pan (2922). So **sources: envelopes 1-4 = 0-3,
+slots 5-8 = 4-7, macros 1-8 = 13-20, KTr 21, Vel 22, TrR 23, AT 24** (all confirmed in round 2). Pitch amounts are a fraction of 128 semitones.
+
+## Labelled pairs, round 2 (2026-11-04)
+
+Ten more presets, each routing one source to filter 1 resonance (its first slot: amount at
+1872, source at 1876):
+
+| Source | Number |
+|---|---|
+| Envelope 1-4 | 0-3 (4 confirmed) |
+| Slots 5-8 | 4-7 (8 confirmed) |
+| Macros 1-8 | 13-20 (1 and 8 confirmed) |
+| KTr | 21 |
+| Vel | 22 |
+| TrR | 23 |
+| AT | 24 |
+
+8-12 did not occur (unused, or sources not on these panels). **Insert 1** (16a -> 16b): its first
+knob has a record like the others; slot 5 on it wrote amount 1.0 and source 4 into that
+record's first slot (around offset 2072), so inserts are modulated the same way. Choosing the
+insert type changed an integer at 2048 (0 -> 1) and reset a knob default at 2103 (1.0 -> 0.5).
+(16a was saved with preset 15's TrR routing still on resonance; 16b vs 16a was clean.)
+**Slot 8 as performer** (17): the slot type is 1 (LFO 0, performer 1, stepper 2), and a ~270-byte
+performer block (repeating float/int curve records) is inserted, with the container's size
+fields growing as for the stepper.
 
 A writer does not need the wavetable ids: wavetables and every other exposed control are set
 through Live by name after the written patch is loaded; the file carries only what the host
