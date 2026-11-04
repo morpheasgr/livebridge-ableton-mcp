@@ -69,7 +69,7 @@ in the unpacked patch; `f` = float32, `i` = int32, little-endian):
 | Env 1 -> filter 1 cutoff: amount to full | 1770 f | 0.6504 -> 1.0 | routing amount |
 | (same slot) | 1774 i | 0 | its source: envelope 1 = 0 |
 | Env 1 -> filter 2 cutoff removed | 1921 i | 0 -> -1 | empty slot = -1; the amount at 1917 (0.6738) stays |
-| Env 2 -> filter 1 resonance added | 1876 i | -1 -> 1 | envelope 2 = 1; amount at 1872 stayed 0 (not set in that save?) |
+| Env 2 -> filter 1 resonance added | 1872 f / 1876 i | 0 -> 0.6914 / -1 -> 1 | envelope 2 = 1 (a first save without the amount set showed only the source changing) |
 | Macro 1 -> filter 1 resonance | 1872 f / 1876 i | 0 -> 0.7832 / -1 -> 13 | macro 1 = source 13 |
 | Slot 5 curve A sine -> square | 3236 i | 0 -> 2 | curve index (sine 0, square 2; probably the menu's order: sine, saw, square, triangle) |
 | Slot 8 LFO -> stepper | 3292 i | 0 -> 2 | slot type (LFO 0, stepper 2; performer probably 1); a 120-byte stepper block is inserted after it, and the container's size fields (offsets 0, 84, 180, 192) grow |
