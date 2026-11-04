@@ -52,9 +52,34 @@ FastLZ — to be confirmed by Massive loading one.
 | 1124 | one byte 0 -> 1 | the oscillators' "restart via gate" switch |
 | 5636 | 3 -> 2 | unknown (a counter?) |
 
-**The exposed controls are one float32 table, in the map's order:** offset = 208 + 4 x the
+**The continuous controls are one float32 table, in the map's order:** offset = 208 + 4 x the
 parameter's index in `plugin_maps/massive_vst3.json` (OSC2-AMP index 16, OSC3-AMP 21,
-ENVELOPE3-DEC.TME 104 all fit), values 0..1 as Live's normalized value. Still unknown: the
-routings (source, target, amount), LFO curves, stepper steps, performer curves, the other
-switches. The method that found the above: save two presets that differ in one known thing,
-unpack both, compare.
+ENVELOPE3-DEC.TME 104 all fit), values 0..1 as Live's normalized value. This holds for the
+knobs (map indices 0-148); the switches and selectors from index 149 on (on/off, types,
+wavetables, modes) are stored elsewhere as integers — OSC1-WAVETABLE (index 159) did not change
+at 208 + 4 x 159 when the wavetable changed.
+
+## Labelled pairs (2026-11-04)
+
+Eight presets, each the routed template plus one change, compared with the template (offsets
+in the unpacked patch; `f` = float32, `i` = int32, little-endian):
+
+| Change | Offset | Before -> after | Reading |
+|---|---|---|---|
+| Env 1 -> filter 1 cutoff: amount to full | 1770 f | 0.6504 -> 1.0 | routing amount |
+| (same slot) | 1774 i | 0 | its source: envelope 1 = 0 |
+| Env 1 -> filter 2 cutoff removed | 1921 i | 0 -> -1 | empty slot = -1; the amount at 1917 (0.6738) stays |
+| Env 2 -> filter 1 resonance added | 1876 i | -1 -> 1 | envelope 2 = 1; amount at 1872 stayed 0 (not set in that save?) |
+| Macro 1 -> filter 1 resonance | 1872 f / 1876 i | 0 -> 0.7832 / -1 -> 13 | macro 1 = source 13 |
+| Slot 5 curve A sine -> square | 3236 i | 0 -> 2 | curve index (sine 0, square 2; probably the menu's order: sine, saw, square, triangle) |
+| Slot 8 LFO -> stepper | 3292 i | 0 -> 2 | slot type (LFO 0, stepper 2; performer probably 1); a 120-byte stepper block is inserted after it, and the container's size fields (offsets 0, 84, 180, 192) grow |
+| Stepper step 1 to maximum | 3300 f (in the stepper file) | 0 -> 1.0 | step values are floats |
+| Osc 1 wavetable Squ-Sw I -> VA-Sync | 1358 i | 0 -> -4 | wavetable id (not the list position: a table of ids is needed) |
+
+So a **routing slot is a float32 amount followed by an int32 source** (-1 = empty; envelopes
+1-4 probably 0-3, slots 5-8 probably 4-7, macro 1 = 13). Each knob's slots sit at fixed offsets
+(filter 1 cutoff 1770, filter 1 resonance 1872, filter 2 cutoff 1917 ...): mapping the slot
+offsets of every modulatable knob is the next step, again by labelled pairs. Still unknown:
+the full source numbering, the wavetable ids, performer curves, the other switches.
+
+Method: save two presets that differ in one known thing, unpack both, compare.
