@@ -137,7 +137,8 @@ is Massive's own default, not a template routing.
   after it. `DW/PRM.1` is the dry/wet or the first control, depending on the type. Master
   effect types (Massive 1.7): None, Reverb, Small Reverb, Flanger Positive, Flanger Pos Mono,
   Flanger Negative, Flanger Negative Mono, Chorus, Chorus Mono, Chorus Ensemble, Phaser, Phaser
-  Mono, Delay, Delay Synced, Dimension Expander, Classic Tube, Tele Tube, Brauner Tube. The
+  Mono, Delay, Delay Synced, Dimension Expander, Classic Tube, Tele Tube, Brauner Tube —
+  master effect 2's list stops at Dimension Expander (no tubes: a tube goes in slot 1). The
   inserts have their own list — read it with `live_device_get_parameter`.
 - **Envelopes 1-4**: Delay (`DELAY`); Attack — time (`ATT.TME`) and the **peak level it rises
   to** (`ATT.LEV`); Decay — time (`DEC.TME`) and the level it falls to (`DEC.LEV`); a sustain

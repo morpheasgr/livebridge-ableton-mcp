@@ -162,3 +162,9 @@ Massive's own save. Steps 1, 2 and 16 at +8, +12, +68 from the type (06, 22, 21)
   Glide Mod faders (likely the 16 x 3 per-step bytes). The loop range (first and last step,
   dragged in the step-number bar) sets the sequence length; where it is stored is not known yet.
 - LFO: a Phase fader sets the start phase; each curve also has a popup of more complex shapes.
+
+## Filter and master effect types (2026-11-07)
+
+Stored as one byte each, as ids that do not follow the menu order: filter 1 at 1750, filter 2
+at 1897 (None 11, Lowpass 4 0, Acid 12); master effect 1 at 5208, 2 at 5397 (None 17, Reverb 0,
+Dimension Expander 14, Brauner Tube 16). Not written by the writer: Live sets types by name.
