@@ -34,7 +34,23 @@ values, procedures) comes from these sources:
   (commit 5937cec, MIT): the 18 genre style profiles (loudness, band balance, role levels) and
   the track-or-master decision rule, re-implemented in `mcp_server/livebridge_mcp/mix.py`.
 
-`SERUM.md` §1-5 are original to this fork, built on LiveBridge's Serum 2 parameter map.
+- **ableton_device_vst_wrapper** by xxnoodl (MIT): the approach behind `live_plugin_host_bank`
+  — a Max for Live device whose `live.dial` objects are named after the plug-in's parameters
+  when the file is written, because Live reads a device's parameter list once, at load
+  (`mcp_server/livebridge_mcp/host_device.py`). Re-implemented, no code copied.
+
+`SERUM.md` §1-5 are original to this fork, built on LiveBridge's Serum 2 parameter map. The
+Massive map, guide (`MASSIVE.md`) and patch writer (`mcp_server/livebridge_mcp/massive.py`) are
+original, worked out from the user's own labelled presets and the Massive manual.
+
+### Studied, not copied
+
+These were read for how Live's API behaves or for feature ideas; no code or text was taken:
+the Remote Script references in `docs/LIVE_API_VERIFIED.md` (ahujasid/ableton-mcp,
+bschoepke/ableton-live-mcp, Ziforge/ableton-liveapi-tools, jpoindexter/ableton-mcp,
+ideoforms/AbletonOSC, gluon's decompiled MIDI Remote Scripts, NSUSpray's Live API doc),
+Producer Pal's plug-in-host spike (GPL-3, re-implemented from its notes), fadelabs/phantom
+(AGPL-3.0, feature list only) and LivePilot (BSL, ideas only).
 
 ## ableton-mcp-pro
 

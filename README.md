@@ -474,5 +474,6 @@ codec from [nicholasbien's ableton-mcp-pro](https://github.com/nicholasbien/able
 (via [kasperikaivola's fork](https://github.com/kasperikaivola/ableton-mcp-pro)), and production
 know-how from [ableton-skills](https://github.com/glincker/ableton-skills),
 [hellyee](https://github.com/guvense/hellyee) and
-[ableton-auto-mix-mcp](https://github.com/HighVoltSound/ableton-auto-mix-mcp). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
+[ableton-auto-mix-mcp](https://github.com/HighVoltSound/ableton-auto-mix-mcp), and the plug-in host's
+dial approach from xxnoodl's ableton_device_vst_wrapper. Ableton and Live are trademarks of Ableton AG; Splice is a trademark
 of Splice. LiveBridge is an independent project and not affiliated with either.
