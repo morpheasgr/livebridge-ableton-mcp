@@ -165,6 +165,30 @@ Massive's own save. Steps 1, 2 and 16 at +8, +12, +68 from the type (06, 22, 21)
 
 ## Filter and master effect types (2026-11-07)
 
-Stored as one byte each, as ids that do not follow the menu order: filter 1 at 1750, filter 2
-at 1897 (None 11, Lowpass 4 0, Acid 12); master effect 1 at 5208, 2 at 5397 (None 17, Reverb 0,
-Dimension Expander 14, Brauner Tube 16). Not written by the writer: Live sets types by name.
+One byte each: filter 1 at 1750, filter 2 at 1897; master effect 1 at 5208, 2 at 5397 (both
+slots share the numbering; slot 2's menu has no tubes). One labelled preset per type, each a
+one-byte change from the template (Scream also changes its second knob's range).
+
+| Id | Filter | Master effect |
+|---|---|---|
+| 0 | Lowpass 4 | Reverb |
+| 1 | Lowpass 2 | Small Reverb |
+| 2 | Highpass 4 | Flanger Positive |
+| 3 | Highpass 2 | Flanger Pos Mono |
+| 4 | Allpass | Flanger Negative |
+| 5 | Double Notch | Flanger Negative Mono |
+| 6 | Bandpass | Chorus |
+| 7 | Bandreject | Chorus Mono |
+| 8 | Scream | Chorus Ensemble |
+| 9 | Daft | Phaser |
+| 10 | Comb | Phaser Mono |
+| 11 | **None** | Delay |
+| 12 | Acid | Delay Synced |
+| 13 | | Classic Tube |
+| 14 | | Dimension Expander |
+| 15 | | Tele Tube |
+| 16 | | Brauner Tube |
+| 17 | | **None** |
+
+Menu order except: filters put None between Comb and Acid; effects list Dimension Expander
+before Classic Tube. Not written by the writer: Live sets types by name.
