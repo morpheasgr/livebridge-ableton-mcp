@@ -134,3 +134,10 @@ records in the template; two with index -2 (envelope 4 on the amp) are not map p
 flag bytes are kept as found (`00 01` on some cutoff slots, meaning unknown). Sizes to fix when
 the compressed stream changes length: every u64 block/chunk size whose extent covers it (five in
 the template: the outer and inner `hsin` blocks and the `DSINt`/`DSINs` chunks).
+
+## LFO curves (2026-11-07)
+
+Slots 5-8 are 24-byte blocks `i32 type, i32 2, 0, 0, i32 curve A, i32 curve B` (template:
+slot 5 at 3220, slot 6 at 3244 ...). Curves: sine 0, saw (down) 1, square 2, triangle 3 —
+the buttons' order (18: slot 6 curve A triangle = 3 at 3260; 19: slot 7 curve B square = 2 at
+3288). A stepper or performer block follows its slot's type, so later slots move.

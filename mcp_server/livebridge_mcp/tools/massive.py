@@ -50,7 +50,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{file_path, routings: [{target, source, amount, slot, semitones?}],
-            modulatable: [knob names], sources: [names]}`. amount is -1..1, a fraction of the
+            modulatable: [knob names], sources: [names], slots: {5..8: {type, curve_a,
+            curve_b}}}`. amount is -1..1, a fraction of the
             knob's range; on a pitch knob also in semitones (1.0 = 128).
         """
         cmd = "massive.routings"
@@ -59,8 +60,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if isinstance(path, dict):
                 return path
             patch = massive.Patch.load(path)
-            return {"file_path": str(path), "routings": patch.routings(),
-                    "modulatable": patch.targets(), "sources": list(massive.SOURCES)}
+            result = {"file_path": str(path), "routings": patch.routings(),
+                      "modulatable": patch.targets(), "sources": list(massive.SOURCES)}
+            try:
+                result["slots"] = patch.slots()
+            except ValueError as exc:
+                result["slots_note"] = str(exc)
+            return result
         except FileNotFoundError:
             return tool_error(f"no such file: {file_path}", type="not_found", cmd=cmd)
         except Exception as exc:
@@ -68,7 +74,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     @mcp.tool()
     def live_massive_write(
-        routings: list[dict[str, Any]],
+        routings: list[dict[str, Any]] | None = None,
+        lfos: list[dict[str, Any]] | None = None,
         name: str | None = None,
         output_path: str | None = None,
         template: str | None = None,
@@ -87,6 +94,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 "macro1".."macro8" | "ktr" | "vel" | "trr" | "at", "amount": -1..1 (fraction
                 of the knob's range) or "semitones" (pitch knobs), or "remove": true}. A source
                 already on the knob gets the new amount; otherwise it takes a free slot.
+            lfos: LFO shapes of slots 5-8: [{"slot": 5, "curve_a": "square", "curve_b":
+                "triangle"}] — "sine" | "saw" (down) | "square" | "triangle". The slot's XFade
+                knob (MODn-CROSSF./GLIDE, set through Live) blends A (0) to B (100).
             name: File name for the new preset (default "LB Massive"); written next to the
                 template, so it shows in Live's browser beside it.
             output_path: Full path instead of name.
@@ -95,17 +105,19 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             overwrite: Replace an existing output file (never the template).
 
         Returns:
-            `{template, output_path?, changes: [...], routings: [...], written}`.
+            `{template, output_path?, changes: [...], routings: [...], slots?, written}`.
 
         Gotchas: a knob has 1-3 slots (see live_massive_routings); a full knob is refused —
         remove a routing first. The modulation depth also follows the source's own level
         (envelope levels, MOD5-8 AMP, macro values): a routed source at rest is silent.
-        The template's own routings stay unless removed. The file carries routings only:
-        LFO curves, stepper steps and slot types are set in Massive's window for now.
+        The template's own routings stay unless removed. The file carries routings and LFO curves;
+        stepper steps and slot types are set in Massive's window for now.
         """
         cmd = "massive.write"
-        if not isinstance(routings, list) or not 1 <= len(routings) <= 64:
-            return tool_error("routings must be a list of 1..64 entries", cmd=cmd)
+        routings, lfos = routings or [], lfos or []
+        if not isinstance(routings, list) or len(routings) > 64 or \
+                not isinstance(lfos, list) or len(lfos) > 4 or not routings + lfos:
+            return tool_error("give routings (1..64) and/or lfos (1..4)", cmd=cmd)
         try:
             source = _expand(template) if template else find_template()
             if isinstance(source, dict):
@@ -119,10 +131,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                            amount=entry.get("amount"),
                                            semitones=entry.get("semitones"),
                                            remove=bool(entry.get("remove"))))
+            for entry in lfos:
+                if not isinstance(entry, dict) or "slot" not in entry:
+                    return tool_error("each lfo needs slot (5..8) and curve_a/curve_b", cmd=cmd)
+                changes.append(patch.set_curve(int(entry["slot"]), entry.get("curve_a"),
+                                               entry.get("curve_b")))
             data = patch.to_bytes()
             massive.Patch(data)                          # what we write parses again
             result: dict[str, Any] = {"template": str(source), "changes": changes,
                                       "routings": patch.routings(), "written": False}
+            if lfos:
+                result["slots"] = patch.slots()
             if output_path:
                 target = _expand(output_path)
             else:

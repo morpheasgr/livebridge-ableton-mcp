@@ -94,14 +94,16 @@ When the template's routings don't fit the sound, write a new preset with differ
    "amount": 0.4}, {"target": "OSC1-PITCH", "source": "env3", "semitones": 24},
    {"target": "PAN (Fltr-Path)", "source": "slot7", "remove": true}], name="LB Acid")`:
    sources `env1`-`env4`, `slot5`-`slot8`, `macro1`-`macro8`, `ktr`, `vel`, `trr`, `at`;
-   amount -1..1 of the knob's range (negative = downwards). The file goes next to the
+   amount -1..1 of the knob's range (negative = downwards). LFO shapes in the same call:
+   `lfos=[{"slot": 5, "curve_a": "square", "curve_b": "triangle"}]` (sine, saw, square,
+   triangle; `MODn-CROSSF./GLIDE` blends A at 0 to B at 100). The file goes next to the
    template.
 3. `live_plugin_expose(plugin="Massive", preset_file=<output_path>, parameters=["sound_design"],
    ...)`, then set the knobs by name and turn up each source's level as before.
 
 A knob has 1-3 slots (`live_massive_routings` shows them); a full knob is refused, so remove
-one first. The file carries routings only: LFO shapes, stepper steps and slot types stay as
-the template has them (slots 5-8 are sine LFOs). Verified on the user's Massive: a written
+one first. The file carries routings and LFO shapes: stepper steps and slot types stay as the
+template has them (slots 5-8 are LFOs, curve A sine, curve B saw). Verified on the user's Massive: a written
 preset loads, an added routing shows on its knob (semitones exactly: +12 shows as 12.00), a
 removed one is gone, the template's other routings stay. Envelope 4 on Amp Mod and Bypass Mod
 is Massive's own default, not a template routing.

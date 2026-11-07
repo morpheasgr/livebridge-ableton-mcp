@@ -23,7 +23,8 @@ def _payload():
                              (0.0, -1, b"\x00\x01")], 33) + b"\x00\x00\x00\x00\x00" + \
         _record(0.0, 1.0, [(0.0, -1, b"\x00\x00"), (0.0, -1, b"\x00\x00")], 35) + \
         b"\x00" * 4 + _record(0.0, 10.583, [(0.09375, 2, b"\x00\x00"),
-                                            (0.0, -1, b"\x00\x00")], 8) + bytes(300)
+                                            (0.0, -1, b"\x00\x00")], 8) + bytes(40) + \
+        b"".join(struct.pack("<6i", 0, 2, 0, 0, 0, 1) for _ in range(4)) + bytes(300)
 
 
 def _preset(payload):
@@ -126,3 +127,17 @@ def test_write_tool_writes_next_to_the_template(tmp_path):
                                          "remove": True}],
                                        output_path=str(template), template=str(template))
     assert "replace the template" in str(same)
+
+
+def test_lfo_curves():
+    patch = M.Patch(_preset(_payload()))
+    assert patch.slots()[5] == {"type": "lfo", "curve_a": "sine", "curve_b": "saw"}
+    assert patch.set_curve(6, curve_a="triangle")["curve_a_before"] == "sine"
+    patch.set_curve(7, curve_b="Square")
+    again = M.Patch(patch.to_bytes()).slots()
+    assert (again[6]["curve_a"], again[7]["curve_b"], again[8]["curve_a"]) == \
+        ("triangle", "square", "sine")
+    with pytest.raises(ValueError, match="curve_a must be"):
+        patch.set_curve(5, curve_a="noise")
+    with pytest.raises(ValueError, match="5..8"):
+        patch.set_curve(4, curve_a="sine")

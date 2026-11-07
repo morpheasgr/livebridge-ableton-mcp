@@ -39,7 +39,9 @@ _ALIASES = {**{f"envelope{i}": f"env{i}" for i in range(1, 5)},
             **{f"mod{i}": f"slot{i}" for i in range(5, 9)},
             "keytrack": "ktr", "velocity": "vel", "trigger": "trr", "aftertouch": "at"}
 SOURCE_NAMES = {number: name for name, number in SOURCES.items()}
-PITCH_RANGE_ST = 128.0          # a pitch amount of 1.0 is 128 semitones
+PITCH_RANGE_ST = 128.0
+CURVES = ("sine", "saw", "square", "triangle")         # Massive's curve buttons, in order
+SLOT_TYPES = {0: "lfo", 1: "performer", 2: "stepper"}          # a pitch amount of 1.0 is 128 semitones
 
 
 # ---------------------------------------------------------------- FastLZ level 1
@@ -211,6 +213,33 @@ class Patch:
                     out.append(entry)
         return out
 
+    def slots(self) -> dict[int, dict[str, Any]]:
+        """Mod slots 5-8: {slot: {type, curve_a?, curve_b?}} (curves only for LFO slots)."""
+        out = {}
+        for k, base in enumerate(_slot_table(self.payload)):
+            kind, curve_a, curve_b = struct.unpack_from("<i12xii", self.payload, base)
+            out[5 + k] = {"type": SLOT_TYPES.get(kind, kind),
+                          "curve_a": CURVES[curve_a], "curve_b": CURVES[curve_b]}
+        return out
+
+    def set_curve(self, slot: int, curve_a: str | None = None,
+                  curve_b: str | None = None) -> dict[str, Any]:
+        if slot not in (5, 6, 7, 8):
+            raise ValueError("slot must be 5..8")
+        table = _slot_table(self.payload)
+        before = self.slots()[slot]
+        change: dict[str, Any] = {"slot": slot}
+        for offset, value, key in ((16, curve_a, "curve_a"), (20, curve_b, "curve_b")):
+            if value is None:
+                continue
+            name = str(value).strip().lower().replace("saw down", "saw")
+            if name not in CURVES:
+                raise ValueError(f"{key} must be one of {', '.join(CURVES)}")
+            struct.pack_into("<i", self.payload, table[slot - 5] + offset, CURVES.index(name))
+            change[key] = name
+            change[key + "_before"] = before[key]
+        return change
+
     def targets(self) -> list[str]:
         names = parameter_names()
         return [names[i] for i in sorted(self.records) if i < len(names)]
@@ -271,6 +300,21 @@ class Patch:
         chunks = dict(self.chunks)
         chunks["Comp"] = bytes(out)
         return _build_vstpreset(self.class_id, chunks)
+
+
+def _slot_table(payload: bytes) -> list[int]:
+    """Offsets of the four LFO blocks of slots 5-8 (``i32 type, 2, 0, 0, curve A, curve B``,
+    24 bytes apart). Found only when all four slots are LFOs, as in the template."""
+    hits = []
+    for base in range(0, len(payload) - 4 * 24, 4):
+        groups = [struct.unpack_from("<6i", payload, base + 24 * k) for k in range(4)]
+        if all(g[0] == 0 and g[1] == 2 and g[2] == g[3] == 0 and 0 <= g[4] <= 3
+               and 0 <= g[5] <= 3 for g in groups):
+            hits.append(base)
+    if len(hits) != 1:
+        raise ValueError("the LFO slots 5-8 were not found (curves need a template whose "
+                         "slots 5-8 are all LFOs, like 'Massive Init (LB routed)')")
+    return [hits[0] + 24 * k for k in range(4)]
 
 
 def _records(payload: bytes) -> dict[int, list[tuple[int, float, float]]]:
