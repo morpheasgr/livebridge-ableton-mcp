@@ -18,6 +18,13 @@ copied. Implemented in `mcp_server/livebridge_mcp/surge.py` (`live_surge_write`)
   only the XML, copies everything after it unchanged and fixes the XML size and chunk size.
   Revisions seen: 21, 22, 24, 26, 30, 31.
 
+## As a `.vstpreset`
+
+Surge XT's VST3 state (class id `ABCDEF019182FAEB566D624153675854`) is the `.fxp` body without
+its 60-byte header: the `Comp` chunk is `sub3` + XML + the rest (checked on the user's "Init"
+saved from Live, revision 31). So the writer emits both; `live_plugin_expose(preset_file=)`
+loads the `.vstpreset`.
+
 ## The XML
 
 - `<parameters>`: every parameter by name (`a_`/`b_` = scene A/B, `fx1_type`...), `value`,

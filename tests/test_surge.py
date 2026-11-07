@@ -87,10 +87,22 @@ def test_write_tool(tmp_path):
         "Pluck", routings=[{"target": "a_filter1_cutoff", "source": "filtereg", "depth": 24}],
         step_sequences=[{"lfo": 2, "steps": [1, 0, 1, 0]}], template=str(INIT_SAW),
         output_path=str(out))
-    assert result["written"] and out.is_file()
+    assert result["written"] and out.is_file() and out.with_suffix(".vstpreset").is_file()
+    vst = out.with_suffix(".vstpreset").read_bytes()
+    assert vst[:4] == b"VST3" and vst[8:40] == S.CLASS_ID.encode()
+    assert S.Patch(vst).routings() == S.Patch(out.read_bytes()).routings()
     read = tools["live_surge_routings"](str(out))
     assert read["name"] == "Pluck" and read["routings"][0]["source"] == "filtereg"
     assert read["step_sequences"][0]["lfo"] == "lfo2"
     again = tools["live_surge_write"]("Pluck", parameters={"a_pan": 0.1},
                                       template=str(INIT_SAW), output_path=str(out))
     assert "exists" in str(again)
+
+
+def test_vstpreset_round_trip_keeps_the_state():
+    patch = S.Patch.load(INIT_SAW)
+    vst = patch.to_vstpreset()
+    again = S.Patch(vst)
+    assert again.to_bytes()[60:] == INIT_SAW.read_bytes()[60:]      # state == fxp body
+    with pytest.raises(ValueError, match="not Surge"):
+        S.Patch(vst[:8] + b"0" * 32 + vst[40:])

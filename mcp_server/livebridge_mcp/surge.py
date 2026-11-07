@@ -19,6 +19,13 @@ from pathlib import Path
 from typing import Any
 
 PLUGIN_ID = b"cjs3"
+CLASS_ID = "ABCDEF019182FAEB566D624153675854"          # Surge XT's VST3 class id
+_INFO = ("<?xml version='1.0' encoding='utf-8'?>\n<MetaInfo>" + "".join(
+    f"<Attribute id='{k}' value='{v}' type='string' flags='writeProtected'></Attribute>"
+    for k, v in (("MediaType", "VstPreset"), ("PlugInCategory", "Instrument|Synth"),
+                 ("plugtype", "Instrument|Synth"), ("PlugInName", "Surge XT"),
+                 ("plugname", "Surge XT"), ("PlugInVendor", "Surge Synth Team")))
+    + "</MetaInfo>").encode()
 REVISIONS = range(16, 32)               # patch revisions seen: 21-31; older ones still parse
 SOURCES: dict[str, int] = {
     "velocity": 1, "keytrack": 2, "polyat": 3, "aftertouch": 4, "pitchbend": 5,
@@ -50,6 +57,8 @@ class Patch:
     """A Surge XT ``.fxp`` patch: its XML tree plus the bytes around it."""
 
     def __init__(self, data: bytes):
+        if data[:4] == b"VST3":                     # a .vstpreset: its state is the fxp body
+            data = _fxp_from_vstpreset(data)
         if len(data) < 92 or data[:4] != b"CcnK" or data[16:20] != PLUGIN_ID:
             raise ValueError("not a Surge XT patch (.fxp with plug-in id cjs3)")
         self.head = bytearray(data[:60])
@@ -208,6 +217,36 @@ class Patch:
         head = bytearray(self.head)
         struct.pack_into(">I", head, 56, len(chunk))
         return bytes(head) + chunk
+
+    def to_vstpreset(self) -> bytes:
+        """The same patch as a VST3 preset (Live's browser and live_plugin_expose load it)."""
+        chunks = {"Comp": self.to_bytes()[60:], "Cont": b"", "Info": _INFO}
+        body, table = b"", []
+        for chunk_id, payload in chunks.items():
+            table.append((chunk_id, 48 + len(body), len(payload)))
+            body += payload
+        out = b"VST3" + struct.pack("<i", 1) + CLASS_ID.encode() + \
+            struct.pack("<q", 48 + len(body)) + body + b"List" + struct.pack("<i", len(table))
+        for chunk_id, start, size in table:
+            out += chunk_id.encode() + struct.pack("<qq", start, size)
+        return out
+
+
+def _fxp_from_vstpreset(data: bytes) -> bytes:
+    if data[8:40].decode("ascii", "replace").upper() != CLASS_ID:
+        raise ValueError("this .vstpreset is not Surge XT")
+    offset = struct.unpack_from("<q", data, 40)[0]
+    if data[offset:offset + 4] != b"List":
+        raise ValueError(".vstpreset has no chunk list")
+    for k in range(struct.unpack_from("<i", data, offset + 4)[0]):
+        entry = data[offset + 8 + 20 * k:offset + 28 + 20 * k]
+        if entry[:4] == b"Comp":
+            start, size = struct.unpack_from("<qq", entry, 4)
+            body = data[start:start + size]
+            head = b"CcnK" + bytes(4) + b"FPCh" + struct.pack(">I", 1) + PLUGIN_ID + \
+                struct.pack(">II", 1, 1) + bytes(28) + struct.pack(">I", len(body))
+            return head + body
+    raise ValueError("the .vstpreset has no Surge state (Comp chunk)")
 
 
 def _lfo_label(index: int) -> str:

@@ -3123,7 +3123,7 @@ Bridge: none (runs in the MCP server)
 
 #### `live_surge_write`
 
-Write a new Surge XT patch: a copy of the template with routings, step sequences and parameters changed; everything else kept (wavetables, FX, nightly data). The patch goes to Surge's user folder (Patches/LiveBridge/<name>.fxp); load it in Surge's patch browser (refresh the list if it is not shown yet).
+Write a new Surge XT patch: a copy of the template with routings, step sequences and parameters changed; everything else kept (wavetables, FX, nightly data). Written to Surge's user folder (Patches/LiveBridge/<name>.fxp, for Surge's own browser) and as <name>.vstpreset beside it — load that into Live with live_plugin_expose(plugin= "Surge XT", preset_file=<vstpreset_path>, ...) or drag it from Live's browser.
 
 | Argument | Type | Default |
 |---|---|---|
@@ -3133,6 +3133,7 @@ Write a new Surge XT patch: a copy of the template with routings, step sequences
 | `parameters` | object \| null | `null` |
 | `template` | str \| null | `null` |
 | `output_path` | str \| null | `null` |
+| `formats` | list[str] \| null | `null` |
 | `dry_run` | bool | `false` |
 | `overwrite` | bool | `false` |
 

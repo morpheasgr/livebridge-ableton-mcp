@@ -56,7 +56,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         """List a Surge XT patch's modulation routings and step sequences. Reads the file only.
 
         Args:
-            file_path: The `.fxp` (Surge's patches: Documents/Surge Synth Team/Surge XT/Patches).
+            file_path: The `.fxp` (Surge's patches: Documents/Surge Synth Team/Surge XT/Patches)
+                or a Surge `.vstpreset`.
 
         Returns:
             `{file_path, name, revision, routings: [{target, source, depth, output?, muted?}],
@@ -84,13 +85,15 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         parameters: dict[str, float] | None = None,
         template: str | None = None,
         output_path: str | None = None,
+        formats: list[str] | None = None,
         dry_run: bool = False,
         overwrite: bool = False,
     ) -> Any:
         """Write a new Surge XT patch: a copy of the template with routings, step sequences and
-        parameters changed; everything else kept (wavetables, FX, nightly data). The patch goes
-        to Surge's user folder (Patches/LiveBridge/<name>.fxp); load it in Surge's patch browser
-        (refresh the list if it is not shown yet).
+        parameters changed; everything else kept (wavetables, FX, nightly data). Written to
+        Surge's user folder (Patches/LiveBridge/<name>.fxp, for Surge's own browser) and as
+        <name>.vstpreset beside it — load that into Live with live_plugin_expose(plugin=
+        "Surge XT", preset_file=<vstpreset_path>, ...) or drag it from Live's browser.
 
         Args:
             name: The patch name (file name and the name Surge shows).
@@ -106,13 +109,17 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 sequencer. Route that LFO somewhere to hear it.
             parameters: {"a_filter1_cutoff": -12.0, "a_osc1_type": 0} — raw patch values in
                 the patch's own units (read an existing patch to see them).
-            template: The `.fxp` to start from (default: Surge's "Init Saw").
-            output_path: Full path instead of Patches/LiveBridge/<name>.fxp.
+            template: The `.fxp` or Surge `.vstpreset` to start from (default: Surge's
+                "Init Saw").
+            output_path: Full path (.fxp or .vstpreset) instead of Patches/LiveBridge/<name>;
+                the other format is written beside it with the same name.
+            formats: ["fxp", "vstpreset"] (default both).
             dry_run: Report the changes, write nothing.
             overwrite: Replace an existing output file (never the template).
 
         Returns:
-            `{template, output_path, changes, routings, step_sequences, written}`.
+            `{template, output_path, vstpreset_path?, changes, routings, step_sequences,
+            written}`.
 
         Gotchas: the arpeggiator (Surge nightlies) is kept but not written. A depth of 0 is
         refused (Surge drops such routings). Parameter values are written as given — copy them
@@ -150,25 +157,37 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                            remove=bool(entry.get("remove")),
                                            output=int(entry.get("output", 0))))
             patch.set_name(stem)
-            data = patch.to_bytes()
-            surge.Patch(data)                                 # what we write reads again
-            target = Path(output_path).expanduser() if output_path else \
+            kinds = [k.lower().lstrip(".") for k in (formats or ["fxp", "vstpreset"])]
+            if not kinds or any(k not in ("fxp", "vstpreset") for k in kinds):
+                return tool_error("formats must list fxp and/or vstpreset", cmd=cmd)
+            base = Path(output_path).expanduser() if output_path else \
                 user_patches() / "LiveBridge" / f"{stem}.fxp"
-            if target.suffix.lower() != ".fxp":
-                return tool_error("output_path must end in .fxp", cmd=cmd)
-            if target.exists() and target.resolve() == source.resolve():
-                return tool_error("the output would replace the template", cmd=cmd)
-            result: dict[str, Any] = {"template": str(source), "output_path": str(target),
-                                      "changes": changes, "routings": patch.routings(),
+            if base.suffix.lower() not in (".fxp", ".vstpreset"):
+                return tool_error("output_path must end in .fxp or .vstpreset", cmd=cmd)
+            outputs = {k: (base.with_suffix("." + k), patch.to_bytes() if k == "fxp"
+                           else patch.to_vstpreset()) for k in kinds}
+            for _path, data in outputs.values():
+                surge.Patch(data)                             # what we write reads again
+            for path, _data in outputs.values():
+                if path.exists() and path.resolve() == source.resolve():
+                    return tool_error("the output would replace the template", cmd=cmd)
+            result: dict[str, Any] = {"template": str(source), "changes": changes,
+                                      "routings": patch.routings(),
                                       "step_sequences": patch.step_sequences(),
                                       "written": False}
+            if "fxp" in outputs:
+                result["output_path"] = str(outputs["fxp"][0])
+            if "vstpreset" in outputs:
+                result["vstpreset_path"] = str(outputs["vstpreset"][0])
             if dry_run:
                 return result
-            if target.exists() and not overwrite:
-                return tool_error(f"{target} exists (pass overwrite=true or another name)",
-                                  type="invalid_state", cmd=cmd)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
+            taken = [str(p) for p, _d in outputs.values() if p.exists()]
+            if taken and not overwrite:
+                return tool_error(f"{', '.join(taken)} exists (pass overwrite=true or another "
+                                  "name)", type="invalid_state", cmd=cmd)
+            for path, data in outputs.values():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
             result["written"] = True
             return result
         except FileNotFoundError as exc:
