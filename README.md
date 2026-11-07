@@ -4,8 +4,9 @@
 
 <h1 align="center">LiveBridge · Ableton Live MCP server for Claude</h1>
 
-> **This is the `morpheasgr` fork of [valentijnh/livebridge-ableton-mcp](https://github.com/valentijnh/livebridge-ableton-mcp).**
-> It adds the optional Max for Live devices (LiveBridge Engine and LiveBridge MIDI: real-time
+> **Originally created by [Valentijn](https://github.com/valentijnh)
+> ([valentijnh/livebridge-ableton-mcp](https://github.com/valentijnh/livebridge-ableton-mcp)), developed
+> further here by [morpheasgr](https://github.com/morpheasgr).** This version adds the optional Max for Live devices (LiveBridge Engine and LiveBridge MIDI: real-time
 > listening, A/B and masking while playing, captures, live modulation, follow actions, MIDI input,
 > faster automation recording), sample and plug-in search across Live's browser, arrangements that
 > keep their automation, production know-how (genres, Serum 2, workflows), a sound library,
@@ -463,7 +464,8 @@ about what you made with it helps just as much.
 ## License
 
 MIT — see [LICENSE](LICENSE). LiveBridge was created by
-[Valentijn](https://github.com/valentijnh) ([original repository](https://github.com/valentijnh/livebridge-ableton-mcp));
-this fork adds mixing and mastering by measurement and is maintained by
-[morpheasgr](https://github.com/morpheasgr). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
+[Valentijn](https://github.com/valentijnh) ([original repository](https://github.com/valentijnh/livebridge-ableton-mcp)),
+whose work this project is built on and whose copyright notice it keeps. It is developed further and
+maintained by [morpheasgr](https://github.com/morpheasgr): the Max for Live devices, mixing and mastering
+by measurement, plug-in racks and patch writing (Serum 2, Massive), sample search and more. Ableton and Live are trademarks of Ableton AG; Splice is a trademark
 of Splice. LiveBridge is an independent project and not affiliated with either.
