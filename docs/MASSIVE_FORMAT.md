@@ -145,8 +145,9 @@ the buttons' order (18: slot 6 curve A triangle = 3 at 3260; 19: slot 7 curve B 
 ## Steppers (2026-11-07)
 
 Turning an LFO slot into a stepper replaces the 20 bytes after its type (`2, 0, 0, A, B`)
-with 140: `i32 2, 16 x f32 steps (0..1, 0 = bottom), 16 zero bytes, i32 2, 16 x 3 per-step
-bytes (00 01 00 by default: the two buttons under each step, top = glide), i32 0`, sets the
+with 140: `i32 2, 16 x f32 steps (0..1, 0 = bottom), 16 per-step glide bytes (1 = on; 24:
+steps 1 and 16 at +72 and +87 from the type), i32 2, 16 x 3 per-step bytes (00 01 00 by
+default; probably the Amp Mod row), i32 0`, sets the
 type to 2 and adds 120 to the five u64 sizes in the unpacked patch at 0, 84 (`hsin`), 124
 (`DSIN`), 180 and 192 (`prst`). Verified for slots 5 (20) and 8 (05): the result equals
 Massive's own save. Steps 1, 2 and 16 at +8, +12, +68 from the type (06, 22, 21).

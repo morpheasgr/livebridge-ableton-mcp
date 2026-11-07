@@ -225,12 +225,14 @@ class Patch:
                               "curve_b": CURVES[curve_b]}
             else:
                 steps = struct.unpack_from("<16f", self.payload, base + 8)
-                out[5 + k] = {"type": "stepper", "steps": [round(v, 4) for v in steps]}
+                glide = [n + 1 for n in range(16) if self.payload[base + 72 + n]]
+                out[5 + k] = {"type": "stepper", "steps": [round(v, 4) for v in steps],
+                              "glide": glide}
         return out
 
     def set_slot(self, slot: int, type: str | None = None, curve_a: str | None = None,
-                 curve_b: str | None = None, steps: list[float] | None = None
-                 ) -> dict[str, Any]:
+                 curve_b: str | None = None, steps: list[float] | None = None,
+                 glide: list[int] | None = None) -> dict[str, Any]:
         """Change mod slot 5-8: its type (lfo/stepper), LFO curves, stepper steps."""
         if slot not in (5, 6, 7, 8):
             raise ValueError("slot must be 5..8")
@@ -275,6 +277,15 @@ class Patch:
                 raise ValueError("steps must be 1..16 values 0..1 (0 = bottom)")
             struct.pack_into(f"<{len(values)}f", self.payload, base + 8, *values)
             change.update(steps=[round(v, 4) for v in values], steps_before=now["steps"])
+        if glide is not None:
+            if now["type"] != "stepper":
+                raise ValueError(f"slot {slot} is an LFO: glide needs type='stepper'")
+            numbers = sorted({int(n) for n in glide})
+            if not all(1 <= n <= 16 for n in numbers):
+                raise ValueError("glide lists step numbers 1..16")
+            for n in range(16):
+                self.payload[base + 72 + n] = 1 if n + 1 in numbers else 0
+            change.update(glide=numbers, glide_before=now["glide"])
         return change
 
     def targets(self) -> list[str]:
@@ -346,7 +357,7 @@ class Patch:
 
 
 # A slot's data after its i32 type: an LFO's 20 bytes (2, 0, 0, curve A, curve B), or a
-# stepper's 140 (2, 16 f32 steps, 16 zero bytes, 2, 16 x 3 per-step bytes, 0) — the default
+# stepper's 140 (2, 16 f32 steps, 16 per-step glide bytes, 2, 16 x 3 per-step bytes, 0) — the default
 # stepper as Massive saves it (labelled presets 05 and 20).
 _LFO_BODY = struct.pack("<5i", 2, 0, 0, 0, 1)
 _STEPPER_BODY = struct.pack("<i", 2) + bytes(80) + struct.pack("<i", 2) + \

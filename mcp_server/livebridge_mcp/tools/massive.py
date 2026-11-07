@@ -51,7 +51,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Returns:
             `{file_path, routings: [{target, source, amount, slot, semitones?}],
             modulatable: [knob names], sources: [names], slots: {5..8: {type, curve_a,
-            curve_b} | {type: "stepper", steps}}}`. amount is -1..1, a fraction of the
+            curve_b} | {type: "stepper", steps, glide}}}`. amount is -1..1, a fraction of the
             knob's range; on a pitch knob also in semitones (1.0 = 128).
         """
         cmd = "massive.routings"
@@ -98,7 +98,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 {"slot": 8, "type": "stepper", "steps": [1, 0, 0.5, 0, ...]}]. LFO curves:
                 "sine" | "saw" (down) | "square" | "triangle"; the slot's XFade knob
                 (MODn-CROSSF./GLIDE, set through Live) blends A (0) to B (100). type: "lfo" |
-                "stepper"; steps: 1..16 values 0..1 (0 = bottom; steps not given stay 0).
+                "stepper"; steps: 1..16 values 0..1 (0 = bottom; steps not given stay 0);
+                glide: the step numbers that glide into their value ([1, 16]), with the
+                stepper's Glide Mod fader (in Massive's window) setting how long.
                 Rate, sync, restart and amp of the slot are set through Live as before.
             name: File name for the new preset (default "LB Massive"); written next to the
                 template, so it shows in Live's browser beside it.
@@ -114,7 +116,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         remove a routing first. The modulation depth also follows the source's own level
         (envelope levels, MOD5-8 AMP, macro values): a routed source at rest is silent.
         The template's own routings stay unless removed. Performer slots and the stepper's
-        per-step buttons (glide) are not written yet.
+        loop range and Amp Mod row are not written yet.
         """
         cmd = "massive.write"
         routings, slots = routings or [], slots or []
@@ -140,7 +142,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 changes.append(patch.set_slot(int(entry["slot"]), type=entry.get("type"),
                                               curve_a=entry.get("curve_a"),
                                               curve_b=entry.get("curve_b"),
-                                              steps=entry.get("steps")))
+                                              steps=entry.get("steps"),
+                                              glide=entry.get("glide")))
             data = patch.to_bytes()
             massive.Patch(data)                          # what we write parses again
             result: dict[str, Any] = {"template": str(source), "changes": changes,

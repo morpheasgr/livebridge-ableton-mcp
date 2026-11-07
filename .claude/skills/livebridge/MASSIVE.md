@@ -98,7 +98,8 @@ When the template's routings don't fit the sound, write a new preset with differ
    `slots=[{"slot": 5, "curve_a": "square", "curve_b": "triangle"}]` for LFO shapes (sine,
    saw, square, triangle; `MODn-CROSSF./GLIDE` blends A at 0 to B at 100), or
    `{"slot": 8, "type": "stepper", "steps": [1, 0, 0.6, 0, 1, 0, 0.3, 0]}` for a stepper
-   (up to 16 values 0..1, 0 = bottom; the rest stay 0). A stepper's rate, sync, restart and
+   (up to 16 values 0..1, 0 = bottom; the rest stay 0; `"glide": [1, 16]` makes those steps
+   glide into their value, at the speed of the stepper's Glide Mod fader in Massive's window). A stepper's rate, sync, restart and
    amp are its `MODn-*` controls in Live, as for an LFO. Turning a template slot into a
    stepper keeps its routings (slot 5 still drives the cutoff: a stepped filter). The file goes next to the
    template.
@@ -109,8 +110,7 @@ A knob takes one or two routings (`live_massive_routings` shows them); a full kn
 so remove one first. Knobs with three slots (cutoff, position, ...) have two normal slots and a
 sidechain slot "SC" (the manual: with SC switched on in Massive, that source scales the other
 two from 0 to 100 % instead of adding); the writer never fills it, and reports a routing found
-there as `slot: "sc"`. Not written yet: performer slots and the stepper's per-step buttons (the top one glides
-into the step). The template's slots 5-8 are LFOs, curve A sine, curve B saw. Verified on the user's Massive: a written
+there as `slot: "sc"`. Not written yet: performer slots, the stepper's loop range (its length) and its Amp Mod row. The template's slots 5-8 are LFOs, curve A sine, curve B saw. Verified on the user's Massive: a written
 preset loads, an added routing shows on its knob (semitones exactly: +12 shows as 12.00), a
 removed one is gone, the template's other routings stay. Envelope 4 on Amp Mod and Bypass Mod
 is Massive's own default, not a template routing.
