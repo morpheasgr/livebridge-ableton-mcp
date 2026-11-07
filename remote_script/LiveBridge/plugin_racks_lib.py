@@ -702,7 +702,8 @@ def preset_folders(identity, library=None, extra=None, env=None):
     return out
 
 
-PRESET_EXTENSIONS = (".vstpreset", ".serumpreset", ".adv", ".adg", ".aupreset", ".nmsv")
+PRESET_EXTENSIONS = (".vstpreset", ".serumpreset", ".adv", ".adg", ".aupreset", ".nmsv",
+                     ".fxp")
 
 
 def _preset_entry(path, identity, fields_text):
@@ -727,6 +728,10 @@ def _preset_entry(path, identity, fields_text):
         if norm(identity.get("name")) != "massive":
             return None
         entry.update({"kind": "nmsv", "embeddable": False})
+    elif lowered.endswith(".fxp"):     # Surge XT's own patches (its browser loads them)
+        if norm(identity.get("name")) != "surgext":
+            return None
+        entry.update({"kind": "fxp", "embeddable": False})
     elif lowered.endswith(".aupreset"):
         if fmt != "AU":
             return None
@@ -1057,11 +1062,12 @@ def load_map(path):
     """A parameter map JSON (``{"plugin", "format", "parameters": [[name, id], ...],
     "groups"?: {...}, ...}``) or None."""
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, "r", encoding="utf-8-sig") as handle:   # a BOM from Windows tools
             data = json.load(handle)
     except (OSError, ValueError):
         return None
-    if not isinstance(data, dict) or not isinstance(data.get("parameters"), list):
+    if not isinstance(data, dict) or not isinstance(data.get("parameters"), list) or \
+            not data["parameters"]:     # an empty map (a failed probe) is no map
         return None
     return data
 
@@ -1070,6 +1076,12 @@ def save_map(path, data):
     folder = os.path.dirname(path)
     if not os.path.isdir(folder):
         os.makedirs(folder)
+    if os.path.isfile(path) and os.path.getsize(path) > 64 and load_map(path) is None:
+        # a map that does not parse (hand-edited, other encoding) is kept, never overwritten
+        backup = path + ".unreadable"
+        if os.path.exists(backup):
+            os.remove(backup)
+        os.replace(path, backup)
     temp = path + ".tmp"
     with open(temp, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=1, ensure_ascii=False)

@@ -1,0 +1,5219 @@
+{
+ "plugin": "Surge XT",
+ "vendor": "Surge Synth Team",
+ "format": "VST3",
+ "class_id": "ABCDEF019182FAEB566D624153675854",
+ "plugin_version": "1.4.0",
+ "source": "hash-computed by local Claude and verified in Live 12.4.16 (probe racks), 2026-11-08; sections by LiveBridge",
+ "id_rule": "VST3 ParamID = JUCE String::hashCode(Surge storage name) & 0x7fffffff",
+ "count": 774,
+ "plugin_parameter_count": 2855,
+ "missing": [
+  "Bypass Surge XT"
+ ],
+ "missing_note": "2080 'MIDI CC ch|cc' proxies left out on purpose",
+ "parameters": [
+  [
+   "B LFO 4 Trigger Mode",
+   2465059
+  ],
+  [
+   "A Filter 1 Resonance",
+   8095466
+  ],
+  [
+   "A Scene LFO 3 Unipolar",
+   8476940
+  ],
+  [
+   "A LFO 1 Sustain",
+   9744797
+  ],
+  [
+   "A LFO 5 Release",
+   17380229
+  ],
+  [
+   "B Amp EG Release Shape",
+   45340747
+  ],
+  [
+   "A Scene LFO 1 Trigger Mode",
+   52856383
+  ],
+  [
+   "B Amp EG Envelope Mode",
+   62469249
+  ],
+  [
+   "B LFO 5 Deform",
+   68191240
+  ],
+  [
+   "B Filter 1 Keytrack",
+   72750671
+  ],
+  [
+   "B Scene LFO 3 Sustain",
+   76936004
+  ],
+  [
+   "B Filter EG Envelope Mode",
+   91098400
+  ],
+  [
+   "A Pan",
+   92522431
+  ],
+  [
+   "B Pan",
+   93445952
+  ],
+  [
+   "A Filter 2 Offset Mode",
+   97439073
+  ],
+  [
+   "FX A4 Param 11",
+   101867457
+  ],
+  [
+   "FX A4 Param 12",
+   101867458
+  ],
+  [
+   "B Osc 2 Keytrack",
+   102595291
+  ],
+  [
+   "FX B3 Param 11",
+   102790978
+  ],
+  [
+   "FX B3 Param 12",
+   102790979
+  ],
+  [
+   "FX B4 Param 11",
+   103714499
+  ],
+  [
+   "FX B4 Param 12",
+   103714500
+  ],
+  [
+   "FX S3 Param 11",
+   104638020
+  ],
+  [
+   "FX S3 Param 12",
+   104638021
+  ],
+  [
+   "B Scene LFO 2 Amplitude",
+   104688688
+  ],
+  [
+   "FX S4 Param 11",
+   105561541
+  ],
+  [
+   "FX S4 Param 12",
+   105561542
+  ],
+  [
+   "FX G3 Param 11",
+   106485062
+  ],
+  [
+   "FX G3 Param 12",
+   106485063
+  ],
+  [
+   "FX G4 Param 11",
+   107408583
+  ],
+  [
+   "FX G4 Param 12",
+   107408584
+  ],
+  [
+   "B Scene LFO 5 Trigger Mode",
+   110794247
+  ],
+  [
+   "B Scene LFO 4 Attack",
+   120676838
+  ],
+  [
+   "B Scene LFO 6 Attack",
+   137454447
+  ],
+  [
+   "FX A1 FX Type",
+   145909210
+  ],
+  [
+   "B LFO 2 Amplitude",
+   148978602
+  ],
+  [
+   "B LFO 5 Unipolar",
+   154599121
+  ],
+  [
+   "A LFO 4 Decay",
+   163262327
+  ],
+  [
+   "A LFO 4 Delay",
+   163270976
+  ],
+  [
+   "A Feedback",
+   164559267
+  ],
+  [
+   "B Osc 1 Route",
+   164966037
+  ],
+  [
+   "B Osc 2 Route",
+   164966038
+  ],
+  [
+   "B Osc 3 Route",
+   164966039
+  ],
+  [
+   "A Amp EG Decay Shape",
+   166454303
+  ],
+  [
+   "A LFO 4 Phase",
+   174432568
+  ],
+  [
+   "FX A2 FX Type",
+   174538361
+  ],
+  [
+   "B Osc 1 Volume",
+   175404922
+  ],
+  [
+   "B Osc 2 Volume",
+   175404923
+  ],
+  [
+   "B Osc 3 Volume",
+   175404924
+  ],
+  [
+   "A LFO 4 Type",
+   177203038
+  ],
+  [
+   "A Ring Modulation 1x2 Solo",
+   177936595
+  ],
+  [
+   "A Ring Modulation 2x3 Solo",
+   177936627
+  ],
+  [
+   "A Noise Mute",
+   183903250
+  ],
+  [
+   "B LFO 3 Sustain",
+   184244542
+  ],
+  [
+   "B Scene LFO 1 Release",
+   191879974
+  ],
+  [
+   "B Scene LFO 4 Deform",
+   192308323
+  ],
+  [
+   "A Osc 2 Octave",
+   195956606
+  ],
+  [
+   "B LFO 3 Trigger Mode",
+   198978564
+  ],
+  [
+   "FX B1 FX Type",
+   203167512
+  ],
+  [
+   "A Scene LFO 2 Unipolar",
+   204990445
+  ],
+  [
+   "B Scene LFO 6 Deform",
+   209085932
+  ],
+  [
+   "Split Point",
+   220886277
+  ],
+  [
+   "A Osc 2 Shape",
+   222678801
+  ],
+  [
+   "A Osc 2 Width 1",
+   222678802
+  ],
+  [
+   "A Osc 2 Width 2",
+   222678803
+  ],
+  [
+   "A Osc 2 Sub Mix",
+   222678804
+  ],
+  [
+   "A Osc 2 Sync",
+   222678805
+  ],
+  [
+   "A Osc 2 Unison Detune",
+   222678806
+  ],
+  [
+   "A Osc 2 Unison Voices",
+   222678807
+  ],
+  [
+   "A Scene LFO 6 Release",
+   224521599
+  ],
+  [
+   "B Scene LFO 5 Decay",
+   227616370
+  ],
+  [
+   "B Scene LFO 5 Delay",
+   227625019
+  ],
+  [
+   "FX B2 FX Type",
+   231796663
+  ],
+  [
+   "B Scene LFO 5 Phase",
+   238786611
+  ],
+  [
+   "Polyphony Limit",
+   240235375
+  ],
+  [
+   "B Scene LFO 5 Type",
+   241557081
+  ],
+  [
+   "A Scene LFO 2 Sustain",
+   242465444
+  ],
+  [
+   "A Osc 1 Mute",
+   247329706
+  ],
+  [
+   "A Osc 2 Mute",
+   247329707
+  ],
+  [
+   "A Osc 3 Mute",
+   247329708
+  ],
+  [
+   "A LFO 6 Trigger Mode",
+   249369888
+  ],
+  [
+   "FX S1 FX Type",
+   260425814
+  ],
+  [
+   "B Scene LFO 6 Unipolar",
+   262928309
+  ],
+  [
+   "B Scene LFO 6 Amplitude",
+   263813001
+  ],
+  [
+   "A Scene LFO 1 Amplitude",
+   264690576
+  ],
+  [
+   "B Link Resonance",
+   265457599
+  ],
+  [
+   "A Osc 3 Pitch",
+   271464179
+  ],
+  [
+   "FX S2 FX Type",
+   289054965
+  ],
+  [
+   "A LFO 5 Attack",
+   289962762
+  ],
+  [
+   "B LFO 4 Decay",
+   292345046
+  ],
+  [
+   "B LFO 4 Delay",
+   292353695
+  ],
+  [
+   "B Osc 1 Keytrack",
+   299108796
+  ],
+  [
+   "B LFO 1 Release",
+   299188512
+  ],
+  [
+   "B LFO 4 Phase",
+   303515287
+  ],
+  [
+   "A Scene LFO 3 Decay",
+   305813436
+  ],
+  [
+   "A Scene LFO 3 Delay",
+   305822085
+  ],
+  [
+   "B LFO 4 Type",
+   306285757
+  ],
+  [
+   "B Osc 1 Octave",
+   307226912
+  ],
+  [
+   "A LFO 1 Amplitude",
+   308980490
+  ],
+  [
+   "B Noise Mute",
+   312985969
+  ],
+  [
+   "A Scene LFO 3 Phase",
+   316983677
+  ],
+  [
+   "FX G1 FX Type",
+   317684116
+  ],
+  [
+   "A Scene LFO 3 Type",
+   319754147
+  ],
+  [
+   "A Send FX 1 Level",
+   326778877
+  ],
+  [
+   "A Send FX 2 Level",
+   326778878
+  ],
+  [
+   "A Send FX 3 Level",
+   326778879
+  ],
+  [
+   "A Send FX 4 Level",
+   326778880
+  ],
+  [
+   "B Osc 1 Shape",
+   333949107
+  ],
+  [
+   "B Osc 1 Width 1",
+   333949108
+  ],
+  [
+   "B Osc 1 Width 2",
+   333949109
+  ],
+  [
+   "B Osc 1 Sub Mix",
+   333949110
+  ],
+  [
+   "B Osc 1 Sync",
+   333949111
+  ],
+  [
+   "B Osc 1 Unison Detune",
+   333949112
+  ],
+  [
+   "B Osc 1 Unison Voices",
+   333949113
+  ],
+  [
+   "FX Chain Bypass",
+   341421301
+  ],
+  [
+   "FX G2 FX Type",
+   346313267
+  ],
+  [
+   "A LFO 2 Sustain",
+   349773982
+  ],
+  [
+   "B LFO 4 Unipolar",
+   351112626
+  ],
+  [
+   "A LFO 6 Release",
+   357409414
+  ],
+  [
+   "A Filter 2 Resonance",
+   358627755
+  ],
+  [
+   "A Osc 1 Route",
+   361479542
+  ],
+  [
+   "A Osc 2 Route",
+   361479543
+  ],
+  [
+   "A Osc 3 Route",
+   361479544
+  ],
+  [
+   "A LFO 5 Deform",
+   361594247
+  ],
+  [
+   "B Amp EG Sustain",
+   369300101
+  ],
+  [
+   "A Osc 1 Volume",
+   371918427
+  ],
+  [
+   "A Osc 2 Volume",
+   371918428
+  ],
+  [
+   "A Osc 3 Volume",
+   371918429
+  ],
+  [
+   "FX A3 FX Type",
+   374942418
+  ],
+  [
+   "B LFO 2 Trigger Mode",
+   395492069
+  ],
+  [
+   "B Osc 3 Pitch",
+   400546898
+  ],
+  [
+   "B LFO 4 Attack",
+   401233068
+  ],
+  [
+   "A Scene LFO 1 Unipolar",
+   401503950
+  ],
+  [
+   "A Scene LFO 4 Attack",
+   414079845
+  ],
+  [
+   "B Scene LFO 4 Sustain",
+   416965189
+  ],
+  [
+   "A Scene LFO 6 Trigger Mode",
+   424814919
+  ],
+  [
+   "B Scene LFO 3 Decay",
+   434896155
+  ],
+  [
+   "B Scene LFO 3 Delay",
+   434904804
+  ],
+  [
+   "A LFO 5 Trigger Mode",
+   445883393
+  ],
+  [
+   "B Scene LFO 3 Phase",
+   446066396
+  ],
+  [
+   "B Scene LFO 3 Type",
+   448836866
+  ],
+  [
+   "B FM Depth",
+   453953672
+  ],
+  [
+   "A Amp EG Release Shape",
+   454164972
+  ],
+  [
+   "B Scene LFO 3 Amplitude",
+   455220977
+  ],
+  [
+   "A Waveshaper Type",
+   456251615
+  ],
+  [
+   "B Scene LFO 5 Unipolar",
+   459441814
+  ],
+  [
+   "B LFO 4 Deform",
+   472864553
+  ],
+  [
+   "A Scene LFO 4 Deform",
+   485711330
+  ],
+  [
+   "A Noise Solo",
+   487135832
+  ],
+  [
+   "A Filter Balance",
+   495256997
+  ],
+  [
+   "B LFO 3 Amplitude",
+   499510891
+  ],
+  [
+   "A Scene LFO 5 Decay",
+   521019377
+  ],
+  [
+   "A Scene LFO 5 Delay",
+   521028026
+  ],
+  [
+   "B LFO 4 Sustain",
+   524273727
+  ],
+  [
+   "B Scene LFO 3 Attack",
+   525350151
+  ],
+  [
+   "B Scene LFO 2 Release",
+   531909159
+  ],
+  [
+   "A Scene LFO 5 Phase",
+   532189618
+  ],
+  [
+   "A Scene LFO 5 Type",
+   534960088
+  ],
+  [
+   "A LFO 2 Decay",
+   535738613
+  ],
+  [
+   "A LFO 2 Delay",
+   535747262
+  ],
+  [
+   "A Filter EG Decay",
+   538873470
+  ],
+  [
+   "B Scene LFO 5 Attack",
+   542127760
+  ],
+  [
+   "A Osc 3 Keytrack",
+   546013625
+  ],
+  [
+   "A LFO 2 Phase",
+   546908854
+  ],
+  [
+   "B LFO 3 Unipolar",
+   547626131
+  ],
+  [
+   "A LFO 2 Type",
+   549679324
+  ],
+  [
+   "A Scene LFO 3 Sustain",
+   582494629
+  ],
+  [
+   "B Osc 1 Mute",
+   587358891
+  ],
+  [
+   "B Osc 2 Mute",
+   587358892
+  ],
+  [
+   "B Osc 3 Mute",
+   587358893
+  ],
+  [
+   "B LFO 1 Trigger Mode",
+   592005574
+  ],
+  [
+   "Send FX 1 Return",
+   595200762
+  ],
+  [
+   "Send FX 2 Return",
+   595200763
+  ],
+  [
+   "Send FX 3 Return",
+   595200764
+  ],
+  [
+   "Send FX 4 Return",
+   595200765
+  ],
+  [
+   "B Scene LFO 3 Deform",
+   596981636
+  ],
+  [
+   "B Scene LFO 5 Sustain",
+   597041883
+  ],
+  [
+   "A LFO 6 Unipolar",
+   598017455
+  ],
+  [
+   "A Osc 1 Octave",
+   600629919
+  ],
+  [
+   "B Highpass",
+   608327915
+  ],
+  [
+   "B Scene LFO 5 Deform",
+   613759245
+  ],
+  [
+   "A Scene LFO 2 Amplitude",
+   615222865
+  ],
+  [
+   "B Noise Solo",
+   616218551
+  ],
+  [
+   "A Scene LFO 5 Trigger Mode",
+   621328424
+  ],
+  [
+   "A Osc 1 Shape",
+   627352114
+  ],
+  [
+   "A Osc 1 Width 1",
+   627352115
+  ],
+  [
+   "A Osc 1 Width 2",
+   627352116
+  ],
+  [
+   "A Osc 1 Sub Mix",
+   627352117
+  ],
+  [
+   "A Osc 1 Sync",
+   627352118
+  ],
+  [
+   "A Osc 1 Unison Detune",
+   627352119
+  ],
+  [
+   "A Osc 1 Unison Voices",
+   627352120
+  ],
+  [
+   "B LFO 2 Release",
+   639217697
+  ],
+  [
+   "A LFO 4 Trigger Mode",
+   642396898
+  ],
+  [
+   "A Scene LFO 6 Attack",
+   643013072
+  ],
+  [
+   "A Osc 1 Pitch",
+   643940465
+  ],
+  [
+   "A FM Depth",
+   650467177
+  ],
+  [
+   "A LFO 2 Amplitude",
+   659512779
+  ],
+  [
+   "B Noise Volume",
+   661343810
+  ],
+  [
+   "B LFO 2 Decay",
+   664821332
+  ],
+  [
+   "B LFO 2 Delay",
+   664829981
+  ],
+  [
+   "B Filter EG Decay",
+   667956189
+  ],
+  [
+   "B LFO 2 Phase",
+   675991573
+  ],
+  [
+   "B Send FX 1 Level",
+   677311166
+  ],
+  [
+   "B Send FX 2 Level",
+   677311167
+  ],
+  [
+   "B Send FX 3 Level",
+   677311168
+  ],
+  [
+   "B Send FX 4 Level",
+   677311169
+  ],
+  [
+   "A Scene LFO 1 Decay",
+   678289722
+  ],
+  [
+   "A Scene LFO 1 Delay",
+   678298371
+  ],
+  [
+   "B LFO 2 Type",
+   678762043
+  ],
+  [
+   "B Filter 1 Subtype",
+   681115927
+  ],
+  [
+   "B Octave",
+   683041837
+  ],
+  [
+   "A Scene LFO 1 Phase",
+   689459963
+  ],
+  [
+   "A LFO 3 Sustain",
+   689803167
+  ],
+  [
+   "A Scene LFO 1 Type",
+   692230433
+  ],
+  [
+   "A LFO 4 Attack",
+   694636075
+  ],
+  [
+   "A Scene LFO 1 Release",
+   697438599
+  ],
+  [
+   "B Osc 1 Retrigger",
+   707220149
+  ],
+  [
+   "A Scene LFO 5 Amplitude",
+   707454663
+  ],
+  [
+   "B Filter EG Attack Shape",
+   708366695
+  ],
+  [
+   "B Filter EG Sustain",
+   709329286
+  ],
+  [
+   "A Scene LFO 6 Deform",
+   714644557
+  ],
+  [
+   "A Width",
+   720711763
+  ],
+  [
+   "B Play Mode",
+   721521324
+  ],
+  [
+   "A Osc 2 Keytrack",
+   742527130
+  ],
+  [
+   "B LFO 2 Unipolar",
+   744139636
+  ],
+  [
+   "B Width",
+   749340914
+  ],
+  [
+   "A LFO 4 Deform",
+   766267560
+  ],
+  [
+   "B Osc 1 Pitch",
+   773023184
+  ],
+  [
+   "A Scene LFO 6 Unipolar",
+   773462486
+  ],
+  [
+   "B Velocity > VCA Gain",
+   780310393
+  ],
+  [
+   "A Pre-Filter Gain",
+   792055704
+  ],
+  [
+   "A LFO 5 Unipolar",
+   794530960
+  ],
+  [
+   "B Waveshaper Type",
+   796280800
+  ],
+  [
+   "A LFO 1 Release",
+   804747137
+  ],
+  [
+   "B Scene LFO 4 Amplitude",
+   805753266
+  ],
+  [
+   "B LFO 3 Attack",
+   805906381
+  ],
+  [
+   "B Scene LFO 1 Decay",
+   807372441
+  ],
+  [
+   "B Scene LFO 1 Delay",
+   807381090
+  ],
+  [
+   "B Ring Modulation 1x2 Route",
+   807998404
+  ],
+  [
+   "B Ring Modulation 2x3 Route",
+   807998436
+  ],
+  [
+   "B Scene LFO 1 Phase",
+   818542682
+  ],
+  [
+   "A Scene LFO 3 Attack",
+   818753158
+  ],
+  [
+   "B Scene LFO 1 Type",
+   821313152
+  ],
+  [
+   "M1: -",
+   825615485
+  ],
+  [
+   "M2: -",
+   825615486
+  ],
+  [
+   "M3: -",
+   825615487
+  ],
+  [
+   "M4: -",
+   825615488
+  ],
+  [
+   "M5: -",
+   825615489
+  ],
+  [
+   "M6: -",
+   825615490
+  ],
+  [
+   "M7: -",
+   825615491
+  ],
+  [
+   "M8: -",
+   825615492
+  ],
+  [
+   "A LFO 3 Trigger Mode",
+   838910403
+  ],
+  [
+   "B Filter Balance",
+   845789286
+  ],
+  [
+   "B LFO 4 Amplitude",
+   850043180
+  ],
+  [
+   "A Osc Drift",
+   856649291
+  ],
+  [
+   "B LFO 5 Sustain",
+   864302912
+  ],
+  [
+   "A Pitch",
+   867473890
+  ],
+  [
+   "B Scene LFO 3 Release",
+   871938344
+  ],
+  [
+   "A Filter 2 Keytrack",
+   873309519
+  ],
+  [
+   "A Amp EG Sustain",
+   874858726
+  ],
+  [
+   "B LFO 3 Deform",
+   877537866
+  ],
+  [
+   "FX A1 Param 1",
+   885066848
+  ],
+  [
+   "FX A1 Param 2",
+   885066849
+  ],
+  [
+   "FX A1 Param 3",
+   885066850
+  ],
+  [
+   "FX A1 Param 4",
+   885066851
+  ],
+  [
+   "FX A1 Param 5",
+   885066852
+  ],
+  [
+   "FX A1 Param 6",
+   885066853
+  ],
+  [
+   "FX A1 Param 7",
+   885066854
+  ],
+  [
+   "FX A1 Param 8",
+   885066855
+  ],
+  [
+   "FX A1 Param 9",
+   885066856
+  ],
+  [
+   "FX A1 Param 10",
+   885066857
+  ],
+  [
+   "FX A2 Param 1",
+   885096639
+  ],
+  [
+   "FX A2 Param 2",
+   885096640
+  ],
+  [
+   "FX A2 Param 3",
+   885096641
+  ],
+  [
+   "FX A2 Param 4",
+   885096642
+  ],
+  [
+   "FX A2 Param 5",
+   885096643
+  ],
+  [
+   "FX A2 Param 6",
+   885096644
+  ],
+  [
+   "FX A2 Param 7",
+   885096645
+  ],
+  [
+   "FX A2 Param 8",
+   885096646
+  ],
+  [
+   "FX A2 Param 9",
+   885096647
+  ],
+  [
+   "FX A2 Param 10",
+   885096648
+  ],
+  [
+   "FX B1 Param 1",
+   885126430
+  ],
+  [
+   "FX B1 Param 2",
+   885126431
+  ],
+  [
+   "FX B1 Param 3",
+   885126432
+  ],
+  [
+   "FX B1 Param 4",
+   885126433
+  ],
+  [
+   "FX B1 Param 5",
+   885126434
+  ],
+  [
+   "FX B1 Param 6",
+   885126435
+  ],
+  [
+   "FX B1 Param 7",
+   885126436
+  ],
+  [
+   "FX B1 Param 8",
+   885126437
+  ],
+  [
+   "FX B1 Param 9",
+   885126438
+  ],
+  [
+   "FX B1 Param 10",
+   885126439
+  ],
+  [
+   "FX B2 Param 1",
+   885156221
+  ],
+  [
+   "FX B2 Param 2",
+   885156222
+  ],
+  [
+   "FX B2 Param 3",
+   885156223
+  ],
+  [
+   "FX B2 Param 4",
+   885156224
+  ],
+  [
+   "FX B2 Param 5",
+   885156225
+  ],
+  [
+   "FX B2 Param 6",
+   885156226
+  ],
+  [
+   "FX B2 Param 7",
+   885156227
+  ],
+  [
+   "FX B2 Param 8",
+   885156228
+  ],
+  [
+   "FX B2 Param 9",
+   885156229
+  ],
+  [
+   "FX B2 Param 10",
+   885156230
+  ],
+  [
+   "FX S1 Param 1",
+   885186012
+  ],
+  [
+   "FX S1 Param 2",
+   885186013
+  ],
+  [
+   "FX S1 Param 3",
+   885186014
+  ],
+  [
+   "FX S1 Param 4",
+   885186015
+  ],
+  [
+   "FX S1 Param 5",
+   885186016
+  ],
+  [
+   "FX S1 Param 6",
+   885186017
+  ],
+  [
+   "FX S1 Param 7",
+   885186018
+  ],
+  [
+   "FX S1 Param 8",
+   885186019
+  ],
+  [
+   "FX S1 Param 9",
+   885186020
+  ],
+  [
+   "FX S1 Param 10",
+   885186021
+  ],
+  [
+   "FX S2 Param 1",
+   885215803
+  ],
+  [
+   "FX S2 Param 2",
+   885215804
+  ],
+  [
+   "FX S2 Param 3",
+   885215805
+  ],
+  [
+   "FX S2 Param 4",
+   885215806
+  ],
+  [
+   "FX S2 Param 5",
+   885215807
+  ],
+  [
+   "FX S2 Param 6",
+   885215808
+  ],
+  [
+   "FX S2 Param 7",
+   885215809
+  ],
+  [
+   "FX S2 Param 8",
+   885215810
+  ],
+  [
+   "FX S2 Param 9",
+   885215811
+  ],
+  [
+   "FX S2 Param 10",
+   885215812
+  ],
+  [
+   "FX G1 Param 1",
+   885245594
+  ],
+  [
+   "FX G1 Param 2",
+   885245595
+  ],
+  [
+   "FX G1 Param 3",
+   885245596
+  ],
+  [
+   "FX G1 Param 4",
+   885245597
+  ],
+  [
+   "FX G1 Param 5",
+   885245598
+  ],
+  [
+   "FX G1 Param 6",
+   885245599
+  ],
+  [
+   "FX G1 Param 7",
+   885245600
+  ],
+  [
+   "FX G1 Param 8",
+   885245601
+  ],
+  [
+   "FX G1 Param 9",
+   885245602
+  ],
+  [
+   "FX G1 Param 10",
+   885245603
+  ],
+  [
+   "FX G2 Param 1",
+   885275385
+  ],
+  [
+   "FX G2 Param 2",
+   885275386
+  ],
+  [
+   "FX G2 Param 3",
+   885275387
+  ],
+  [
+   "FX G2 Param 4",
+   885275388
+  ],
+  [
+   "FX G2 Param 5",
+   885275389
+  ],
+  [
+   "FX G2 Param 6",
+   885275390
+  ],
+  [
+   "FX G2 Param 7",
+   885275391
+  ],
+  [
+   "FX G2 Param 8",
+   885275392
+  ],
+  [
+   "FX G2 Param 9",
+   885275393
+  ],
+  [
+   "FX G2 Param 10",
+   885275394
+  ],
+  [
+   "FX A3 Param 1",
+   885305176
+  ],
+  [
+   "FX A3 Param 2",
+   885305177
+  ],
+  [
+   "FX A3 Param 3",
+   885305178
+  ],
+  [
+   "FX A3 Param 4",
+   885305179
+  ],
+  [
+   "FX A3 Param 5",
+   885305180
+  ],
+  [
+   "FX A3 Param 6",
+   885305181
+  ],
+  [
+   "FX A3 Param 7",
+   885305182
+  ],
+  [
+   "FX A3 Param 8",
+   885305183
+  ],
+  [
+   "FX A3 Param 9",
+   885305184
+  ],
+  [
+   "FX A3 Param 10",
+   885305185
+  ],
+  [
+   "A Scene LFO 3 Deform",
+   890384643
+  ],
+  [
+   "B Volume",
+   894308759
+  ],
+  [
+   "B Keytrack Root Key",
+   898950273
+  ],
+  [
+   "A Play Mode",
+   918034829
+  ],
+  [
+   "A Scene LFO 4 Sustain",
+   922523814
+  ],
+  [
+   "B Scene LFO 2 Attack",
+   930023464
+  ],
+  [
+   "B Scene LFO 6 Sustain",
+   937071068
+  ],
+  [
+   "A Osc 1 Keytrack",
+   939040635
+  ],
+  [
+   "B LFO 1 Unipolar",
+   940653141
+  ],
+  [
+   "A Noise Volume",
+   954746817
+  ],
+  [
+   "A Scene LFO 3 Amplitude",
+   965755154
+  ],
+  [
+   "A Scene LFO 5 Unipolar",
+   969975991
+  ],
+  [
+   "B Scene LFO 4 Trigger Mode",
+   970867677
+  ],
+  [
+   "A Filter Configuration",
+   974101959
+  ],
+  [
+   "B LFO 3 Release",
+   979246882
+  ],
+  [
+   "A LFO 4 Unipolar",
+   991044465
+  ],
+  [
+   "A Portamento",
+   994712943
+  ],
+  [
+   "B Scene LFO 2 Deform",
+   1001654949
+  ],
+  [
+   "A LFO 3 Amplitude",
+   1010045068
+  ],
+  [
+   "FX A4 FX Type",
+   1010597960
+  ],
+  [
+   "A Highpass",
+   1013001228
+  ],
+  [
+   "B Filter 2 Subtype",
+   1021145112
+  ],
+  [
+   "B Filter EG Decay Shape",
+   1023462591
+  ],
+  [
+   "A LFO 4 Sustain",
+   1029832352
+  ],
+  [
+   "B Filter 2 Cutoff",
+   1030151567
+  ],
+  [
+   "B Filter 1 Type",
+   1032169661
+  ],
+  [
+   "A LFO 2 Trigger Mode",
+   1035423908
+  ],
+  [
+   "A Scene LFO 2 Release",
+   1037467784
+  ],
+  [
+   "FX B3 FX Type",
+   1039227111
+  ],
+  [
+   "B Waveshaper Drive",
+   1047393700
+  ],
+  [
+   "A Scene LFO 5 Attack",
+   1047686385
+  ],
+  [
+   "A LFO 5 Decay",
+   1050766008
+  ],
+  [
+   "A LFO 5 Delay",
+   1050774657
+  ],
+  [
+   "B Osc 2 Retrigger",
+   1057752438
+  ],
+  [
+   "A Scene LFO 6 Amplitude",
+   1057986952
+  ],
+  [
+   "B Filter 2 Type",
+   1060798812
+  ],
+  [
+   "B Noise Route",
+   1061649735
+  ],
+  [
+   "A LFO 5 Phase",
+   1061936249
+  ],
+  [
+   "A LFO 5 Type",
+   1064706719
+  ],
+  [
+   "FX B4 FX Type",
+   1067856262
+  ],
+  [
+   "A Filter 1 Keytrack",
+   1069823024
+  ],
+  [
+   "B Filter 2 FEG Mod Amount",
+   1081003159
+  ],
+  [
+   "A Octave",
+   1087715150
+  ],
+  [
+   "A Keytrack Root Key",
+   1095463778
+  ],
+  [
+   "FX S3 FX Type",
+   1096485413
+  ],
+  [
+   "A Osc 1 Solo",
+   1098519332
+  ],
+  [
+   "A Osc 2 Solo",
+   1098519333
+  ],
+  [
+   "A Osc 3 Solo",
+   1098519334
+  ],
+  [
+   "A LFO 3 Attack",
+   1099309388
+  ],
+  [
+   "A Link Resonance",
+   1109929470
+  ],
+  [
+   "B Scene LFO 6 Decay",
+   1115120051
+  ],
+  [
+   "B Scene LFO 6 Delay",
+   1115128700
+  ],
+  [
+   "A Scene LFO 5 Deform",
+   1119317870
+  ],
+  [
+   "B Portamento",
+   1123795662
+  ],
+  [
+   "FX S4 FX Type",
+   1125114564
+  ],
+  [
+   "B Scene LFO 6 Phase",
+   1126290292
+  ],
+  [
+   "B Scene LFO 6 Type",
+   1129060762
+  ],
+  [
+   "B Pre-Filter Gain",
+   1142587993
+  ],
+  [
+   "A LFO 2 Release",
+   1144776322
+  ],
+  [
+   "FX G3 FX Type",
+   1153743715
+  ],
+  [
+   "B Amp EG Release",
+   1164302441
+  ],
+  [
+   "FX Disable",
+   1166337147
+  ],
+  [
+   "B Scene LFO 3 Trigger Mode",
+   1167381182
+  ],
+  [
+   "A LFO 3 Deform",
+   1170940873
+  ],
+  [
+   "B LFO 5 Decay",
+   1179848727
+  ],
+  [
+   "B LFO 5 Delay",
+   1179857376
+  ],
+  [
+   "FX G4 FX Type",
+   1182372866
+  ],
+  [
+   "A LFO 3 Unipolar",
+   1187557970
+  ],
+  [
+   "B LFO 5 Phase",
+   1191018968
+  ],
+  [
+   "A Scene LFO 4 Decay",
+   1193317117
+  ],
+  [
+   "A Scene LFO 4 Delay",
+   1193325766
+  ],
+  [
+   "B LFO 5 Type",
+   1193789438
+  ],
+  [
+   "B LFO 5 Amplitude",
+   1200575469
+  ],
+  [
+   "B LFO 6 Sustain",
+   1204332097
+  ],
+  [
+   "A Scene LFO 4 Phase",
+   1204487358
+  ],
+  [
+   "A Scene LFO 4 Type",
+   1207257828
+  ],
+  [
+   "B LFO 2 Attack",
+   1210579694
+  ],
+  [
+   "B Scene LFO 4 Release",
+   1211967529
+  ],
+  [
+   "B Amp EG Attack Shape",
+   1213925320
+  ],
+  [
+   "A Filter EG Sustain",
+   1214887911
+  ],
+  [
+   "A Osc 1 Retrigger",
+   1217754326
+  ],
+  [
+   "B Ring Modulation 1x2 Mute",
+   1221741786
+  ],
+  [
+   "B Ring Modulation 2x3 Mute",
+   1221741818
+  ],
+  [
+   "A Scene LFO 2 Attack",
+   1223426471
+  ],
+  [
+   "A VCA Gain",
+   1224911995
+  ],
+  [
+   "A LFO 1 Trigger Mode",
+   1231937413
+  ],
+  [
+   "A LFO 1 Hold",
+   1235707781
+  ],
+  [
+   "A LFO 1 Rate",
+   1235992486
+  ],
+  [
+   "A Scene LFO 5 Sustain",
+   1236973722
+  ],
+  [
+   "A Waveshaper Drive",
+   1243907205
+  ],
+  [
+   "A LFO 2 Hold",
+   1264336932
+  ],
+  [
+   "A LFO 2 Rate",
+   1264621637
+  ],
+  [
+   "B LFO 2 Deform",
+   1282211179
+  ],
+  [
+   "A FM Routing",
+   1282981710
+  ],
+  [
+   "B Ring Modulation 1x2 Volume",
+   1283416617
+  ],
+  [
+   "B Ring Modulation 2x3 Volume",
+   1283416649
+  ],
+  [
+   "A Velocity > VCA Gain",
+   1285869018
+  ],
+  [
+   "A LFO 3 Hold",
+   1292966083
+  ],
+  [
+   "A LFO 3 Rate",
+   1293250788
+  ],
+  [
+   "A Scene LFO 2 Deform",
+   1295057956
+  ],
+  [
+   "A Volume",
+   1298982072
+  ],
+  [
+   "B Filter EG Attack",
+   1307760261
+  ],
+  [
+   "B Filter 1 Resonance",
+   1311107243
+  ],
+  [
+   "A Ring Modulation 1x2 Route",
+   1313557029
+  ],
+  [
+   "A Ring Modulation 2x3 Route",
+   1313557061
+  ],
+  [
+   "A Scene LFO 4 Amplitude",
+   1316287443
+  ],
+  [
+   "B Amp EG Decay Shape",
+   1316865598
+  ],
+  [
+   "B LFO 4 Release",
+   1319276067
+  ],
+  [
+   "B Scene LFO 4 Unipolar",
+   1319515244
+  ],
+  [
+   "A LFO 4 Hold",
+   1321595234
+  ],
+  [
+   "A LFO 4 Rate",
+   1321879939
+  ],
+  [
+   "B Scene LFO 4 Decay",
+   1322399836
+  ],
+  [
+   "B Scene LFO 4 Delay",
+   1322408485
+  ],
+  [
+   "B Filter Configuration",
+   1324634248
+  ],
+  [
+   "A Scene LFO 5 Hold",
+   1333135784
+  ],
+  [
+   "A Scene LFO 5 Rate",
+   1333420489
+  ],
+  [
+   "B Scene LFO 4 Phase",
+   1333570077
+  ],
+  [
+   "B Scene LFO 1 Attack",
+   1334696777
+  ],
+  [
+   "B Scene LFO 4 Type",
+   1336340547
+  ],
+  [
+   "Global Volume",
+   1336600346
+  ],
+  [
+   "A LFO 5 Hold",
+   1350224385
+  ],
+  [
+   "A LFO 5 Rate",
+   1350509090
+  ],
+  [
+   "A Noise Route",
+   1355052742
+  ],
+  [
+   "A LFO 4 Amplitude",
+   1360577357
+  ],
+  [
+   "A Scene LFO 6 Hold",
+   1361764935
+  ],
+  [
+   "A Scene LFO 6 Rate",
+   1362049640
+  ],
+  [
+   "B Scene LFO 2 Trigger Mode",
+   1363894687
+  ],
+  [
+   "A LFO 5 Sustain",
+   1369861537
+  ],
+  [
+   "A Scene LFO 3 Release",
+   1377496969
+  ],
+  [
+   "A LFO 6 Hold",
+   1378853536
+  ],
+  [
+   "A LFO 6 Rate",
+   1379138241
+  ],
+  [
+   "A LFO 2 Unipolar",
+   1384071475
+  ],
+  [
+   "B Scene LFO 5 Release",
+   1392044223
+  ],
+  [
+   "B Scene LFO 1 Deform",
+   1406328262
+  ],
+  [
+   "A Osc 1 Type",
+   1406380009
+  ],
+  [
+   "A Scene LFO 1 Hold",
+   1407482687
+  ],
+  [
+   "A Scene LFO 1 Rate",
+   1407767392
+  ],
+  [
+   "B Osc 3 Retrigger",
+   1408284727
+  ],
+  [
+   "A Scene LFO 6 Decay",
+   1408523058
+  ],
+  [
+   "A Scene LFO 6 Delay",
+   1408531707
+  ],
+  [
+   "A Scene LFO 6 Phase",
+   1419693299
+  ],
+  [
+   "A Scene LFO 6 Type",
+   1422463769
+  ],
+  [
+   "A LFO 3 Decay",
+   1423242294
+  ],
+  [
+   "A LFO 3 Delay",
+   1423250943
+  ],
+  [
+   "A LFO 3 Phase",
+   1434412535
+  ],
+  [
+   "B Filter 1 Cutoff",
+   1434824880
+  ],
+  [
+   "A Osc 2 Type",
+   1435009160
+  ],
+  [
+   "A Scene LFO 2 Hold",
+   1436111838
+  ],
+  [
+   "A Scene LFO 2 Rate",
+   1436396543
+  ],
+  [
+   "A LFO 3 Type",
+   1437183005
+  ],
+  [
+   "B Osc 1 Solo",
+   1438548517
+  ],
+  [
+   "B Osc 2 Solo",
+   1438548518
+  ],
+  [
+   "B Osc 3 Solo",
+   1438548519
+  ],
+  [
+   "B Noise Color",
+   1439189859
+  ],
+  [
+   "B Filter 2 Offset Mode",
+   1450748770
+  ],
+  [
+   "B Scene LFO 5 Hold",
+   1462218503
+  ],
+  [
+   "B Scene LFO 5 Rate",
+   1462503208
+  ],
+  [
+   "A Osc 3 Type",
+   1463638311
+  ],
+  [
+   "A Scene LFO 3 Hold",
+   1464740989
+  ],
+  [
+   "A Scene LFO 3 Rate",
+   1465025694
+  ],
+  [
+   "A Filter 1 Subtype",
+   1475289878
+  ],
+  [
+   "A LFO 3 Release",
+   1484805507
+  ],
+  [
+   "B Filter 1 FEG Mod Amount",
+   1485676472
+  ],
+  [
+   "B Scene LFO 6 Hold",
+   1490847654
+  ],
+  [
+   "B Scene LFO 6 Rate",
+   1491132359
+  ],
+  [
+   "A Scene LFO 4 Hold",
+   1493370140
+  ],
+  [
+   "A Scene LFO 4 Rate",
+   1493654845
+  ],
+  [
+   "A LFO 2 Attack",
+   1503982701
+  ],
+  [
+   "B Filter EG Release",
+   1504331626
+  ],
+  [
+   "A Ring Modulation 1x2 Mute",
+   1515144793
+  ],
+  [
+   "A Ring Modulation 2x3 Mute",
+   1515144825
+  ],
+  [
+   "B Scene LFO 3 Unipolar",
+   1516028749
+  ],
+  [
+   "A Osc 2 Pitch",
+   1531444146
+  ],
+  [
+   "A Filter 1 Type",
+   1537728286
+  ],
+  [
+   "A Filter 2 Cutoff",
+   1540685744
+  ],
+  [
+   "B Scene LFO 1 Sustain",
+   1544361282
+  ],
+  [
+   "B LFO 6 Amplitude",
+   1551107758
+  ],
+  [
+   "B LFO 3 Decay",
+   1552325013
+  ],
+  [
+   "B LFO 3 Delay",
+   1552333662
+  ],
+  [
+   "A Filter EG Attack Shape",
+   1552838566
+  ],
+  [
+   "B Filter EG Release Shape",
+   1552892556
+  ],
+  [
+   "A Pitch Bend Down Range",
+   1553223004
+  ],
+  [
+   "A Pitch Bend Up Range",
+   1553223533
+  ],
+  [
+   "B Scene LFO 1 Trigger Mode",
+   1560408192
+  ],
+  [
+   "B LFO 3 Phase",
+   1563495254
+  ],
+  [
+   "Character",
+   1564195625
+  ],
+  [
+   "A Scene LFO 2 Decay",
+   1565793403
+  ],
+  [
+   "A Scene LFO 2 Delay",
+   1565802052
+  ],
+  [
+   "B LFO 3 Type",
+   1566265724
+  ],
+  [
+   "A Filter 2 Type",
+   1566357437
+  ],
+  [
+   "A Osc 2 Retrigger",
+   1568286615
+  ],
+  [
+   "B VCA Gain",
+   1575444284
+  ],
+  [
+   "A LFO 2 Deform",
+   1575614186
+  ],
+  [
+   "A Scene LFO 2 Phase",
+   1576963644
+  ],
+  [
+   "A Scene LFO 6 Sustain",
+   1577002907
+  ],
+  [
+   "A Scene LFO 2 Type",
+   1579734114
+  ],
+  [
+   "A LFO 1 Unipolar",
+   1580584980
+  ],
+  [
+   "B LFO 1 Hold",
+   1586240070
+  ],
+  [
+   "B LFO 1 Rate",
+   1586524775
+  ],
+  [
+   "A Filter 2 FEG Mod Amount",
+   1591537336
+  ],
+  [
+   "A Filter EG Attack",
+   1601163268
+  ],
+  [
+   "A Scene LFO 4 Trigger Mode",
+   1610799516
+  ],
+  [
+   "B LFO 2 Hold",
+   1614869221
+  ],
+  [
+   "B LFO 2 Rate",
+   1615153926
+  ],
+  [
+   "B LFO 1 Attack",
+   1615253007
+  ],
+  [
+   "A Scene LFO 1 Attack",
+   1628099784
+  ],
+  [
+   "B FM Routing",
+   1633513999
+  ],
+  [
+   "A Noise Color",
+   1635703364
+  ],
+  [
+   "B LFO 3 Hold",
+   1643498372
+  ],
+  [
+   "B LFO 3 Rate",
+   1643783077
+  ],
+  [
+   "B Osc 3 Octave",
+   1645363934
+  ],
+  [
+   "B LFO 1 Sustain",
+   1651669820
+  ],
+  [
+   "B LFO 5 Release",
+   1659305252
+  ],
+  [
+   "B Osc 2 Pitch",
+   1660526865
+  ],
+  [
+   "B Filter 2 Resonance",
+   1661639532
+  ],
+  [
+   "FX A4 Param 1",
+   1665854030
+  ],
+  [
+   "FX A4 Param 2",
+   1665854031
+  ],
+  [
+   "FX A4 Param 3",
+   1665854032
+  ],
+  [
+   "FX A4 Param 4",
+   1665854033
+  ],
+  [
+   "FX A4 Param 5",
+   1665854034
+  ],
+  [
+   "FX A4 Param 6",
+   1665854035
+  ],
+  [
+   "FX A4 Param 7",
+   1665854036
+  ],
+  [
+   "FX A4 Param 8",
+   1665854037
+  ],
+  [
+   "FX A4 Param 9",
+   1665854038
+  ],
+  [
+   "FX A4 Param 10",
+   1665854039
+  ],
+  [
+   "FX B3 Param 1",
+   1665883821
+  ],
+  [
+   "FX B3 Param 2",
+   1665883822
+  ],
+  [
+   "FX B3 Param 3",
+   1665883823
+  ],
+  [
+   "FX B3 Param 4",
+   1665883824
+  ],
+  [
+   "FX B3 Param 5",
+   1665883825
+  ],
+  [
+   "FX B3 Param 6",
+   1665883826
+  ],
+  [
+   "FX B3 Param 7",
+   1665883827
+  ],
+  [
+   "FX B3 Param 8",
+   1665883828
+  ],
+  [
+   "FX B3 Param 9",
+   1665883829
+  ],
+  [
+   "FX B3 Param 10",
+   1665883830
+  ],
+  [
+   "FX B4 Param 1",
+   1665913612
+  ],
+  [
+   "FX B4 Param 2",
+   1665913613
+  ],
+  [
+   "FX B4 Param 3",
+   1665913614
+  ],
+  [
+   "FX B4 Param 4",
+   1665913615
+  ],
+  [
+   "FX B4 Param 5",
+   1665913616
+  ],
+  [
+   "FX B4 Param 6",
+   1665913617
+  ],
+  [
+   "FX B4 Param 7",
+   1665913618
+  ],
+  [
+   "FX B4 Param 8",
+   1665913619
+  ],
+  [
+   "FX B4 Param 9",
+   1665913620
+  ],
+  [
+   "FX B4 Param 10",
+   1665913621
+  ],
+  [
+   "FX S3 Param 1",
+   1665943403
+  ],
+  [
+   "FX S3 Param 2",
+   1665943404
+  ],
+  [
+   "FX S3 Param 3",
+   1665943405
+  ],
+  [
+   "FX S3 Param 4",
+   1665943406
+  ],
+  [
+   "FX S3 Param 5",
+   1665943407
+  ],
+  [
+   "FX S3 Param 6",
+   1665943408
+  ],
+  [
+   "FX S3 Param 7",
+   1665943409
+  ],
+  [
+   "FX S3 Param 8",
+   1665943410
+  ],
+  [
+   "FX S3 Param 9",
+   1665943411
+  ],
+  [
+   "FX S3 Param 10",
+   1665943412
+  ],
+  [
+   "FX S4 Param 1",
+   1665973194
+  ],
+  [
+   "FX S4 Param 2",
+   1665973195
+  ],
+  [
+   "FX S4 Param 3",
+   1665973196
+  ],
+  [
+   "FX S4 Param 4",
+   1665973197
+  ],
+  [
+   "FX S4 Param 5",
+   1665973198
+  ],
+  [
+   "FX S4 Param 6",
+   1665973199
+  ],
+  [
+   "FX S4 Param 7",
+   1665973200
+  ],
+  [
+   "FX S4 Param 8",
+   1665973201
+  ],
+  [
+   "FX S4 Param 9",
+   1665973202
+  ],
+  [
+   "FX S4 Param 10",
+   1665973203
+  ],
+  [
+   "FX G3 Param 1",
+   1666002985
+  ],
+  [
+   "FX G3 Param 2",
+   1666002986
+  ],
+  [
+   "FX G3 Param 3",
+   1666002987
+  ],
+  [
+   "FX G3 Param 4",
+   1666002988
+  ],
+  [
+   "FX G3 Param 5",
+   1666002989
+  ],
+  [
+   "FX G3 Param 6",
+   1666002990
+  ],
+  [
+   "FX G3 Param 7",
+   1666002991
+  ],
+  [
+   "FX G3 Param 8",
+   1666002992
+  ],
+  [
+   "FX G3 Param 9",
+   1666002993
+  ],
+  [
+   "FX G3 Param 10",
+   1666002994
+  ],
+  [
+   "FX G4 Param 1",
+   1666032776
+  ],
+  [
+   "FX G4 Param 2",
+   1666032777
+  ],
+  [
+   "FX G4 Param 3",
+   1666032778
+  ],
+  [
+   "FX G4 Param 4",
+   1666032779
+  ],
+  [
+   "FX G4 Param 5",
+   1666032780
+  ],
+  [
+   "FX G4 Param 6",
+   1666032781
+  ],
+  [
+   "FX G4 Param 7",
+   1666032782
+  ],
+  [
+   "FX G4 Param 8",
+   1666032783
+  ],
+  [
+   "FX G4 Param 9",
+   1666032784
+  ],
+  [
+   "FX G4 Param 10",
+   1666032785
+  ],
+  [
+   "FX A1 Param 11",
+   1667268591
+  ],
+  [
+   "FX A1 Param 12",
+   1667268592
+  ],
+  [
+   "FX A2 Param 11",
+   1668192112
+  ],
+  [
+   "FX A2 Param 12",
+   1668192113
+  ],
+  [
+   "FX B1 Param 11",
+   1669115633
+  ],
+  [
+   "FX B1 Param 12",
+   1669115634
+  ],
+  [
+   "A Amp EG Release",
+   1669861066
+  ],
+  [
+   "FX B2 Param 11",
+   1670039154
+  ],
+  [
+   "FX B2 Param 12",
+   1670039155
+  ],
+  [
+   "FX S1 Param 11",
+   1670962675
+  ],
+  [
+   "FX S1 Param 12",
+   1670962676
+  ],
+  [
+   "FX S2 Param 11",
+   1671886196
+  ],
+  [
+   "FX S2 Param 12",
+   1671886197
+  ],
+  [
+   "B Osc 3 Shape",
+   1672086129
+  ],
+  [
+   "B Osc 3 Width 1",
+   1672086130
+  ],
+  [
+   "B Osc 3 Width 2",
+   1672086131
+  ],
+  [
+   "B Osc 3 Sub Mix",
+   1672086132
+  ],
+  [
+   "B Osc 3 Sync",
+   1672086133
+  ],
+  [
+   "B Osc 3 Unison Detune",
+   1672086134
+  ],
+  [
+   "B Osc 3 Unison Voices",
+   1672086135
+  ],
+  [
+   "B LFO 4 Hold",
+   1672127523
+  ],
+  [
+   "B LFO 4 Rate",
+   1672412228
+  ],
+  [
+   "FX G1 Param 11",
+   1672809717
+  ],
+  [
+   "FX G1 Param 12",
+   1672809718
+  ],
+  [
+   "FX G2 Param 11",
+   1673733238
+  ],
+  [
+   "FX G2 Param 12",
+   1673733239
+  ],
+  [
+   "FX A3 Param 11",
+   1674656759
+  ],
+  [
+   "FX A3 Param 12",
+   1674656760
+  ],
+  [
+   "B Pitch Bend Down Range",
+   1682305723
+  ],
+  [
+   "B Pitch Bend Up Range",
+   1682306252
+  ],
+  [
+   "B LFO 1 Deform",
+   1686884492
+  ],
+  [
+   "B Scene LFO 2 Decay",
+   1694876122
+  ],
+  [
+   "B Scene LFO 2 Delay",
+   1694884771
+  ],
+  [
+   "A Scene LFO 1 Deform",
+   1699731269
+  ],
+  [
+   "B LFO 5 Hold",
+   1700756674
+  ],
+  [
+   "B LFO 5 Rate",
+   1701041379
+  ],
+  [
+   "B Scene LFO 2 Phase",
+   1706046363
+  ],
+  [
+   "B Scene LFO 2 Type",
+   1708816833
+  ],
+  [
+   "A LFO 6 Sustain",
+   1709890722
+  ],
+  [
+   "A LFO 5 Amplitude",
+   1711109646
+  ],
+  [
+   "B Amp EG Attack",
+   1712433574
+  ],
+  [
+   "B Scene LFO 2 Unipolar",
+   1712542254
+  ],
+  [
+   "A Scene LFO 4 Release",
+   1717526154
+  ],
+  [
+   "B LFO 6 Hold",
+   1729385825
+  ],
+  [
+   "B LFO 6 Rate",
+   1729670530
+  ],
+  [
+   "Scene Mode",
+   1730096175
+  ],
+  [
+   "B Scene LFO 6 Release",
+   1732073408
+  ],
+  [
+   "B LFO 6 Attack",
+   1739370090
+  ],
+  [
+   "B Osc Drift",
+   1744152972
+  ],
+  [
+   "Active Scene",
+   1746267673
+  ],
+  [
+   "B Pitch",
+   1754977571
+  ],
+  [
+   "B Osc 1 Type",
+   1756912298
+  ],
+  [
+   "B LFO 6 Trigger Mode",
+   1756921697
+  ],
+  [
+   "B Scene LFO 1 Hold",
+   1758014976
+  ],
+  [
+   "B Scene LFO 1 Rate",
+   1758299681
+  ],
+  [
+   "B Osc 2 Type",
+   1785541449
+  ],
+  [
+   "B Scene LFO 2 Hold",
+   1786644127
+  ],
+  [
+   "B Scene LFO 2 Rate",
+   1786928832
+  ],
+  [
+   "A Ring Modulation 1x2 Volume",
+   1788975242
+  ],
+  [
+   "A Ring Modulation 2x3 Volume",
+   1788975274
+  ],
+  [
+   "A LFO 1 Decay",
+   1795718580
+  ],
+  [
+   "A LFO 1 Delay",
+   1795727229
+  ],
+  [
+   "A Amp EG Decay",
+   1798853437
+  ],
+  [
+   "A LFO 1 Phase",
+   1806888821
+  ],
+  [
+   "A Scene LFO 3 Trigger Mode",
+   1807313021
+  ],
+  [
+   "A LFO 1 Type",
+   1809659291
+  ],
+  [
+   "B LFO 6 Deform",
+   1811001575
+  ],
+  [
+   "B Osc 3 Type",
+   1814170600
+  ],
+  [
+   "B Scene LFO 3 Hold",
+   1815273278
+  ],
+  [
+   "A Filter 2 Subtype",
+   1815319063
+  ],
+  [
+   "B Scene LFO 3 Rate",
+   1815557983
+  ],
+  [
+   "A LFO 4 Release",
+   1824834692
+  ],
+  [
+   "B Scene LFO 4 Hold",
+   1843902429
+  ],
+  [
+   "B Scene LFO 4 Rate",
+   1844187134
+  ],
+  [
+   "A Amp EG Envelope Mode",
+   1859420608
+  ],
+  [
+   "B Scene LFO 2 Sustain",
+   1884390467
+  ],
+  [
+   "A Filter EG Envelope Mode",
+   1888049759
+  ],
+  [
+   "B Scene LFO 1 Amplitude",
+   1901640047
+  ],
+  [
+   "A LFO 1 Attack",
+   1908656014
+  ],
+  [
+   "B Scene LFO 1 Unipolar",
+   1909055759
+  ],
+  [
+   "A Osc 3 Retrigger",
+   1918818904
+  ],
+  [
+   "B LFO 1 Decay",
+   1924801299
+  ],
+  [
+   "B LFO 1 Delay",
+   1924809948
+  ],
+  [
+   "B Amp EG Decay",
+   1927936156
+  ],
+  [
+   "B LFO 1 Phase",
+   1935971540
+  ],
+  [
+   "A LFO 6 Decay",
+   1938269689
+  ],
+  [
+   "A LFO 6 Delay",
+   1938278338
+  ],
+  [
+   "B LFO 1 Type",
+   1938742010
+  ],
+  [
+   "A Osc 3 Octave",
+   1938766941
+  ],
+  [
+   "A Filter 1 Cutoff",
+   1945359057
+  ],
+  [
+   "B LFO 1 Amplitude",
+   1945929961
+  ],
+  [
+   "A LFO 6 Phase",
+   1949439930
+  ],
+  [
+   "A LFO 6 Type",
+   1952210400
+  ],
+  [
+   "B LFO 5 Trigger Mode",
+   1953435202
+  ],
+  [
+   "A Scene LFO 4 Unipolar",
+   1959447083
+  ],
+  [
+   "A Filter EG Release Shape",
+   1961716781
+  ],
+  [
+   "A Osc 3 Shape",
+   1965489136
+  ],
+  [
+   "A Osc 3 Width 1",
+   1965489137
+  ],
+  [
+   "A Osc 3 Width 2",
+   1965489138
+  ],
+  [
+   "A Osc 3 Sub Mix",
+   1965489139
+  ],
+  [
+   "A Osc 3 Sync",
+   1965489140
+  ],
+  [
+   "A Osc 3 Unison Detune",
+   1965489141
+  ],
+  [
+   "A Osc 3 Unison Voices",
+   1965489142
+  ],
+  [
+   "A LFO 1 Deform",
+   1980287499
+  ],
+  [
+   "B LFO 2 Sustain",
+   1991699005
+  ],
+  [
+   "A Filter 1 FEG Mod Amount",
+   1996210649
+  ],
+  [
+   "B LFO 6 Release",
+   1999334437
+  ],
+  [
+   "A Scene LFO 2 Trigger Mode",
+   2003826526
+  ],
+  [
+   "A Amp EG Attack",
+   2005836581
+  ],
+  [
+   "A Filter EG Release",
+   2009890251
+  ],
+  [
+   "A Filter EG Decay Shape",
+   2020534944
+  ],
+  [
+   "B Filter 2 Keytrack",
+   2023720814
+  ],
+  [
+   "A Scene LFO 5 Release",
+   2031976062
+  ],
+  [
+   "B Ring Modulation 1x2 Solo",
+   2032017236
+  ],
+  [
+   "B Ring Modulation 2x3 Solo",
+   2032017268
+  ],
+  [
+   "A LFO 6 Attack",
+   2032773097
+  ],
+  [
+   "A Scene LFO 1 Sustain",
+   2049919907
+  ],
+  [
+   "B Osc 2 Octave",
+   2050037247
+  ],
+  [
+   "B Osc 3 Keytrack",
+   2053565434
+  ],
+  [
+   "A Amp EG Attack Shape",
+   2058397191
+  ],
+  [
+   "B Scene LFO 5 Amplitude",
+   2060764360
+  ],
+  [
+   "A LFO 6 Amplitude",
+   2061641935
+  ],
+  [
+   "B Scene LFO 6 Trigger Mode",
+   2061764390
+  ],
+  [
+   "B LFO 6 Decay",
+   2067352408
+  ],
+  [
+   "B LFO 6 Delay",
+   2067361057
+  ],
+  [
+   "B Osc 2 Shape",
+   2076759442
+  ],
+  [
+   "B Osc 2 Width 1",
+   2076759443
+  ],
+  [
+   "B Osc 2 Width 2",
+   2076759444
+  ],
+  [
+   "B Osc 2 Sub Mix",
+   2076759445
+  ],
+  [
+   "B Osc 2 Sync",
+   2076759446
+  ],
+  [
+   "B Osc 2 Unison Detune",
+   2076759447
+  ],
+  [
+   "B Osc 2 Unison Voices",
+   2076759448
+  ],
+  [
+   "B LFO 6 Phase",
+   2078522649
+  ],
+  [
+   "B LFO 6 Type",
+   2081293119
+  ],
+  [
+   "A LFO 6 Deform",
+   2104404582
+  ],
+  [
+   "B LFO 6 Unipolar",
+   2105569264
+  ],
+  [
+   "B Feedback",
+   2115529410
+  ],
+  [
+   "B LFO 5 Attack",
+   2144043403
+  ]
+ ],
+ "notes": [
+  "Surge XT. Names: A/B = scene; 'LFO 1-6' are the voice LFOs, 'Scene LFO 1-6' the scene LFOs (in patch files lfo0-5 and lfo6-11). FX slots: A1-A4 and B1-B4 are the scene inserts, S1-S4 the sends, G1-G4 global; 'FX A1 Param 1' is the first control of that slot's effect (what it does depends on the FX type).",
+  "Macros show as 'M1: -'..'M8: -' until the patch names them ('M1: Cutoff'): the name in Live changes with the patch.",
+  "Modulation routings, step sequences and MSEGs are not host parameters: write them into a patch with live_surge_write (routings, step_sequences) and load its .vstpreset with live_plugin_expose(preset_file=...).",
+  "VST3 ids are hashes of Surge's storage names (id_rule); 2080 'MIDI CC' proxy parameters are left out. 'Bypass Surge XT' is not mapped."
+ ],
+ "groups": {
+  "sound_design": [
+   "A Osc 1 Type",
+   "A Osc 1 Pitch",
+   "A Osc 1 Octave",
+   "A Osc 1 Shape",
+   "A Osc 1 Width 1",
+   "A Osc 1 Width 2",
+   "A Osc 1 Sub Mix",
+   "A Osc 1 Sync",
+   "A Osc 1 Unison Detune",
+   "A Osc 1 Unison Voices",
+   "A Osc 1 Volume",
+   "A Osc 1 Mute",
+   "A Osc 2 Type",
+   "A Osc 2 Pitch",
+   "A Osc 2 Octave",
+   "A Osc 2 Shape",
+   "A Osc 2 Width 1",
+   "A Osc 2 Width 2",
+   "A Osc 2 Sub Mix",
+   "A Osc 2 Sync",
+   "A Osc 2 Unison Detune",
+   "A Osc 2 Unison Voices",
+   "A Osc 2 Volume",
+   "A Osc 2 Mute",
+   "A Osc 3 Type",
+   "A Osc 3 Pitch",
+   "A Osc 3 Octave",
+   "A Osc 3 Shape",
+   "A Osc 3 Width 1",
+   "A Osc 3 Width 2",
+   "A Osc 3 Sub Mix",
+   "A Osc 3 Sync",
+   "A Osc 3 Unison Detune",
+   "A Osc 3 Unison Voices",
+   "A Osc 3 Volume",
+   "A Osc 3 Mute",
+   "A Filter 1 Type",
+   "A Filter 1 Subtype",
+   "A Filter 1 Cutoff",
+   "A Filter 1 Resonance",
+   "A Filter 1 FEG Mod Amount",
+   "A Filter 1 Keytrack",
+   "A Filter 2 Type",
+   "A Filter 2 Subtype",
+   "A Filter 2 Cutoff",
+   "A Filter 2 Resonance",
+   "A Filter 2 FEG Mod Amount",
+   "A Filter 2 Keytrack",
+   "A Filter Configuration",
+   "A Filter Balance",
+   "A Feedback",
+   "A Waveshaper Type",
+   "A Waveshaper Drive",
+   "A Highpass",
+   "A Noise Volume",
+   "A Noise Color",
+   "A Noise Mute",
+   "A FM Routing",
+   "A FM Depth",
+   "A Amp EG Attack",
+   "A Amp EG Decay",
+   "A Amp EG Sustain",
+   "A Amp EG Release",
+   "A Filter EG Attack",
+   "A Filter EG Decay",
+   "A Filter EG Sustain",
+   "A Filter EG Release",
+   "A LFO 1 Type",
+   "A LFO 1 Rate",
+   "A LFO 1 Amplitude",
+   "A LFO 1 Phase",
+   "A LFO 1 Deform",
+   "A LFO 1 Trigger Mode",
+   "A LFO 1 Unipolar",
+   "A LFO 2 Type",
+   "A LFO 2 Rate",
+   "A LFO 2 Amplitude",
+   "A LFO 2 Phase",
+   "A LFO 2 Deform",
+   "A LFO 2 Trigger Mode",
+   "A LFO 2 Unipolar",
+   "A LFO 3 Type",
+   "A LFO 3 Rate",
+   "A LFO 3 Amplitude",
+   "A LFO 3 Phase",
+   "A LFO 3 Deform",
+   "A LFO 3 Trigger Mode",
+   "A LFO 3 Unipolar",
+   "A Scene LFO 1 Type",
+   "A Scene LFO 1 Rate",
+   "A Scene LFO 1 Amplitude",
+   "A Scene LFO 1 Phase",
+   "A Scene LFO 1 Deform",
+   "A Scene LFO 1 Trigger Mode",
+   "A Scene LFO 1 Unipolar",
+   "M1: -",
+   "M2: -",
+   "M3: -",
+   "M4: -",
+   "M5: -",
+   "M6: -",
+   "M7: -",
+   "M8: -",
+   "A Volume",
+   "A Pan",
+   "A Width",
+   "A Pitch",
+   "A Octave",
+   "A Portamento",
+   "A Play Mode",
+   "A Osc Drift",
+   "A Send FX 1 Level",
+   "A Send FX 2 Level",
+   "FX A1 FX Type",
+   "FX A1 Param 1",
+   "FX A1 Param 2",
+   "FX A1 Param 3",
+   "FX A1 Param 4",
+   "FX A1 Param 5",
+   "FX A1 Param 6",
+   "Global Volume"
+  ],
+  "sound_design b": [
+   "B Osc 1 Type",
+   "B Osc 1 Pitch",
+   "B Osc 1 Octave",
+   "B Osc 1 Shape",
+   "B Osc 1 Width 1",
+   "B Osc 1 Width 2",
+   "B Osc 1 Sub Mix",
+   "B Osc 1 Sync",
+   "B Osc 1 Unison Detune",
+   "B Osc 1 Unison Voices",
+   "B Osc 1 Volume",
+   "B Osc 1 Mute",
+   "B Osc 2 Type",
+   "B Osc 2 Pitch",
+   "B Osc 2 Octave",
+   "B Osc 2 Shape",
+   "B Osc 2 Width 1",
+   "B Osc 2 Width 2",
+   "B Osc 2 Sub Mix",
+   "B Osc 2 Sync",
+   "B Osc 2 Unison Detune",
+   "B Osc 2 Unison Voices",
+   "B Osc 2 Volume",
+   "B Osc 2 Mute",
+   "B Osc 3 Type",
+   "B Osc 3 Pitch",
+   "B Osc 3 Octave",
+   "B Osc 3 Shape",
+   "B Osc 3 Width 1",
+   "B Osc 3 Width 2",
+   "B Osc 3 Sub Mix",
+   "B Osc 3 Sync",
+   "B Osc 3 Unison Detune",
+   "B Osc 3 Unison Voices",
+   "B Osc 3 Volume",
+   "B Osc 3 Mute",
+   "B Filter 1 Type",
+   "B Filter 1 Subtype",
+   "B Filter 1 Cutoff",
+   "B Filter 1 Resonance",
+   "B Filter 1 FEG Mod Amount",
+   "B Filter 1 Keytrack",
+   "B Filter 2 Type",
+   "B Filter 2 Subtype",
+   "B Filter 2 Cutoff",
+   "B Filter 2 Resonance",
+   "B Filter 2 FEG Mod Amount",
+   "B Filter 2 Keytrack",
+   "B Filter Configuration",
+   "B Filter Balance",
+   "B Feedback",
+   "B Waveshaper Type",
+   "B Waveshaper Drive",
+   "B Highpass",
+   "B Noise Volume",
+   "B Noise Color",
+   "B Noise Mute",
+   "B FM Routing",
+   "B FM Depth",
+   "B Amp EG Attack",
+   "B Amp EG Decay",
+   "B Amp EG Sustain",
+   "B Amp EG Release",
+   "B Filter EG Attack",
+   "B Filter EG Decay",
+   "B Filter EG Sustain",
+   "B Filter EG Release",
+   "B LFO 1 Type",
+   "B LFO 1 Rate",
+   "B LFO 1 Amplitude",
+   "B LFO 1 Phase",
+   "B LFO 1 Deform",
+   "B LFO 1 Trigger Mode",
+   "B LFO 1 Unipolar",
+   "B LFO 2 Type",
+   "B LFO 2 Rate",
+   "B LFO 2 Amplitude",
+   "B LFO 2 Phase",
+   "B LFO 2 Deform",
+   "B LFO 2 Trigger Mode",
+   "B LFO 2 Unipolar",
+   "B LFO 3 Type",
+   "B LFO 3 Rate",
+   "B LFO 3 Amplitude",
+   "B LFO 3 Phase",
+   "B LFO 3 Deform",
+   "B LFO 3 Trigger Mode",
+   "B LFO 3 Unipolar",
+   "B Scene LFO 1 Type",
+   "B Scene LFO 1 Rate",
+   "B Scene LFO 1 Amplitude",
+   "B Scene LFO 1 Phase",
+   "B Scene LFO 1 Deform",
+   "B Scene LFO 1 Trigger Mode",
+   "B Scene LFO 1 Unipolar",
+   "M1: -",
+   "M2: -",
+   "M3: -",
+   "M4: -",
+   "M5: -",
+   "M6: -",
+   "M7: -",
+   "M8: -",
+   "B Volume",
+   "B Pan",
+   "B Width",
+   "B Pitch",
+   "B Octave",
+   "B Portamento",
+   "B Play Mode",
+   "B Osc Drift",
+   "B Send FX 1 Level",
+   "B Send FX 2 Level",
+   "FX A1 FX Type",
+   "FX A1 Param 1",
+   "FX A1 Param 2",
+   "FX A1 Param 3",
+   "FX A1 Param 4",
+   "FX A1 Param 5",
+   "FX A1 Param 6",
+   "Global Volume"
+  ],
+  "osc a": [
+   "A Osc 2 Octave",
+   "A Osc 2 Shape",
+   "A Osc 2 Width 1",
+   "A Osc 2 Width 2",
+   "A Osc 2 Sub Mix",
+   "A Osc 2 Sync",
+   "A Osc 2 Unison Detune",
+   "A Osc 2 Unison Voices",
+   "A Osc 1 Mute",
+   "A Osc 2 Mute",
+   "A Osc 3 Mute",
+   "A Osc 3 Pitch",
+   "A Osc 1 Route",
+   "A Osc 2 Route",
+   "A Osc 3 Route",
+   "A Osc 1 Volume",
+   "A Osc 2 Volume",
+   "A Osc 3 Volume",
+   "A Osc 3 Keytrack",
+   "A Osc 1 Octave",
+   "A Osc 1 Shape",
+   "A Osc 1 Width 1",
+   "A Osc 1 Width 2",
+   "A Osc 1 Sub Mix",
+   "A Osc 1 Sync",
+   "A Osc 1 Unison Detune",
+   "A Osc 1 Unison Voices",
+   "A Osc 1 Pitch",
+   "A Osc 2 Keytrack",
+   "A Osc Drift",
+   "A Osc 1 Keytrack",
+   "A Osc 1 Solo",
+   "A Osc 2 Solo",
+   "A Osc 3 Solo",
+   "A Osc 1 Retrigger",
+   "A Osc 1 Type",
+   "A Osc 2 Type",
+   "A Osc 3 Type",
+   "A Osc 2 Pitch",
+   "A Osc 2 Retrigger",
+   "A Osc 3 Retrigger",
+   "A Osc 3 Octave",
+   "A Osc 3 Shape",
+   "A Osc 3 Width 1",
+   "A Osc 3 Width 2",
+   "A Osc 3 Sub Mix",
+   "A Osc 3 Sync",
+   "A Osc 3 Unison Detune",
+   "A Osc 3 Unison Voices"
+  ],
+  "filter a": [
+   "A Filter 1 Resonance",
+   "A Filter 2 Offset Mode",
+   "A Feedback",
+   "A Filter 2 Resonance",
+   "A Waveshaper Type",
+   "A Filter Balance",
+   "A Filter 2 Keytrack",
+   "A Filter Configuration",
+   "A Highpass",
+   "A Filter 1 Keytrack",
+   "A Link Resonance",
+   "A Waveshaper Drive",
+   "A Filter 1 Subtype",
+   "A Filter 1 Type",
+   "A Filter 2 Cutoff",
+   "A Filter 2 Type",
+   "A Filter 2 FEG Mod Amount",
+   "A Filter 2 Subtype",
+   "A Filter 1 Cutoff",
+   "A Filter 1 FEG Mod Amount"
+  ],
+  "env a": [
+   "A Amp EG Decay Shape",
+   "A Amp EG Release Shape",
+   "A Filter EG Decay",
+   "A Amp EG Sustain",
+   "A Filter EG Sustain",
+   "A Filter EG Attack Shape",
+   "A Filter EG Attack",
+   "A Amp EG Release",
+   "A Amp EG Decay",
+   "A Amp EG Envelope Mode",
+   "A Filter EG Envelope Mode",
+   "A Filter EG Release Shape",
+   "A Amp EG Attack",
+   "A Filter EG Release",
+   "A Filter EG Decay Shape",
+   "A Amp EG Attack Shape"
+  ],
+  "lfo a": [
+   "A LFO 1 Sustain",
+   "A LFO 5 Release",
+   "A LFO 4 Decay",
+   "A LFO 4 Delay",
+   "A LFO 4 Phase",
+   "A LFO 4 Type",
+   "A LFO 6 Trigger Mode",
+   "A LFO 5 Attack",
+   "A LFO 1 Amplitude",
+   "A LFO 2 Sustain",
+   "A LFO 6 Release",
+   "A LFO 5 Deform",
+   "A LFO 5 Trigger Mode",
+   "A LFO 2 Decay",
+   "A LFO 2 Delay",
+   "A LFO 2 Phase",
+   "A LFO 2 Type",
+   "A LFO 6 Unipolar",
+   "A LFO 4 Trigger Mode",
+   "A LFO 2 Amplitude",
+   "A LFO 3 Sustain",
+   "A LFO 4 Attack",
+   "A LFO 4 Deform",
+   "A LFO 5 Unipolar",
+   "A LFO 1 Release",
+   "A LFO 3 Trigger Mode",
+   "A LFO 4 Unipolar",
+   "A LFO 3 Amplitude",
+   "A LFO 4 Sustain",
+   "A LFO 2 Trigger Mode",
+   "A LFO 5 Decay",
+   "A LFO 5 Delay",
+   "A LFO 5 Phase",
+   "A LFO 5 Type",
+   "A LFO 3 Attack",
+   "A LFO 2 Release",
+   "A LFO 3 Deform",
+   "A LFO 3 Unipolar",
+   "A LFO 1 Trigger Mode",
+   "A LFO 1 Hold",
+   "A LFO 1 Rate",
+   "A LFO 2 Hold",
+   "A LFO 2 Rate",
+   "A LFO 3 Hold",
+   "A LFO 3 Rate",
+   "A LFO 4 Hold",
+   "A LFO 4 Rate",
+   "A LFO 5 Hold",
+   "A LFO 5 Rate",
+   "A LFO 4 Amplitude",
+   "A LFO 5 Sustain",
+   "A LFO 6 Hold",
+   "A LFO 6 Rate",
+   "A LFO 2 Unipolar",
+   "A LFO 3 Decay",
+   "A LFO 3 Delay",
+   "A LFO 3 Phase",
+   "A LFO 3 Type",
+   "A LFO 3 Release",
+   "A LFO 2 Attack",
+   "A LFO 2 Deform",
+   "A LFO 1 Unipolar",
+   "A LFO 6 Sustain",
+   "A LFO 5 Amplitude",
+   "A LFO 1 Decay",
+   "A LFO 1 Delay",
+   "A LFO 1 Phase",
+   "A LFO 1 Type",
+   "A LFO 4 Release",
+   "A LFO 1 Attack",
+   "A LFO 6 Decay",
+   "A LFO 6 Delay",
+   "A LFO 6 Phase",
+   "A LFO 6 Type",
+   "A LFO 1 Deform",
+   "A LFO 6 Attack",
+   "A LFO 6 Amplitude",
+   "A LFO 6 Deform"
+  ],
+  "scene lfo a": [
+   "A Scene LFO 3 Unipolar",
+   "A Scene LFO 1 Trigger Mode",
+   "A Scene LFO 2 Unipolar",
+   "A Scene LFO 6 Release",
+   "A Scene LFO 2 Sustain",
+   "A Scene LFO 1 Amplitude",
+   "A Scene LFO 3 Decay",
+   "A Scene LFO 3 Delay",
+   "A Scene LFO 3 Phase",
+   "A Scene LFO 3 Type",
+   "A Scene LFO 1 Unipolar",
+   "A Scene LFO 4 Attack",
+   "A Scene LFO 6 Trigger Mode",
+   "A Scene LFO 4 Deform",
+   "A Scene LFO 5 Decay",
+   "A Scene LFO 5 Delay",
+   "A Scene LFO 5 Phase",
+   "A Scene LFO 5 Type",
+   "A Scene LFO 3 Sustain",
+   "A Scene LFO 2 Amplitude",
+   "A Scene LFO 5 Trigger Mode",
+   "A Scene LFO 6 Attack",
+   "A Scene LFO 1 Decay",
+   "A Scene LFO 1 Delay",
+   "A Scene LFO 1 Phase",
+   "A Scene LFO 1 Type",
+   "A Scene LFO 1 Release",
+   "A Scene LFO 5 Amplitude",
+   "A Scene LFO 6 Deform",
+   "A Scene LFO 6 Unipolar",
+   "A Scene LFO 3 Attack",
+   "A Scene LFO 3 Deform",
+   "A Scene LFO 4 Sustain",
+   "A Scene LFO 3 Amplitude",
+   "A Scene LFO 5 Unipolar",
+   "A Scene LFO 2 Release",
+   "A Scene LFO 5 Attack",
+   "A Scene LFO 6 Amplitude",
+   "A Scene LFO 5 Deform",
+   "A Scene LFO 4 Decay",
+   "A Scene LFO 4 Delay",
+   "A Scene LFO 4 Phase",
+   "A Scene LFO 4 Type",
+   "A Scene LFO 2 Attack",
+   "A Scene LFO 5 Sustain",
+   "A Scene LFO 2 Deform",
+   "A Scene LFO 4 Amplitude",
+   "A Scene LFO 5 Hold",
+   "A Scene LFO 5 Rate",
+   "A Scene LFO 6 Hold",
+   "A Scene LFO 6 Rate",
+   "A Scene LFO 3 Release",
+   "A Scene LFO 1 Hold",
+   "A Scene LFO 1 Rate",
+   "A Scene LFO 6 Decay",
+   "A Scene LFO 6 Delay",
+   "A Scene LFO 6 Phase",
+   "A Scene LFO 6 Type",
+   "A Scene LFO 2 Hold",
+   "A Scene LFO 2 Rate",
+   "A Scene LFO 3 Hold",
+   "A Scene LFO 3 Rate",
+   "A Scene LFO 4 Hold",
+   "A Scene LFO 4 Rate",
+   "A Scene LFO 2 Decay",
+   "A Scene LFO 2 Delay",
+   "A Scene LFO 2 Phase",
+   "A Scene LFO 6 Sustain",
+   "A Scene LFO 2 Type",
+   "A Scene LFO 4 Trigger Mode",
+   "A Scene LFO 1 Attack",
+   "A Scene LFO 1 Deform",
+   "A Scene LFO 4 Release",
+   "A Scene LFO 3 Trigger Mode",
+   "A Scene LFO 4 Unipolar",
+   "A Scene LFO 2 Trigger Mode",
+   "A Scene LFO 5 Release",
+   "A Scene LFO 1 Sustain"
+  ],
+  "mixer a": [
+   "A Ring Modulation 1x2 Solo",
+   "A Ring Modulation 2x3 Solo",
+   "A Noise Mute",
+   "A Osc 1 Mute",
+   "A Osc 2 Mute",
+   "A Osc 3 Mute",
+   "A Osc 1 Route",
+   "A Osc 2 Route",
+   "A Osc 3 Route",
+   "A Osc 1 Volume",
+   "A Osc 2 Volume",
+   "A Osc 3 Volume",
+   "A Noise Solo",
+   "A Pre-Filter Gain",
+   "A Noise Volume",
+   "A Osc 1 Solo",
+   "A Osc 2 Solo",
+   "A Osc 3 Solo",
+   "A VCA Gain",
+   "A Velocity > VCA Gain",
+   "A Ring Modulation 1x2 Route",
+   "A Ring Modulation 2x3 Route",
+   "A Noise Route",
+   "A Ring Modulation 1x2 Mute",
+   "A Ring Modulation 2x3 Mute",
+   "A Noise Color",
+   "A Ring Modulation 1x2 Volume",
+   "A Ring Modulation 2x3 Volume"
+  ],
+  "voice a": [
+   "A Pan",
+   "A Send FX 1 Level",
+   "A Send FX 2 Level",
+   "A Send FX 3 Level",
+   "A Send FX 4 Level",
+   "A Width",
+   "A Pitch",
+   "A Play Mode",
+   "A Portamento",
+   "A Octave",
+   "A Keytrack Root Key",
+   "A Volume",
+   "A Pitch Bend Down Range",
+   "A Pitch Bend Up Range"
+  ],
+  "osc b": [
+   "B Osc 2 Keytrack",
+   "B Osc 1 Route",
+   "B Osc 2 Route",
+   "B Osc 3 Route",
+   "B Osc 1 Volume",
+   "B Osc 2 Volume",
+   "B Osc 3 Volume",
+   "B Osc 1 Keytrack",
+   "B Osc 1 Octave",
+   "B Osc 1 Shape",
+   "B Osc 1 Width 1",
+   "B Osc 1 Width 2",
+   "B Osc 1 Sub Mix",
+   "B Osc 1 Sync",
+   "B Osc 1 Unison Detune",
+   "B Osc 1 Unison Voices",
+   "B Osc 3 Pitch",
+   "B Osc 1 Mute",
+   "B Osc 2 Mute",
+   "B Osc 3 Mute",
+   "B Osc 1 Retrigger",
+   "B Osc 1 Pitch",
+   "B Osc 2 Retrigger",
+   "B Osc 3 Retrigger",
+   "B Osc 1 Solo",
+   "B Osc 2 Solo",
+   "B Osc 3 Solo",
+   "B Osc 3 Octave",
+   "B Osc 2 Pitch",
+   "B Osc 3 Shape",
+   "B Osc 3 Width 1",
+   "B Osc 3 Width 2",
+   "B Osc 3 Sub Mix",
+   "B Osc 3 Sync",
+   "B Osc 3 Unison Detune",
+   "B Osc 3 Unison Voices",
+   "B Osc Drift",
+   "B Osc 1 Type",
+   "B Osc 2 Type",
+   "B Osc 3 Type",
+   "B Osc 2 Octave",
+   "B Osc 3 Keytrack",
+   "B Osc 2 Shape",
+   "B Osc 2 Width 1",
+   "B Osc 2 Width 2",
+   "B Osc 2 Sub Mix",
+   "B Osc 2 Sync",
+   "B Osc 2 Unison Detune",
+   "B Osc 2 Unison Voices"
+  ],
+  "filter b": [
+   "B Filter 1 Keytrack",
+   "B Link Resonance",
+   "B Highpass",
+   "B Filter 1 Subtype",
+   "B Waveshaper Type",
+   "B Filter Balance",
+   "B Filter 2 Subtype",
+   "B Filter 2 Cutoff",
+   "B Filter 1 Type",
+   "B Waveshaper Drive",
+   "B Filter 2 Type",
+   "B Filter 2 FEG Mod Amount",
+   "B Filter 1 Resonance",
+   "B Filter Configuration",
+   "B Filter 1 Cutoff",
+   "B Filter 2 Offset Mode",
+   "B Filter 1 FEG Mod Amount",
+   "B Filter 2 Resonance",
+   "B Filter 2 Keytrack",
+   "B Feedback"
+  ],
+  "env b": [
+   "B Amp EG Release Shape",
+   "B Amp EG Envelope Mode",
+   "B Filter EG Envelope Mode",
+   "B Amp EG Sustain",
+   "B Filter EG Decay",
+   "B Filter EG Attack Shape",
+   "B Filter EG Sustain",
+   "B Filter EG Decay Shape",
+   "B Amp EG Release",
+   "B Amp EG Attack Shape",
+   "B Filter EG Attack",
+   "B Amp EG Decay Shape",
+   "B Filter EG Release",
+   "B Filter EG Release Shape",
+   "B Amp EG Attack",
+   "B Amp EG Decay"
+  ],
+  "lfo b": [
+   "B LFO 4 Trigger Mode",
+   "B LFO 5 Deform",
+   "B LFO 2 Amplitude",
+   "B LFO 5 Unipolar",
+   "B LFO 3 Sustain",
+   "B LFO 3 Trigger Mode",
+   "B LFO 4 Decay",
+   "B LFO 4 Delay",
+   "B LFO 1 Release",
+   "B LFO 4 Phase",
+   "B LFO 4 Type",
+   "B LFO 4 Unipolar",
+   "B LFO 2 Trigger Mode",
+   "B LFO 4 Attack",
+   "B LFO 4 Deform",
+   "B LFO 3 Amplitude",
+   "B LFO 4 Sustain",
+   "B LFO 3 Unipolar",
+   "B LFO 1 Trigger Mode",
+   "B LFO 2 Release",
+   "B LFO 2 Decay",
+   "B LFO 2 Delay",
+   "B LFO 2 Phase",
+   "B LFO 2 Type",
+   "B LFO 2 Unipolar",
+   "B LFO 3 Attack",
+   "B LFO 4 Amplitude",
+   "B LFO 5 Sustain",
+   "B LFO 3 Deform",
+   "B LFO 1 Unipolar",
+   "B LFO 3 Release",
+   "B LFO 5 Decay",
+   "B LFO 5 Delay",
+   "B LFO 5 Phase",
+   "B LFO 5 Type",
+   "B LFO 5 Amplitude",
+   "B LFO 6 Sustain",
+   "B LFO 2 Attack",
+   "B LFO 2 Deform",
+   "B LFO 4 Release",
+   "B LFO 6 Amplitude",
+   "B LFO 3 Decay",
+   "B LFO 3 Delay",
+   "B LFO 3 Phase",
+   "B LFO 3 Type",
+   "B LFO 1 Hold",
+   "B LFO 1 Rate",
+   "B LFO 2 Hold",
+   "B LFO 2 Rate",
+   "B LFO 1 Attack",
+   "B LFO 3 Hold",
+   "B LFO 3 Rate",
+   "B LFO 1 Sustain",
+   "B LFO 5 Release",
+   "B LFO 4 Hold",
+   "B LFO 4 Rate",
+   "B LFO 1 Deform",
+   "B LFO 5 Hold",
+   "B LFO 5 Rate",
+   "B LFO 6 Hold",
+   "B LFO 6 Rate",
+   "B LFO 6 Attack",
+   "B LFO 6 Trigger Mode",
+   "B LFO 6 Deform",
+   "B LFO 1 Decay",
+   "B LFO 1 Delay",
+   "B LFO 1 Phase",
+   "B LFO 1 Type",
+   "B LFO 1 Amplitude",
+   "B LFO 5 Trigger Mode",
+   "B LFO 2 Sustain",
+   "B LFO 6 Release",
+   "B LFO 6 Decay",
+   "B LFO 6 Delay",
+   "B LFO 6 Phase",
+   "B LFO 6 Type",
+   "B LFO 6 Unipolar",
+   "B LFO 5 Attack"
+  ],
+  "scene lfo b": [
+   "B Scene LFO 3 Sustain",
+   "B Scene LFO 2 Amplitude",
+   "B Scene LFO 5 Trigger Mode",
+   "B Scene LFO 4 Attack",
+   "B Scene LFO 6 Attack",
+   "B Scene LFO 1 Release",
+   "B Scene LFO 4 Deform",
+   "B Scene LFO 6 Deform",
+   "B Scene LFO 5 Decay",
+   "B Scene LFO 5 Delay",
+   "B Scene LFO 5 Phase",
+   "B Scene LFO 5 Type",
+   "B Scene LFO 6 Unipolar",
+   "B Scene LFO 6 Amplitude",
+   "B Scene LFO 4 Sustain",
+   "B Scene LFO 3 Decay",
+   "B Scene LFO 3 Delay",
+   "B Scene LFO 3 Phase",
+   "B Scene LFO 3 Type",
+   "B Scene LFO 3 Amplitude",
+   "B Scene LFO 5 Unipolar",
+   "B Scene LFO 3 Attack",
+   "B Scene LFO 2 Release",
+   "B Scene LFO 5 Attack",
+   "B Scene LFO 3 Deform",
+   "B Scene LFO 5 Sustain",
+   "B Scene LFO 5 Deform",
+   "B Scene LFO 4 Amplitude",
+   "B Scene LFO 1 Decay",
+   "B Scene LFO 1 Delay",
+   "B Scene LFO 1 Phase",
+   "B Scene LFO 1 Type",
+   "B Scene LFO 3 Release",
+   "B Scene LFO 2 Attack",
+   "B Scene LFO 6 Sustain",
+   "B Scene LFO 4 Trigger Mode",
+   "B Scene LFO 2 Deform",
+   "B Scene LFO 6 Decay",
+   "B Scene LFO 6 Delay",
+   "B Scene LFO 6 Phase",
+   "B Scene LFO 6 Type",
+   "B Scene LFO 3 Trigger Mode",
+   "B Scene LFO 4 Release",
+   "B Scene LFO 4 Unipolar",
+   "B Scene LFO 4 Decay",
+   "B Scene LFO 4 Delay",
+   "B Scene LFO 4 Phase",
+   "B Scene LFO 1 Attack",
+   "B Scene LFO 4 Type",
+   "B Scene LFO 2 Trigger Mode",
+   "B Scene LFO 5 Release",
+   "B Scene LFO 1 Deform",
+   "B Scene LFO 5 Hold",
+   "B Scene LFO 5 Rate",
+   "B Scene LFO 6 Hold",
+   "B Scene LFO 6 Rate",
+   "B Scene LFO 3 Unipolar",
+   "B Scene LFO 1 Sustain",
+   "B Scene LFO 1 Trigger Mode",
+   "B Scene LFO 2 Decay",
+   "B Scene LFO 2 Delay",
+   "B Scene LFO 2 Phase",
+   "B Scene LFO 2 Type",
+   "B Scene LFO 2 Unipolar",
+   "B Scene LFO 6 Release",
+   "B Scene LFO 1 Hold",
+   "B Scene LFO 1 Rate",
+   "B Scene LFO 2 Hold",
+   "B Scene LFO 2 Rate",
+   "B Scene LFO 3 Hold",
+   "B Scene LFO 3 Rate",
+   "B Scene LFO 4 Hold",
+   "B Scene LFO 4 Rate",
+   "B Scene LFO 2 Sustain",
+   "B Scene LFO 1 Amplitude",
+   "B Scene LFO 1 Unipolar",
+   "B Scene LFO 5 Amplitude",
+   "B Scene LFO 6 Trigger Mode"
+  ],
+  "mixer b": [
+   "B Osc 1 Route",
+   "B Osc 2 Route",
+   "B Osc 3 Route",
+   "B Osc 1 Volume",
+   "B Osc 2 Volume",
+   "B Osc 3 Volume",
+   "B Noise Mute",
+   "B Osc 1 Mute",
+   "B Osc 2 Mute",
+   "B Osc 3 Mute",
+   "B Noise Solo",
+   "B Noise Volume",
+   "B Velocity > VCA Gain",
+   "B Ring Modulation 1x2 Route",
+   "B Ring Modulation 2x3 Route",
+   "B Noise Route",
+   "B Pre-Filter Gain",
+   "B Ring Modulation 1x2 Mute",
+   "B Ring Modulation 2x3 Mute",
+   "B Ring Modulation 1x2 Volume",
+   "B Ring Modulation 2x3 Volume",
+   "B Osc 1 Solo",
+   "B Osc 2 Solo",
+   "B Osc 3 Solo",
+   "B Noise Color",
+   "B VCA Gain",
+   "B Ring Modulation 1x2 Solo",
+   "B Ring Modulation 2x3 Solo"
+  ],
+  "voice b": [
+   "B Pan",
+   "B Send FX 1 Level",
+   "B Send FX 2 Level",
+   "B Send FX 3 Level",
+   "B Send FX 4 Level",
+   "B Octave",
+   "B Play Mode",
+   "B Width",
+   "B Volume",
+   "B Keytrack Root Key",
+   "B Portamento",
+   "B Pitch Bend Down Range",
+   "B Pitch Bend Up Range",
+   "B Pitch"
+  ],
+  "macros": [
+   "M1: -",
+   "M2: -",
+   "M3: -",
+   "M4: -",
+   "M5: -",
+   "M6: -",
+   "M7: -",
+   "M8: -"
+  ],
+  "fx": [
+   "FX A4 Param 11",
+   "FX A4 Param 12",
+   "FX B3 Param 11",
+   "FX B3 Param 12",
+   "FX B4 Param 11",
+   "FX B4 Param 12",
+   "FX S3 Param 11",
+   "FX S3 Param 12",
+   "FX S4 Param 11",
+   "FX S4 Param 12",
+   "FX G3 Param 11",
+   "FX G3 Param 12",
+   "FX G4 Param 11",
+   "FX G4 Param 12",
+   "FX A1 FX Type",
+   "FX A2 FX Type",
+   "FX B1 FX Type",
+   "FX B2 FX Type",
+   "FX S1 FX Type",
+   "FX S2 FX Type",
+   "FX G1 FX Type",
+   "FX G2 FX Type",
+   "FX A3 FX Type",
+   "FX A1 Param 1",
+   "FX A1 Param 2",
+   "FX A1 Param 3",
+   "FX A1 Param 4",
+   "FX A1 Param 5",
+   "FX A1 Param 6",
+   "FX A1 Param 7",
+   "FX A1 Param 8",
+   "FX A1 Param 9",
+   "FX A1 Param 10",
+   "FX A2 Param 1",
+   "FX A2 Param 2",
+   "FX A2 Param 3",
+   "FX A2 Param 4",
+   "FX A2 Param 5",
+   "FX A2 Param 6",
+   "FX A2 Param 7",
+   "FX A2 Param 8",
+   "FX A2 Param 9",
+   "FX A2 Param 10",
+   "FX B1 Param 1",
+   "FX B1 Param 2",
+   "FX B1 Param 3",
+   "FX B1 Param 4",
+   "FX B1 Param 5",
+   "FX B1 Param 6",
+   "FX B1 Param 7",
+   "FX B1 Param 8",
+   "FX B1 Param 9",
+   "FX B1 Param 10",
+   "FX B2 Param 1",
+   "FX B2 Param 2",
+   "FX B2 Param 3",
+   "FX B2 Param 4",
+   "FX B2 Param 5",
+   "FX B2 Param 6",
+   "FX B2 Param 7",
+   "FX B2 Param 8",
+   "FX B2 Param 9",
+   "FX B2 Param 10",
+   "FX S1 Param 1",
+   "FX S1 Param 2",
+   "FX S1 Param 3",
+   "FX S1 Param 4",
+   "FX S1 Param 5",
+   "FX S1 Param 6",
+   "FX S1 Param 7",
+   "FX S1 Param 8",
+   "FX S1 Param 9",
+   "FX S1 Param 10",
+   "FX S2 Param 1",
+   "FX S2 Param 2",
+   "FX S2 Param 3",
+   "FX S2 Param 4",
+   "FX S2 Param 5",
+   "FX S2 Param 6",
+   "FX S2 Param 7",
+   "FX S2 Param 8",
+   "FX S2 Param 9",
+   "FX S2 Param 10",
+   "FX G1 Param 1",
+   "FX G1 Param 2",
+   "FX G1 Param 3",
+   "FX G1 Param 4",
+   "FX G1 Param 5",
+   "FX G1 Param 6",
+   "FX G1 Param 7",
+   "FX G1 Param 8",
+   "FX G1 Param 9",
+   "FX G1 Param 10",
+   "FX G2 Param 1",
+   "FX G2 Param 2",
+   "FX G2 Param 3",
+   "FX G2 Param 4",
+   "FX G2 Param 5",
+   "FX G2 Param 6",
+   "FX G2 Param 7",
+   "FX G2 Param 8",
+   "FX G2 Param 9",
+   "FX G2 Param 10",
+   "FX A3 Param 1",
+   "FX A3 Param 2",
+   "FX A3 Param 3",
+   "FX A3 Param 4",
+   "FX A3 Param 5",
+   "FX A3 Param 6",
+   "FX A3 Param 7",
+   "FX A3 Param 8",
+   "FX A3 Param 9",
+   "FX A3 Param 10",
+   "FX A4 FX Type",
+   "FX B3 FX Type",
+   "FX B4 FX Type",
+   "FX S3 FX Type",
+   "FX S4 FX Type",
+   "FX G3 FX Type",
+   "FX G4 FX Type",
+   "FX A4 Param 1",
+   "FX A4 Param 2",
+   "FX A4 Param 3",
+   "FX A4 Param 4",
+   "FX A4 Param 5",
+   "FX A4 Param 6",
+   "FX A4 Param 7",
+   "FX A4 Param 8",
+   "FX A4 Param 9",
+   "FX A4 Param 10",
+   "FX B3 Param 1",
+   "FX B3 Param 2",
+   "FX B3 Param 3",
+   "FX B3 Param 4",
+   "FX B3 Param 5",
+   "FX B3 Param 6",
+   "FX B3 Param 7",
+   "FX B3 Param 8",
+   "FX B3 Param 9",
+   "FX B3 Param 10",
+   "FX B4 Param 1",
+   "FX B4 Param 2",
+   "FX B4 Param 3",
+   "FX B4 Param 4",
+   "FX B4 Param 5",
+   "FX B4 Param 6",
+   "FX B4 Param 7",
+   "FX B4 Param 8",
+   "FX B4 Param 9",
+   "FX B4 Param 10",
+   "FX S3 Param 1",
+   "FX S3 Param 2",
+   "FX S3 Param 3",
+   "FX S3 Param 4",
+   "FX S3 Param 5",
+   "FX S3 Param 6",
+   "FX S3 Param 7",
+   "FX S3 Param 8",
+   "FX S3 Param 9",
+   "FX S3 Param 10",
+   "FX S4 Param 1",
+   "FX S4 Param 2",
+   "FX S4 Param 3",
+   "FX S4 Param 4",
+   "FX S4 Param 5",
+   "FX S4 Param 6",
+   "FX S4 Param 7",
+   "FX S4 Param 8",
+   "FX S4 Param 9",
+   "FX S4 Param 10",
+   "FX G3 Param 1",
+   "FX G3 Param 2",
+   "FX G3 Param 3",
+   "FX G3 Param 4",
+   "FX G3 Param 5",
+   "FX G3 Param 6",
+   "FX G3 Param 7",
+   "FX G3 Param 8",
+   "FX G3 Param 9",
+   "FX G3 Param 10",
+   "FX G4 Param 1",
+   "FX G4 Param 2",
+   "FX G4 Param 3",
+   "FX G4 Param 4",
+   "FX G4 Param 5",
+   "FX G4 Param 6",
+   "FX G4 Param 7",
+   "FX G4 Param 8",
+   "FX G4 Param 9",
+   "FX G4 Param 10",
+   "FX A1 Param 11",
+   "FX A1 Param 12",
+   "FX A2 Param 11",
+   "FX A2 Param 12",
+   "FX B1 Param 11",
+   "FX B1 Param 12",
+   "FX B2 Param 11",
+   "FX B2 Param 12",
+   "FX S1 Param 11",
+   "FX S1 Param 12",
+   "FX S2 Param 11",
+   "FX S2 Param 12",
+   "FX G1 Param 11",
+   "FX G1 Param 12",
+   "FX G2 Param 11",
+   "FX G2 Param 12",
+   "FX A3 Param 11",
+   "FX A3 Param 12"
+  ],
+  "fx a1": [
+   "FX A1 FX Type",
+   "FX A1 Param 1",
+   "FX A1 Param 2",
+   "FX A1 Param 3",
+   "FX A1 Param 4",
+   "FX A1 Param 5",
+   "FX A1 Param 6",
+   "FX A1 Param 7",
+   "FX A1 Param 8",
+   "FX A1 Param 9",
+   "FX A1 Param 10",
+   "FX A1 Param 11",
+   "FX A1 Param 12"
+  ],
+  "fx a2": [
+   "FX A2 FX Type",
+   "FX A2 Param 1",
+   "FX A2 Param 2",
+   "FX A2 Param 3",
+   "FX A2 Param 4",
+   "FX A2 Param 5",
+   "FX A2 Param 6",
+   "FX A2 Param 7",
+   "FX A2 Param 8",
+   "FX A2 Param 9",
+   "FX A2 Param 10",
+   "FX A2 Param 11",
+   "FX A2 Param 12"
+  ],
+  "fx a3": [
+   "FX A3 FX Type",
+   "FX A3 Param 1",
+   "FX A3 Param 2",
+   "FX A3 Param 3",
+   "FX A3 Param 4",
+   "FX A3 Param 5",
+   "FX A3 Param 6",
+   "FX A3 Param 7",
+   "FX A3 Param 8",
+   "FX A3 Param 9",
+   "FX A3 Param 10",
+   "FX A3 Param 11",
+   "FX A3 Param 12"
+  ],
+  "fx a4": [
+   "FX A4 Param 11",
+   "FX A4 Param 12",
+   "FX A4 FX Type",
+   "FX A4 Param 1",
+   "FX A4 Param 2",
+   "FX A4 Param 3",
+   "FX A4 Param 4",
+   "FX A4 Param 5",
+   "FX A4 Param 6",
+   "FX A4 Param 7",
+   "FX A4 Param 8",
+   "FX A4 Param 9",
+   "FX A4 Param 10"
+  ],
+  "fx b1": [
+   "FX B1 FX Type",
+   "FX B1 Param 1",
+   "FX B1 Param 2",
+   "FX B1 Param 3",
+   "FX B1 Param 4",
+   "FX B1 Param 5",
+   "FX B1 Param 6",
+   "FX B1 Param 7",
+   "FX B1 Param 8",
+   "FX B1 Param 9",
+   "FX B1 Param 10",
+   "FX B1 Param 11",
+   "FX B1 Param 12"
+  ],
+  "fx b2": [
+   "FX B2 FX Type",
+   "FX B2 Param 1",
+   "FX B2 Param 2",
+   "FX B2 Param 3",
+   "FX B2 Param 4",
+   "FX B2 Param 5",
+   "FX B2 Param 6",
+   "FX B2 Param 7",
+   "FX B2 Param 8",
+   "FX B2 Param 9",
+   "FX B2 Param 10",
+   "FX B2 Param 11",
+   "FX B2 Param 12"
+  ],
+  "fx b3": [
+   "FX B3 Param 11",
+   "FX B3 Param 12",
+   "FX B3 FX Type",
+   "FX B3 Param 1",
+   "FX B3 Param 2",
+   "FX B3 Param 3",
+   "FX B3 Param 4",
+   "FX B3 Param 5",
+   "FX B3 Param 6",
+   "FX B3 Param 7",
+   "FX B3 Param 8",
+   "FX B3 Param 9",
+   "FX B3 Param 10"
+  ],
+  "fx b4": [
+   "FX B4 Param 11",
+   "FX B4 Param 12",
+   "FX B4 FX Type",
+   "FX B4 Param 1",
+   "FX B4 Param 2",
+   "FX B4 Param 3",
+   "FX B4 Param 4",
+   "FX B4 Param 5",
+   "FX B4 Param 6",
+   "FX B4 Param 7",
+   "FX B4 Param 8",
+   "FX B4 Param 9",
+   "FX B4 Param 10"
+  ],
+  "fx s1": [
+   "FX S1 FX Type",
+   "FX S1 Param 1",
+   "FX S1 Param 2",
+   "FX S1 Param 3",
+   "FX S1 Param 4",
+   "FX S1 Param 5",
+   "FX S1 Param 6",
+   "FX S1 Param 7",
+   "FX S1 Param 8",
+   "FX S1 Param 9",
+   "FX S1 Param 10",
+   "FX S1 Param 11",
+   "FX S1 Param 12"
+  ],
+  "fx s2": [
+   "FX S2 FX Type",
+   "FX S2 Param 1",
+   "FX S2 Param 2",
+   "FX S2 Param 3",
+   "FX S2 Param 4",
+   "FX S2 Param 5",
+   "FX S2 Param 6",
+   "FX S2 Param 7",
+   "FX S2 Param 8",
+   "FX S2 Param 9",
+   "FX S2 Param 10",
+   "FX S2 Param 11",
+   "FX S2 Param 12"
+  ],
+  "fx s3": [
+   "FX S3 Param 11",
+   "FX S3 Param 12",
+   "FX S3 FX Type",
+   "FX S3 Param 1",
+   "FX S3 Param 2",
+   "FX S3 Param 3",
+   "FX S3 Param 4",
+   "FX S3 Param 5",
+   "FX S3 Param 6",
+   "FX S3 Param 7",
+   "FX S3 Param 8",
+   "FX S3 Param 9",
+   "FX S3 Param 10"
+  ],
+  "fx s4": [
+   "FX S4 Param 11",
+   "FX S4 Param 12",
+   "FX S4 FX Type",
+   "FX S4 Param 1",
+   "FX S4 Param 2",
+   "FX S4 Param 3",
+   "FX S4 Param 4",
+   "FX S4 Param 5",
+   "FX S4 Param 6",
+   "FX S4 Param 7",
+   "FX S4 Param 8",
+   "FX S4 Param 9",
+   "FX S4 Param 10"
+  ],
+  "fx g1": [
+   "FX G1 FX Type",
+   "FX G1 Param 1",
+   "FX G1 Param 2",
+   "FX G1 Param 3",
+   "FX G1 Param 4",
+   "FX G1 Param 5",
+   "FX G1 Param 6",
+   "FX G1 Param 7",
+   "FX G1 Param 8",
+   "FX G1 Param 9",
+   "FX G1 Param 10",
+   "FX G1 Param 11",
+   "FX G1 Param 12"
+  ],
+  "fx g2": [
+   "FX G2 FX Type",
+   "FX G2 Param 1",
+   "FX G2 Param 2",
+   "FX G2 Param 3",
+   "FX G2 Param 4",
+   "FX G2 Param 5",
+   "FX G2 Param 6",
+   "FX G2 Param 7",
+   "FX G2 Param 8",
+   "FX G2 Param 9",
+   "FX G2 Param 10",
+   "FX G2 Param 11",
+   "FX G2 Param 12"
+  ],
+  "fx g3": [
+   "FX G3 Param 11",
+   "FX G3 Param 12",
+   "FX G3 FX Type",
+   "FX G3 Param 1",
+   "FX G3 Param 2",
+   "FX G3 Param 3",
+   "FX G3 Param 4",
+   "FX G3 Param 5",
+   "FX G3 Param 6",
+   "FX G3 Param 7",
+   "FX G3 Param 8",
+   "FX G3 Param 9",
+   "FX G3 Param 10"
+  ],
+  "fx g4": [
+   "FX G4 Param 11",
+   "FX G4 Param 12",
+   "FX G4 FX Type",
+   "FX G4 Param 1",
+   "FX G4 Param 2",
+   "FX G4 Param 3",
+   "FX G4 Param 4",
+   "FX G4 Param 5",
+   "FX G4 Param 6",
+   "FX G4 Param 7",
+   "FX G4 Param 8",
+   "FX G4 Param 9",
+   "FX G4 Param 10"
+  ],
+  "global": [
+   "Active Scene",
+   "Character",
+   "FX Chain Bypass",
+   "FX Disable",
+   "Global Volume",
+   "Polyphony Limit",
+   "Scene Mode",
+   "Send FX 1 Return",
+   "Send FX 2 Return",
+   "Send FX 3 Return",
+   "Send FX 4 Return",
+   "Split Point"
+  ]
+ },
+ "preset_folders": {
+  "windows": [
+   "%USERPROFILE%\\Documents\\Surge Synth Team\\Surge XT\\Patches"
+  ],
+  "macos": [
+   "~/Documents/Surge Synth Team/Surge XT/Patches"
+  ]
+ },
+ "storage_names": {
+  "B LFO 4 Trigger Mode": "b_lfo3_trigmode",
+  "A Filter 1 Resonance": "a_filter1_resonance",
+  "A Scene LFO 3 Unipolar": "a_lfo8_unipolar",
+  "A LFO 1 Sustain": "a_lfo0_sustain",
+  "A LFO 5 Release": "a_lfo4_release",
+  "B Amp EG Release Shape": "b_env1_release_shape",
+  "A Scene LFO 1 Trigger Mode": "a_lfo6_trigmode",
+  "B Amp EG Envelope Mode": "b_env1_mode",
+  "B LFO 5 Deform": "b_lfo4_deform",
+  "B Filter 1 Keytrack": "b_filter1_keytrack",
+  "B Scene LFO 3 Sustain": "b_lfo8_sustain",
+  "B Filter EG Envelope Mode": "b_env2_mode",
+  "A Pan": "a_pan",
+  "B Pan": "b_pan",
+  "A Filter 2 Offset Mode": "a_f2_cf_is_offset",
+  "FX A4 Param 11": "fx10_p10",
+  "FX A4 Param 12": "fx10_p11",
+  "B Osc 2 Keytrack": "b_osc2_keytrack",
+  "FX B3 Param 11": "fx11_p10",
+  "FX B3 Param 12": "fx11_p11",
+  "FX B4 Param 11": "fx12_p10",
+  "FX B4 Param 12": "fx12_p11",
+  "FX S3 Param 11": "fx13_p10",
+  "FX S3 Param 12": "fx13_p11",
+  "B Scene LFO 2 Amplitude": "b_lfo7_magnitude",
+  "FX S4 Param 11": "fx14_p10",
+  "FX S4 Param 12": "fx14_p11",
+  "FX G3 Param 11": "fx15_p10",
+  "FX G3 Param 12": "fx15_p11",
+  "FX G4 Param 11": "fx16_p10",
+  "FX G4 Param 12": "fx16_p11",
+  "B Scene LFO 5 Trigger Mode": "b_lfo10_trigmode",
+  "B Scene LFO 4 Attack": "b_lfo9_attack",
+  "B Scene LFO 6 Attack": "b_lfo11_attack",
+  "FX A1 FX Type": "fx1_type",
+  "B LFO 2 Amplitude": "b_lfo1_magnitude",
+  "B LFO 5 Unipolar": "b_lfo4_unipolar",
+  "A LFO 4 Decay": "a_lfo3_decay",
+  "A LFO 4 Delay": "a_lfo3_delay",
+  "A Feedback": "a_feedback",
+  "B Osc 1 Route": "b_route_o1",
+  "B Osc 2 Route": "b_route_o2",
+  "B Osc 3 Route": "b_route_o3",
+  "A Amp EG Decay Shape": "a_env1_decay_shape",
+  "A LFO 4 Phase": "a_lfo3_phase",
+  "FX A2 FX Type": "fx2_type",
+  "B Osc 1 Volume": "b_level_o1",
+  "B Osc 2 Volume": "b_level_o2",
+  "B Osc 3 Volume": "b_level_o3",
+  "A LFO 4 Type": "a_lfo3_shape",
+  "A Ring Modulation 1x2 Solo": "a_solo_ring12",
+  "A Ring Modulation 2x3 Solo": "a_solo_ring23",
+  "A Noise Mute": "a_mute_noise",
+  "B LFO 3 Sustain": "b_lfo2_sustain",
+  "B Scene LFO 1 Release": "b_lfo6_release",
+  "B Scene LFO 4 Deform": "b_lfo9_deform",
+  "A Osc 2 Octave": "a_osc2_octave",
+  "B LFO 3 Trigger Mode": "b_lfo2_trigmode",
+  "FX B1 FX Type": "fx3_type",
+  "A Scene LFO 2 Unipolar": "a_lfo7_unipolar",
+  "B Scene LFO 6 Deform": "b_lfo11_deform",
+  "Split Point": "splitkey",
+  "A Osc 2 Shape": "a_osc2_param0",
+  "A Osc 2 Width 1": "a_osc2_param1",
+  "A Osc 2 Width 2": "a_osc2_param2",
+  "A Osc 2 Sub Mix": "a_osc2_param3",
+  "A Osc 2 Sync": "a_osc2_param4",
+  "A Osc 2 Unison Detune": "a_osc2_param5",
+  "A Osc 2 Unison Voices": "a_osc2_param6",
+  "A Scene LFO 6 Release": "a_lfo11_release",
+  "B Scene LFO 5 Decay": "b_lfo10_decay",
+  "B Scene LFO 5 Delay": "b_lfo10_delay",
+  "FX B2 FX Type": "fx4_type",
+  "B Scene LFO 5 Phase": "b_lfo10_phase",
+  "Polyphony Limit": "polylimit",
+  "B Scene LFO 5 Type": "b_lfo10_shape",
+  "A Scene LFO 2 Sustain": "a_lfo7_sustain",
+  "A Osc 1 Mute": "a_mute_o1",
+  "A Osc 2 Mute": "a_mute_o2",
+  "A Osc 3 Mute": "a_mute_o3",
+  "A LFO 6 Trigger Mode": "a_lfo5_trigmode",
+  "FX S1 FX Type": "fx5_type",
+  "B Scene LFO 6 Unipolar": "b_lfo11_unipolar",
+  "B Scene LFO 6 Amplitude": "b_lfo11_magnitude",
+  "A Scene LFO 1 Amplitude": "a_lfo6_magnitude",
+  "B Link Resonance": "b_f2_link_resonance",
+  "A Osc 3 Pitch": "a_osc3_pitch",
+  "FX S2 FX Type": "fx6_type",
+  "A LFO 5 Attack": "a_lfo4_attack",
+  "B LFO 4 Decay": "b_lfo3_decay",
+  "B LFO 4 Delay": "b_lfo3_delay",
+  "B Osc 1 Keytrack": "b_osc1_keytrack",
+  "B LFO 1 Release": "b_lfo0_release",
+  "B LFO 4 Phase": "b_lfo3_phase",
+  "A Scene LFO 3 Decay": "a_lfo8_decay",
+  "A Scene LFO 3 Delay": "a_lfo8_delay",
+  "B LFO 4 Type": "b_lfo3_shape",
+  "B Osc 1 Octave": "b_osc1_octave",
+  "A LFO 1 Amplitude": "a_lfo0_magnitude",
+  "B Noise Mute": "b_mute_noise",
+  "A Scene LFO 3 Phase": "a_lfo8_phase",
+  "FX G1 FX Type": "fx7_type",
+  "A Scene LFO 3 Type": "a_lfo8_shape",
+  "A Send FX 1 Level": "a_send_fx_1",
+  "A Send FX 2 Level": "a_send_fx_2",
+  "A Send FX 3 Level": "a_send_fx_3",
+  "A Send FX 4 Level": "a_send_fx_4",
+  "B Osc 1 Shape": "b_osc1_param0",
+  "B Osc 1 Width 1": "b_osc1_param1",
+  "B Osc 1 Width 2": "b_osc1_param2",
+  "B Osc 1 Sub Mix": "b_osc1_param3",
+  "B Osc 1 Sync": "b_osc1_param4",
+  "B Osc 1 Unison Detune": "b_osc1_param5",
+  "B Osc 1 Unison Voices": "b_osc1_param6",
+  "FX Chain Bypass": "fx_bypass",
+  "FX G2 FX Type": "fx8_type",
+  "A LFO 2 Sustain": "a_lfo1_sustain",
+  "B LFO 4 Unipolar": "b_lfo3_unipolar",
+  "A LFO 6 Release": "a_lfo5_release",
+  "A Filter 2 Resonance": "a_filter2_resonance",
+  "A Osc 1 Route": "a_route_o1",
+  "A Osc 2 Route": "a_route_o2",
+  "A Osc 3 Route": "a_route_o3",
+  "A LFO 5 Deform": "a_lfo4_deform",
+  "B Amp EG Sustain": "b_env1_sustain",
+  "A Osc 1 Volume": "a_level_o1",
+  "A Osc 2 Volume": "a_level_o2",
+  "A Osc 3 Volume": "a_level_o3",
+  "FX A3 FX Type": "fx9_type",
+  "B LFO 2 Trigger Mode": "b_lfo1_trigmode",
+  "B Osc 3 Pitch": "b_osc3_pitch",
+  "B LFO 4 Attack": "b_lfo3_attack",
+  "A Scene LFO 1 Unipolar": "a_lfo6_unipolar",
+  "A Scene LFO 4 Attack": "a_lfo9_attack",
+  "B Scene LFO 4 Sustain": "b_lfo9_sustain",
+  "A Scene LFO 6 Trigger Mode": "a_lfo11_trigmode",
+  "B Scene LFO 3 Decay": "b_lfo8_decay",
+  "B Scene LFO 3 Delay": "b_lfo8_delay",
+  "A LFO 5 Trigger Mode": "a_lfo4_trigmode",
+  "B Scene LFO 3 Phase": "b_lfo8_phase",
+  "B Scene LFO 3 Type": "b_lfo8_shape",
+  "B FM Depth": "b_fm_depth",
+  "A Amp EG Release Shape": "a_env1_release_shape",
+  "B Scene LFO 3 Amplitude": "b_lfo8_magnitude",
+  "A Waveshaper Type": "a_ws_type",
+  "B Scene LFO 5 Unipolar": "b_lfo10_unipolar",
+  "B LFO 4 Deform": "b_lfo3_deform",
+  "A Scene LFO 4 Deform": "a_lfo9_deform",
+  "A Noise Solo": "a_solo_noise",
+  "A Filter Balance": "a_f_balance",
+  "B LFO 3 Amplitude": "b_lfo2_magnitude",
+  "A Scene LFO 5 Decay": "a_lfo10_decay",
+  "A Scene LFO 5 Delay": "a_lfo10_delay",
+  "B LFO 4 Sustain": "b_lfo3_sustain",
+  "B Scene LFO 3 Attack": "b_lfo8_attack",
+  "B Scene LFO 2 Release": "b_lfo7_release",
+  "A Scene LFO 5 Phase": "a_lfo10_phase",
+  "A Scene LFO 5 Type": "a_lfo10_shape",
+  "A LFO 2 Decay": "a_lfo1_decay",
+  "A LFO 2 Delay": "a_lfo1_delay",
+  "A Filter EG Decay": "a_env2_decay",
+  "B Scene LFO 5 Attack": "b_lfo10_attack",
+  "A Osc 3 Keytrack": "a_osc3_keytrack",
+  "A LFO 2 Phase": "a_lfo1_phase",
+  "B LFO 3 Unipolar": "b_lfo2_unipolar",
+  "A LFO 2 Type": "a_lfo1_shape",
+  "A Scene LFO 3 Sustain": "a_lfo8_sustain",
+  "B Osc 1 Mute": "b_mute_o1",
+  "B Osc 2 Mute": "b_mute_o2",
+  "B Osc 3 Mute": "b_mute_o3",
+  "B LFO 1 Trigger Mode": "b_lfo0_trigmode",
+  "Send FX 1 Return": "volume_FX1",
+  "Send FX 2 Return": "volume_FX2",
+  "Send FX 3 Return": "volume_FX3",
+  "Send FX 4 Return": "volume_FX4",
+  "B Scene LFO 3 Deform": "b_lfo8_deform",
+  "B Scene LFO 5 Sustain": "b_lfo10_sustain",
+  "A LFO 6 Unipolar": "a_lfo5_unipolar",
+  "A Osc 1 Octave": "a_osc1_octave",
+  "B Highpass": "b_lowcut",
+  "B Scene LFO 5 Deform": "b_lfo10_deform",
+  "A Scene LFO 2 Amplitude": "a_lfo7_magnitude",
+  "B Noise Solo": "b_solo_noise",
+  "A Scene LFO 5 Trigger Mode": "a_lfo10_trigmode",
+  "A Osc 1 Shape": "a_osc1_param0",
+  "A Osc 1 Width 1": "a_osc1_param1",
+  "A Osc 1 Width 2": "a_osc1_param2",
+  "A Osc 1 Sub Mix": "a_osc1_param3",
+  "A Osc 1 Sync": "a_osc1_param4",
+  "A Osc 1 Unison Detune": "a_osc1_param5",
+  "A Osc 1 Unison Voices": "a_osc1_param6",
+  "B LFO 2 Release": "b_lfo1_release",
+  "A LFO 4 Trigger Mode": "a_lfo3_trigmode",
+  "A Scene LFO 6 Attack": "a_lfo11_attack",
+  "A Osc 1 Pitch": "a_osc1_pitch",
+  "A FM Depth": "a_fm_depth",
+  "A LFO 2 Amplitude": "a_lfo1_magnitude",
+  "B Noise Volume": "b_level_noise",
+  "B LFO 2 Decay": "b_lfo1_decay",
+  "B LFO 2 Delay": "b_lfo1_delay",
+  "B Filter EG Decay": "b_env2_decay",
+  "B LFO 2 Phase": "b_lfo1_phase",
+  "B Send FX 1 Level": "b_send_fx_1",
+  "B Send FX 2 Level": "b_send_fx_2",
+  "B Send FX 3 Level": "b_send_fx_3",
+  "B Send FX 4 Level": "b_send_fx_4",
+  "A Scene LFO 1 Decay": "a_lfo6_decay",
+  "A Scene LFO 1 Delay": "a_lfo6_delay",
+  "B LFO 2 Type": "b_lfo1_shape",
+  "B Filter 1 Subtype": "b_filter1_subtype",
+  "B Octave": "b_octave",
+  "A Scene LFO 1 Phase": "a_lfo6_phase",
+  "A LFO 3 Sustain": "a_lfo2_sustain",
+  "A Scene LFO 1 Type": "a_lfo6_shape",
+  "A LFO 4 Attack": "a_lfo3_attack",
+  "A Scene LFO 1 Release": "a_lfo6_release",
+  "B Osc 1 Retrigger": "b_osc1_retrigger",
+  "A Scene LFO 5 Amplitude": "a_lfo10_magnitude",
+  "B Filter EG Attack Shape": "b_env2_attack_shape",
+  "B Filter EG Sustain": "b_env2_sustain",
+  "A Scene LFO 6 Deform": "a_lfo11_deform",
+  "A Width": "a_pan2",
+  "B Play Mode": "b_polymode",
+  "A Osc 2 Keytrack": "a_osc2_keytrack",
+  "B LFO 2 Unipolar": "b_lfo1_unipolar",
+  "B Width": "b_pan2",
+  "A LFO 4 Deform": "a_lfo3_deform",
+  "B Osc 1 Pitch": "b_osc1_pitch",
+  "A Scene LFO 6 Unipolar": "a_lfo11_unipolar",
+  "B Velocity > VCA Gain": "b_vca_velsense",
+  "A Pre-Filter Gain": "a_level_pfg",
+  "A LFO 5 Unipolar": "a_lfo4_unipolar",
+  "B Waveshaper Type": "b_ws_type",
+  "A LFO 1 Release": "a_lfo0_release",
+  "B Scene LFO 4 Amplitude": "b_lfo9_magnitude",
+  "B LFO 3 Attack": "b_lfo2_attack",
+  "B Scene LFO 1 Decay": "b_lfo6_decay",
+  "B Scene LFO 1 Delay": "b_lfo6_delay",
+  "B Ring Modulation 1x2 Route": "b_route_ring12",
+  "B Ring Modulation 2x3 Route": "b_route_ring23",
+  "B Scene LFO 1 Phase": "b_lfo6_phase",
+  "A Scene LFO 3 Attack": "a_lfo8_attack",
+  "B Scene LFO 1 Type": "b_lfo6_shape",
+  "M1: -": "macro_0",
+  "M2: -": "macro_1",
+  "M3: -": "macro_2",
+  "M4: -": "macro_3",
+  "M5: -": "macro_4",
+  "M6: -": "macro_5",
+  "M7: -": "macro_6",
+  "M8: -": "macro_7",
+  "A LFO 3 Trigger Mode": "a_lfo2_trigmode",
+  "B Filter Balance": "b_f_balance",
+  "B LFO 4 Amplitude": "b_lfo3_magnitude",
+  "A Osc Drift": "a_drift",
+  "B LFO 5 Sustain": "b_lfo4_sustain",
+  "A Pitch": "a_pitch",
+  "B Scene LFO 3 Release": "b_lfo8_release",
+  "A Filter 2 Keytrack": "a_filter2_keytrack",
+  "A Amp EG Sustain": "a_env1_sustain",
+  "B LFO 3 Deform": "b_lfo2_deform",
+  "FX A1 Param 1": "fx1_p0",
+  "FX A1 Param 2": "fx1_p1",
+  "FX A1 Param 3": "fx1_p2",
+  "FX A1 Param 4": "fx1_p3",
+  "FX A1 Param 5": "fx1_p4",
+  "FX A1 Param 6": "fx1_p5",
+  "FX A1 Param 7": "fx1_p6",
+  "FX A1 Param 8": "fx1_p7",
+  "FX A1 Param 9": "fx1_p8",
+  "FX A1 Param 10": "fx1_p9",
+  "FX A2 Param 1": "fx2_p0",
+  "FX A2 Param 2": "fx2_p1",
+  "FX A2 Param 3": "fx2_p2",
+  "FX A2 Param 4": "fx2_p3",
+  "FX A2 Param 5": "fx2_p4",
+  "FX A2 Param 6": "fx2_p5",
+  "FX A2 Param 7": "fx2_p6",
+  "FX A2 Param 8": "fx2_p7",
+  "FX A2 Param 9": "fx2_p8",
+  "FX A2 Param 10": "fx2_p9",
+  "FX B1 Param 1": "fx3_p0",
+  "FX B1 Param 2": "fx3_p1",
+  "FX B1 Param 3": "fx3_p2",
+  "FX B1 Param 4": "fx3_p3",
+  "FX B1 Param 5": "fx3_p4",
+  "FX B1 Param 6": "fx3_p5",
+  "FX B1 Param 7": "fx3_p6",
+  "FX B1 Param 8": "fx3_p7",
+  "FX B1 Param 9": "fx3_p8",
+  "FX B1 Param 10": "fx3_p9",
+  "FX B2 Param 1": "fx4_p0",
+  "FX B2 Param 2": "fx4_p1",
+  "FX B2 Param 3": "fx4_p2",
+  "FX B2 Param 4": "fx4_p3",
+  "FX B2 Param 5": "fx4_p4",
+  "FX B2 Param 6": "fx4_p5",
+  "FX B2 Param 7": "fx4_p6",
+  "FX B2 Param 8": "fx4_p7",
+  "FX B2 Param 9": "fx4_p8",
+  "FX B2 Param 10": "fx4_p9",
+  "FX S1 Param 1": "fx5_p0",
+  "FX S1 Param 2": "fx5_p1",
+  "FX S1 Param 3": "fx5_p2",
+  "FX S1 Param 4": "fx5_p3",
+  "FX S1 Param 5": "fx5_p4",
+  "FX S1 Param 6": "fx5_p5",
+  "FX S1 Param 7": "fx5_p6",
+  "FX S1 Param 8": "fx5_p7",
+  "FX S1 Param 9": "fx5_p8",
+  "FX S1 Param 10": "fx5_p9",
+  "FX S2 Param 1": "fx6_p0",
+  "FX S2 Param 2": "fx6_p1",
+  "FX S2 Param 3": "fx6_p2",
+  "FX S2 Param 4": "fx6_p3",
+  "FX S2 Param 5": "fx6_p4",
+  "FX S2 Param 6": "fx6_p5",
+  "FX S2 Param 7": "fx6_p6",
+  "FX S2 Param 8": "fx6_p7",
+  "FX S2 Param 9": "fx6_p8",
+  "FX S2 Param 10": "fx6_p9",
+  "FX G1 Param 1": "fx7_p0",
+  "FX G1 Param 2": "fx7_p1",
+  "FX G1 Param 3": "fx7_p2",
+  "FX G1 Param 4": "fx7_p3",
+  "FX G1 Param 5": "fx7_p4",
+  "FX G1 Param 6": "fx7_p5",
+  "FX G1 Param 7": "fx7_p6",
+  "FX G1 Param 8": "fx7_p7",
+  "FX G1 Param 9": "fx7_p8",
+  "FX G1 Param 10": "fx7_p9",
+  "FX G2 Param 1": "fx8_p0",
+  "FX G2 Param 2": "fx8_p1",
+  "FX G2 Param 3": "fx8_p2",
+  "FX G2 Param 4": "fx8_p3",
+  "FX G2 Param 5": "fx8_p4",
+  "FX G2 Param 6": "fx8_p5",
+  "FX G2 Param 7": "fx8_p6",
+  "FX G2 Param 8": "fx8_p7",
+  "FX G2 Param 9": "fx8_p8",
+  "FX G2 Param 10": "fx8_p9",
+  "FX A3 Param 1": "fx9_p0",
+  "FX A3 Param 2": "fx9_p1",
+  "FX A3 Param 3": "fx9_p2",
+  "FX A3 Param 4": "fx9_p3",
+  "FX A3 Param 5": "fx9_p4",
+  "FX A3 Param 6": "fx9_p5",
+  "FX A3 Param 7": "fx9_p6",
+  "FX A3 Param 8": "fx9_p7",
+  "FX A3 Param 9": "fx9_p8",
+  "FX A3 Param 10": "fx9_p9",
+  "A Scene LFO 3 Deform": "a_lfo8_deform",
+  "B Volume": "b_volume",
+  "B Keytrack Root Key": "b_ktrkroot",
+  "A Play Mode": "a_polymode",
+  "A Scene LFO 4 Sustain": "a_lfo9_sustain",
+  "B Scene LFO 2 Attack": "b_lfo7_attack",
+  "B Scene LFO 6 Sustain": "b_lfo11_sustain",
+  "A Osc 1 Keytrack": "a_osc1_keytrack",
+  "B LFO 1 Unipolar": "b_lfo0_unipolar",
+  "A Noise Volume": "a_level_noise",
+  "A Scene LFO 3 Amplitude": "a_lfo8_magnitude",
+  "A Scene LFO 5 Unipolar": "a_lfo10_unipolar",
+  "B Scene LFO 4 Trigger Mode": "b_lfo9_trigmode",
+  "A Filter Configuration": "a_fb_config",
+  "B LFO 3 Release": "b_lfo2_release",
+  "A LFO 4 Unipolar": "a_lfo3_unipolar",
+  "A Portamento": "a_portamento",
+  "B Scene LFO 2 Deform": "b_lfo7_deform",
+  "A LFO 3 Amplitude": "a_lfo2_magnitude",
+  "FX A4 FX Type": "fx10_type",
+  "A Highpass": "a_lowcut",
+  "B Filter 2 Subtype": "b_filter2_subtype",
+  "B Filter EG Decay Shape": "b_env2_decay_shape",
+  "A LFO 4 Sustain": "a_lfo3_sustain",
+  "B Filter 2 Cutoff": "b_filter2_cutoff",
+  "B Filter 1 Type": "b_filter1_type",
+  "A LFO 2 Trigger Mode": "a_lfo1_trigmode",
+  "A Scene LFO 2 Release": "a_lfo7_release",
+  "FX B3 FX Type": "fx11_type",
+  "B Waveshaper Drive": "b_ws_drive",
+  "A Scene LFO 5 Attack": "a_lfo10_attack",
+  "A LFO 5 Decay": "a_lfo4_decay",
+  "A LFO 5 Delay": "a_lfo4_delay",
+  "B Osc 2 Retrigger": "b_osc2_retrigger",
+  "A Scene LFO 6 Amplitude": "a_lfo11_magnitude",
+  "B Filter 2 Type": "b_filter2_type",
+  "B Noise Route": "b_route_noise",
+  "A LFO 5 Phase": "a_lfo4_phase",
+  "A LFO 5 Type": "a_lfo4_shape",
+  "FX B4 FX Type": "fx12_type",
+  "A Filter 1 Keytrack": "a_filter1_keytrack",
+  "B Filter 2 FEG Mod Amount": "b_filter2_envmod",
+  "A Octave": "a_octave",
+  "A Keytrack Root Key": "a_ktrkroot",
+  "FX S3 FX Type": "fx13_type",
+  "A Osc 1 Solo": "a_solo_o1",
+  "A Osc 2 Solo": "a_solo_o2",
+  "A Osc 3 Solo": "a_solo_o3",
+  "A LFO 3 Attack": "a_lfo2_attack",
+  "A Link Resonance": "a_f2_link_resonance",
+  "B Scene LFO 6 Decay": "b_lfo11_decay",
+  "B Scene LFO 6 Delay": "b_lfo11_delay",
+  "A Scene LFO 5 Deform": "a_lfo10_deform",
+  "B Portamento": "b_portamento",
+  "FX S4 FX Type": "fx14_type",
+  "B Scene LFO 6 Phase": "b_lfo11_phase",
+  "B Scene LFO 6 Type": "b_lfo11_shape",
+  "B Pre-Filter Gain": "b_level_pfg",
+  "A LFO 2 Release": "a_lfo1_release",
+  "FX G3 FX Type": "fx15_type",
+  "B Amp EG Release": "b_env1_release",
+  "FX Disable": "fx_disable",
+  "B Scene LFO 3 Trigger Mode": "b_lfo8_trigmode",
+  "A LFO 3 Deform": "a_lfo2_deform",
+  "B LFO 5 Decay": "b_lfo4_decay",
+  "B LFO 5 Delay": "b_lfo4_delay",
+  "FX G4 FX Type": "fx16_type",
+  "A LFO 3 Unipolar": "a_lfo2_unipolar",
+  "B LFO 5 Phase": "b_lfo4_phase",
+  "A Scene LFO 4 Decay": "a_lfo9_decay",
+  "A Scene LFO 4 Delay": "a_lfo9_delay",
+  "B LFO 5 Type": "b_lfo4_shape",
+  "B LFO 5 Amplitude": "b_lfo4_magnitude",
+  "B LFO 6 Sustain": "b_lfo5_sustain",
+  "A Scene LFO 4 Phase": "a_lfo9_phase",
+  "A Scene LFO 4 Type": "a_lfo9_shape",
+  "B LFO 2 Attack": "b_lfo1_attack",
+  "B Scene LFO 4 Release": "b_lfo9_release",
+  "B Amp EG Attack Shape": "b_env1_attack_shape",
+  "A Filter EG Sustain": "a_env2_sustain",
+  "A Osc 1 Retrigger": "a_osc1_retrigger",
+  "B Ring Modulation 1x2 Mute": "b_mute_ring12",
+  "B Ring Modulation 2x3 Mute": "b_mute_ring23",
+  "A Scene LFO 2 Attack": "a_lfo7_attack",
+  "A VCA Gain": "a_vca_level",
+  "A LFO 1 Trigger Mode": "a_lfo0_trigmode",
+  "A LFO 1 Hold": "a_lfo0_hold",
+  "A LFO 1 Rate": "a_lfo0_rate",
+  "A Scene LFO 5 Sustain": "a_lfo10_sustain",
+  "A Waveshaper Drive": "a_ws_drive",
+  "A LFO 2 Hold": "a_lfo1_hold",
+  "A LFO 2 Rate": "a_lfo1_rate",
+  "B LFO 2 Deform": "b_lfo1_deform",
+  "A FM Routing": "a_fm_switch",
+  "B Ring Modulation 1x2 Volume": "b_level_ring12",
+  "B Ring Modulation 2x3 Volume": "b_level_ring23",
+  "A Velocity > VCA Gain": "a_vca_velsense",
+  "A LFO 3 Hold": "a_lfo2_hold",
+  "A LFO 3 Rate": "a_lfo2_rate",
+  "A Scene LFO 2 Deform": "a_lfo7_deform",
+  "A Volume": "a_volume",
+  "B Filter EG Attack": "b_env2_attack",
+  "B Filter 1 Resonance": "b_filter1_resonance",
+  "A Ring Modulation 1x2 Route": "a_route_ring12",
+  "A Ring Modulation 2x3 Route": "a_route_ring23",
+  "A Scene LFO 4 Amplitude": "a_lfo9_magnitude",
+  "B Amp EG Decay Shape": "b_env1_decay_shape",
+  "B LFO 4 Release": "b_lfo3_release",
+  "B Scene LFO 4 Unipolar": "b_lfo9_unipolar",
+  "A LFO 4 Hold": "a_lfo3_hold",
+  "A LFO 4 Rate": "a_lfo3_rate",
+  "B Scene LFO 4 Decay": "b_lfo9_decay",
+  "B Scene LFO 4 Delay": "b_lfo9_delay",
+  "B Filter Configuration": "b_fb_config",
+  "A Scene LFO 5 Hold": "a_lfo10_hold",
+  "A Scene LFO 5 Rate": "a_lfo10_rate",
+  "B Scene LFO 4 Phase": "b_lfo9_phase",
+  "B Scene LFO 1 Attack": "b_lfo6_attack",
+  "B Scene LFO 4 Type": "b_lfo9_shape",
+  "Global Volume": "volume",
+  "A LFO 5 Hold": "a_lfo4_hold",
+  "A LFO 5 Rate": "a_lfo4_rate",
+  "A Noise Route": "a_route_noise",
+  "A LFO 4 Amplitude": "a_lfo3_magnitude",
+  "A Scene LFO 6 Hold": "a_lfo11_hold",
+  "A Scene LFO 6 Rate": "a_lfo11_rate",
+  "B Scene LFO 2 Trigger Mode": "b_lfo7_trigmode",
+  "A LFO 5 Sustain": "a_lfo4_sustain",
+  "A Scene LFO 3 Release": "a_lfo8_release",
+  "A LFO 6 Hold": "a_lfo5_hold",
+  "A LFO 6 Rate": "a_lfo5_rate",
+  "A LFO 2 Unipolar": "a_lfo1_unipolar",
+  "B Scene LFO 5 Release": "b_lfo10_release",
+  "B Scene LFO 1 Deform": "b_lfo6_deform",
+  "A Osc 1 Type": "a_osc1_type",
+  "A Scene LFO 1 Hold": "a_lfo6_hold",
+  "A Scene LFO 1 Rate": "a_lfo6_rate",
+  "B Osc 3 Retrigger": "b_osc3_retrigger",
+  "A Scene LFO 6 Decay": "a_lfo11_decay",
+  "A Scene LFO 6 Delay": "a_lfo11_delay",
+  "A Scene LFO 6 Phase": "a_lfo11_phase",
+  "A Scene LFO 6 Type": "a_lfo11_shape",
+  "A LFO 3 Decay": "a_lfo2_decay",
+  "A LFO 3 Delay": "a_lfo2_delay",
+  "A LFO 3 Phase": "a_lfo2_phase",
+  "B Filter 1 Cutoff": "b_filter1_cutoff",
+  "A Osc 2 Type": "a_osc2_type",
+  "A Scene LFO 2 Hold": "a_lfo7_hold",
+  "A Scene LFO 2 Rate": "a_lfo7_rate",
+  "A LFO 3 Type": "a_lfo2_shape",
+  "B Osc 1 Solo": "b_solo_o1",
+  "B Osc 2 Solo": "b_solo_o2",
+  "B Osc 3 Solo": "b_solo_o3",
+  "B Noise Color": "b_noisecol",
+  "B Filter 2 Offset Mode": "b_f2_cf_is_offset",
+  "B Scene LFO 5 Hold": "b_lfo10_hold",
+  "B Scene LFO 5 Rate": "b_lfo10_rate",
+  "A Osc 3 Type": "a_osc3_type",
+  "A Scene LFO 3 Hold": "a_lfo8_hold",
+  "A Scene LFO 3 Rate": "a_lfo8_rate",
+  "A Filter 1 Subtype": "a_filter1_subtype",
+  "A LFO 3 Release": "a_lfo2_release",
+  "B Filter 1 FEG Mod Amount": "b_filter1_envmod",
+  "B Scene LFO 6 Hold": "b_lfo11_hold",
+  "B Scene LFO 6 Rate": "b_lfo11_rate",
+  "A Scene LFO 4 Hold": "a_lfo9_hold",
+  "A Scene LFO 4 Rate": "a_lfo9_rate",
+  "A LFO 2 Attack": "a_lfo1_attack",
+  "B Filter EG Release": "b_env2_release",
+  "A Ring Modulation 1x2 Mute": "a_mute_ring12",
+  "A Ring Modulation 2x3 Mute": "a_mute_ring23",
+  "B Scene LFO 3 Unipolar": "b_lfo8_unipolar",
+  "A Osc 2 Pitch": "a_osc2_pitch",
+  "A Filter 1 Type": "a_filter1_type",
+  "A Filter 2 Cutoff": "a_filter2_cutoff",
+  "B Scene LFO 1 Sustain": "b_lfo6_sustain",
+  "B LFO 6 Amplitude": "b_lfo5_magnitude",
+  "B LFO 3 Decay": "b_lfo2_decay",
+  "B LFO 3 Delay": "b_lfo2_delay",
+  "A Filter EG Attack Shape": "a_env2_attack_shape",
+  "B Filter EG Release Shape": "b_env2_release_shape",
+  "A Pitch Bend Down Range": "a_pbrange_dn",
+  "A Pitch Bend Up Range": "a_pbrange_up",
+  "B Scene LFO 1 Trigger Mode": "b_lfo6_trigmode",
+  "B LFO 3 Phase": "b_lfo2_phase",
+  "Character": "character",
+  "A Scene LFO 2 Decay": "a_lfo7_decay",
+  "A Scene LFO 2 Delay": "a_lfo7_delay",
+  "B LFO 3 Type": "b_lfo2_shape",
+  "A Filter 2 Type": "a_filter2_type",
+  "A Osc 2 Retrigger": "a_osc2_retrigger",
+  "B VCA Gain": "b_vca_level",
+  "A LFO 2 Deform": "a_lfo1_deform",
+  "A Scene LFO 2 Phase": "a_lfo7_phase",
+  "A Scene LFO 6 Sustain": "a_lfo11_sustain",
+  "A Scene LFO 2 Type": "a_lfo7_shape",
+  "A LFO 1 Unipolar": "a_lfo0_unipolar",
+  "B LFO 1 Hold": "b_lfo0_hold",
+  "B LFO 1 Rate": "b_lfo0_rate",
+  "A Filter 2 FEG Mod Amount": "a_filter2_envmod",
+  "A Filter EG Attack": "a_env2_attack",
+  "A Scene LFO 4 Trigger Mode": "a_lfo9_trigmode",
+  "B LFO 2 Hold": "b_lfo1_hold",
+  "B LFO 2 Rate": "b_lfo1_rate",
+  "B LFO 1 Attack": "b_lfo0_attack",
+  "A Scene LFO 1 Attack": "a_lfo6_attack",
+  "B FM Routing": "b_fm_switch",
+  "A Noise Color": "a_noisecol",
+  "B LFO 3 Hold": "b_lfo2_hold",
+  "B LFO 3 Rate": "b_lfo2_rate",
+  "B Osc 3 Octave": "b_osc3_octave",
+  "B LFO 1 Sustain": "b_lfo0_sustain",
+  "B LFO 5 Release": "b_lfo4_release",
+  "B Osc 2 Pitch": "b_osc2_pitch",
+  "B Filter 2 Resonance": "b_filter2_resonance",
+  "FX A4 Param 1": "fx10_p0",
+  "FX A4 Param 2": "fx10_p1",
+  "FX A4 Param 3": "fx10_p2",
+  "FX A4 Param 4": "fx10_p3",
+  "FX A4 Param 5": "fx10_p4",
+  "FX A4 Param 6": "fx10_p5",
+  "FX A4 Param 7": "fx10_p6",
+  "FX A4 Param 8": "fx10_p7",
+  "FX A4 Param 9": "fx10_p8",
+  "FX A4 Param 10": "fx10_p9",
+  "FX B3 Param 1": "fx11_p0",
+  "FX B3 Param 2": "fx11_p1",
+  "FX B3 Param 3": "fx11_p2",
+  "FX B3 Param 4": "fx11_p3",
+  "FX B3 Param 5": "fx11_p4",
+  "FX B3 Param 6": "fx11_p5",
+  "FX B3 Param 7": "fx11_p6",
+  "FX B3 Param 8": "fx11_p7",
+  "FX B3 Param 9": "fx11_p8",
+  "FX B3 Param 10": "fx11_p9",
+  "FX B4 Param 1": "fx12_p0",
+  "FX B4 Param 2": "fx12_p1",
+  "FX B4 Param 3": "fx12_p2",
+  "FX B4 Param 4": "fx12_p3",
+  "FX B4 Param 5": "fx12_p4",
+  "FX B4 Param 6": "fx12_p5",
+  "FX B4 Param 7": "fx12_p6",
+  "FX B4 Param 8": "fx12_p7",
+  "FX B4 Param 9": "fx12_p8",
+  "FX B4 Param 10": "fx12_p9",
+  "FX S3 Param 1": "fx13_p0",
+  "FX S3 Param 2": "fx13_p1",
+  "FX S3 Param 3": "fx13_p2",
+  "FX S3 Param 4": "fx13_p3",
+  "FX S3 Param 5": "fx13_p4",
+  "FX S3 Param 6": "fx13_p5",
+  "FX S3 Param 7": "fx13_p6",
+  "FX S3 Param 8": "fx13_p7",
+  "FX S3 Param 9": "fx13_p8",
+  "FX S3 Param 10": "fx13_p9",
+  "FX S4 Param 1": "fx14_p0",
+  "FX S4 Param 2": "fx14_p1",
+  "FX S4 Param 3": "fx14_p2",
+  "FX S4 Param 4": "fx14_p3",
+  "FX S4 Param 5": "fx14_p4",
+  "FX S4 Param 6": "fx14_p5",
+  "FX S4 Param 7": "fx14_p6",
+  "FX S4 Param 8": "fx14_p7",
+  "FX S4 Param 9": "fx14_p8",
+  "FX S4 Param 10": "fx14_p9",
+  "FX G3 Param 1": "fx15_p0",
+  "FX G3 Param 2": "fx15_p1",
+  "FX G3 Param 3": "fx15_p2",
+  "FX G3 Param 4": "fx15_p3",
+  "FX G3 Param 5": "fx15_p4",
+  "FX G3 Param 6": "fx15_p5",
+  "FX G3 Param 7": "fx15_p6",
+  "FX G3 Param 8": "fx15_p7",
+  "FX G3 Param 9": "fx15_p8",
+  "FX G3 Param 10": "fx15_p9",
+  "FX G4 Param 1": "fx16_p0",
+  "FX G4 Param 2": "fx16_p1",
+  "FX G4 Param 3": "fx16_p2",
+  "FX G4 Param 4": "fx16_p3",
+  "FX G4 Param 5": "fx16_p4",
+  "FX G4 Param 6": "fx16_p5",
+  "FX G4 Param 7": "fx16_p6",
+  "FX G4 Param 8": "fx16_p7",
+  "FX G4 Param 9": "fx16_p8",
+  "FX G4 Param 10": "fx16_p9",
+  "FX A1 Param 11": "fx1_p10",
+  "FX A1 Param 12": "fx1_p11",
+  "FX A2 Param 11": "fx2_p10",
+  "FX A2 Param 12": "fx2_p11",
+  "FX B1 Param 11": "fx3_p10",
+  "FX B1 Param 12": "fx3_p11",
+  "A Amp EG Release": "a_env1_release",
+  "FX B2 Param 11": "fx4_p10",
+  "FX B2 Param 12": "fx4_p11",
+  "FX S1 Param 11": "fx5_p10",
+  "FX S1 Param 12": "fx5_p11",
+  "FX S2 Param 11": "fx6_p10",
+  "FX S2 Param 12": "fx6_p11",
+  "B Osc 3 Shape": "b_osc3_param0",
+  "B Osc 3 Width 1": "b_osc3_param1",
+  "B Osc 3 Width 2": "b_osc3_param2",
+  "B Osc 3 Sub Mix": "b_osc3_param3",
+  "B Osc 3 Sync": "b_osc3_param4",
+  "B Osc 3 Unison Detune": "b_osc3_param5",
+  "B Osc 3 Unison Voices": "b_osc3_param6",
+  "B LFO 4 Hold": "b_lfo3_hold",
+  "B LFO 4 Rate": "b_lfo3_rate",
+  "FX G1 Param 11": "fx7_p10",
+  "FX G1 Param 12": "fx7_p11",
+  "FX G2 Param 11": "fx8_p10",
+  "FX G2 Param 12": "fx8_p11",
+  "FX A3 Param 11": "fx9_p10",
+  "FX A3 Param 12": "fx9_p11",
+  "B Pitch Bend Down Range": "b_pbrange_dn",
+  "B Pitch Bend Up Range": "b_pbrange_up",
+  "B LFO 1 Deform": "b_lfo0_deform",
+  "B Scene LFO 2 Decay": "b_lfo7_decay",
+  "B Scene LFO 2 Delay": "b_lfo7_delay",
+  "A Scene LFO 1 Deform": "a_lfo6_deform",
+  "B LFO 5 Hold": "b_lfo4_hold",
+  "B LFO 5 Rate": "b_lfo4_rate",
+  "B Scene LFO 2 Phase": "b_lfo7_phase",
+  "B Scene LFO 2 Type": "b_lfo7_shape",
+  "A LFO 6 Sustain": "a_lfo5_sustain",
+  "A LFO 5 Amplitude": "a_lfo4_magnitude",
+  "B Amp EG Attack": "b_env1_attack",
+  "B Scene LFO 2 Unipolar": "b_lfo7_unipolar",
+  "A Scene LFO 4 Release": "a_lfo9_release",
+  "B LFO 6 Hold": "b_lfo5_hold",
+  "B LFO 6 Rate": "b_lfo5_rate",
+  "Scene Mode": "scenemode",
+  "B Scene LFO 6 Release": "b_lfo11_release",
+  "B LFO 6 Attack": "b_lfo5_attack",
+  "B Osc Drift": "b_drift",
+  "Active Scene": "scene_active",
+  "B Pitch": "b_pitch",
+  "B Osc 1 Type": "b_osc1_type",
+  "B LFO 6 Trigger Mode": "b_lfo5_trigmode",
+  "B Scene LFO 1 Hold": "b_lfo6_hold",
+  "B Scene LFO 1 Rate": "b_lfo6_rate",
+  "B Osc 2 Type": "b_osc2_type",
+  "B Scene LFO 2 Hold": "b_lfo7_hold",
+  "B Scene LFO 2 Rate": "b_lfo7_rate",
+  "A Ring Modulation 1x2 Volume": "a_level_ring12",
+  "A Ring Modulation 2x3 Volume": "a_level_ring23",
+  "A LFO 1 Decay": "a_lfo0_decay",
+  "A LFO 1 Delay": "a_lfo0_delay",
+  "A Amp EG Decay": "a_env1_decay",
+  "A LFO 1 Phase": "a_lfo0_phase",
+  "A Scene LFO 3 Trigger Mode": "a_lfo8_trigmode",
+  "A LFO 1 Type": "a_lfo0_shape",
+  "B LFO 6 Deform": "b_lfo5_deform",
+  "B Osc 3 Type": "b_osc3_type",
+  "B Scene LFO 3 Hold": "b_lfo8_hold",
+  "A Filter 2 Subtype": "a_filter2_subtype",
+  "B Scene LFO 3 Rate": "b_lfo8_rate",
+  "A LFO 4 Release": "a_lfo3_release",
+  "B Scene LFO 4 Hold": "b_lfo9_hold",
+  "B Scene LFO 4 Rate": "b_lfo9_rate",
+  "A Amp EG Envelope Mode": "a_env1_mode",
+  "B Scene LFO 2 Sustain": "b_lfo7_sustain",
+  "A Filter EG Envelope Mode": "a_env2_mode",
+  "B Scene LFO 1 Amplitude": "b_lfo6_magnitude",
+  "A LFO 1 Attack": "a_lfo0_attack",
+  "B Scene LFO 1 Unipolar": "b_lfo6_unipolar",
+  "A Osc 3 Retrigger": "a_osc3_retrigger",
+  "B LFO 1 Decay": "b_lfo0_decay",
+  "B LFO 1 Delay": "b_lfo0_delay",
+  "B Amp EG Decay": "b_env1_decay",
+  "B LFO 1 Phase": "b_lfo0_phase",
+  "A LFO 6 Decay": "a_lfo5_decay",
+  "A LFO 6 Delay": "a_lfo5_delay",
+  "B LFO 1 Type": "b_lfo0_shape",
+  "A Osc 3 Octave": "a_osc3_octave",
+  "A Filter 1 Cutoff": "a_filter1_cutoff",
+  "B LFO 1 Amplitude": "b_lfo0_magnitude",
+  "A LFO 6 Phase": "a_lfo5_phase",
+  "A LFO 6 Type": "a_lfo5_shape",
+  "B LFO 5 Trigger Mode": "b_lfo4_trigmode",
+  "A Scene LFO 4 Unipolar": "a_lfo9_unipolar",
+  "A Filter EG Release Shape": "a_env2_release_shape",
+  "A Osc 3 Shape": "a_osc3_param0",
+  "A Osc 3 Width 1": "a_osc3_param1",
+  "A Osc 3 Width 2": "a_osc3_param2",
+  "A Osc 3 Sub Mix": "a_osc3_param3",
+  "A Osc 3 Sync": "a_osc3_param4",
+  "A Osc 3 Unison Detune": "a_osc3_param5",
+  "A Osc 3 Unison Voices": "a_osc3_param6",
+  "A LFO 1 Deform": "a_lfo0_deform",
+  "B LFO 2 Sustain": "b_lfo1_sustain",
+  "A Filter 1 FEG Mod Amount": "a_filter1_envmod",
+  "B LFO 6 Release": "b_lfo5_release",
+  "A Scene LFO 2 Trigger Mode": "a_lfo7_trigmode",
+  "A Amp EG Attack": "a_env1_attack",
+  "A Filter EG Release": "a_env2_release",
+  "A Filter EG Decay Shape": "a_env2_decay_shape",
+  "B Filter 2 Keytrack": "b_filter2_keytrack",
+  "A Scene LFO 5 Release": "a_lfo10_release",
+  "B Ring Modulation 1x2 Solo": "b_solo_ring12",
+  "B Ring Modulation 2x3 Solo": "b_solo_ring23",
+  "A LFO 6 Attack": "a_lfo5_attack",
+  "A Scene LFO 1 Sustain": "a_lfo6_sustain",
+  "B Osc 2 Octave": "b_osc2_octave",
+  "B Osc 3 Keytrack": "b_osc3_keytrack",
+  "A Amp EG Attack Shape": "a_env1_attack_shape",
+  "B Scene LFO 5 Amplitude": "b_lfo10_magnitude",
+  "A LFO 6 Amplitude": "a_lfo5_magnitude",
+  "B Scene LFO 6 Trigger Mode": "b_lfo11_trigmode",
+  "B LFO 6 Decay": "b_lfo5_decay",
+  "B LFO 6 Delay": "b_lfo5_delay",
+  "B Osc 2 Shape": "b_osc2_param0",
+  "B Osc 2 Width 1": "b_osc2_param1",
+  "B Osc 2 Width 2": "b_osc2_param2",
+  "B Osc 2 Sub Mix": "b_osc2_param3",
+  "B Osc 2 Sync": "b_osc2_param4",
+  "B Osc 2 Unison Detune": "b_osc2_param5",
+  "B Osc 2 Unison Voices": "b_osc2_param6",
+  "B LFO 6 Phase": "b_lfo5_phase",
+  "B LFO 6 Type": "b_lfo5_shape",
+  "A LFO 6 Deform": "a_lfo5_deform",
+  "B LFO 6 Unipolar": "b_lfo5_unipolar",
+  "B Feedback": "b_feedback",
+  "B LFO 5 Attack": "b_lfo4_attack"
+ }
+}

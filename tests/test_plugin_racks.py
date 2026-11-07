@@ -845,3 +845,56 @@ def test_shipped_maps_hold_every_parameter_the_plugin_roles_use():
         missing = set(mix.plugin_eq_parameters(spec)) - mapped
         assert not missing, (key, sorted(missing))
     assert "Threshold" in names("proc3_vst3.json")            # for the compressor role
+
+
+def _juce_hash(text):
+    value = 0
+    for char in text:
+        value = (31 * value + ord(char)) & 0xFFFFFFFF
+    return value & 0x7FFFFFFF
+
+
+def test_shipped_surge_map_is_consistent_with_the_hash_rule():
+    data = lib.load_map(os.path.join(lib.shipped_maps_dir(), "surgext_vst3.json"))
+    names = [n for n, _i in data["parameters"]]
+    ids = dict(data["parameters"])
+    assert data["count"] == len(names) == len(set(names)) == len(set(ids.values())) == 774
+    storage = data["storage_names"]
+    assert set(storage) == set(names)
+    assert all(ids[name] == _juce_hash(key) for name, key in storage.items())
+    assert ids["A Filter 1 Cutoff"] == 1945359057
+    for group, members in data["groups"].items():
+        assert set(members) <= set(names), group
+        assert len(members) <= 128 or group == "fx", group
+    assert len(data["groups"]["sound_design"]) <= 128
+
+
+def test_empty_or_bom_maps(tmp_path):
+    empty = tmp_path / "empty.json"
+    empty.write_text('{"plugin": "X", "parameters": []}', encoding="utf-8")
+    assert lib.load_map(str(empty)) is None                # a failed probe is no map
+    bom = tmp_path / "bom.json"
+    bom.write_bytes(b"\xef\xbb\xbf" + b'{"plugin": "X", "parameters": [["A", 1]]}')
+    assert lib.load_map(str(bom))["parameters"] == [["A", 1]]
+
+
+def test_surge_fxp_patches_are_listed(tmp_path, monkeypatch):
+    monkeypatch.setattr(lib, "is_windows", lambda: False)
+    surge = {"name": "Surge XT", "vendor": "Surge Synth Team", "format": "VST3",
+             "class_id": "ABCDEF019182FAEB566D624153675854", "kind": "instrument"}
+    folder = tmp_path / "Patches" / "Bass"
+    folder.mkdir(parents=True)
+    (folder / "Reese.fxp").write_bytes(b"CcnK" + bytes(60))
+    entries, _ = lib.list_presets([str(tmp_path / "Patches")], surge)
+    assert [(e["name"], e["kind"], e["embeddable"]) for e in entries] == \
+        [("Reese", "fxp", False)]
+    assert lib.list_presets([str(tmp_path / "Patches")], dict(surge, name="Serum 2"))[0] == []
+
+
+def test_an_unreadable_map_is_kept_not_overwritten(tmp_path):
+    path = tmp_path / "x_vst3.json"
+    path.write_text("{ not json at all, but someone's hand-made map ............ }",
+                    encoding="utf-8")
+    lib.save_map(str(path), {"plugin": "X", "parameters": [["A", 1]]})
+    assert lib.load_map(str(path))["parameters"] == [["A", 1]]
+    assert "hand-made" in (tmp_path / "x_vst3.json.unreadable").read_text(encoding="utf-8")

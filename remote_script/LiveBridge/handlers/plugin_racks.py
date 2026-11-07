@@ -529,8 +529,9 @@ def plugin_racks_map(ctx, plugin=None, track=None, device=None, plugin_format=No
     Gotchas:
         Probing loads the plug-in ~20-40 times (Serum 2: 2939 ids, 27 loads,
         ~25 s) and briefly holds one instance on "LB_MAP".  VST3 only.
-        Plug-ins whose ParameterIds are hashes (some JUCE builds) cannot be
-        found by probing — ``count`` stays 0.
+        Plug-ins whose ParameterIds are hashes of their names (JUCE builds: Surge XT,
+        Vital) cannot be found by probing: the probe then fails with ``not_found``
+        and caches nothing (Surge XT's map ships with LiveBridge).
     """
     fmt = _check_format(plugin_format)
     if isinstance(max_seconds, bool) or not isinstance(max_seconds, (int, float)) \
@@ -574,6 +575,17 @@ def plugin_racks_map(ctx, plugin=None, track=None, device=None, plugin_format=No
             first = False
             ids = job.pending or job.prober.next_ids()
             if not ids:
+                if not job.prober.parameters():     # nothing found: report it, cache nothing
+                    _JOBS.pop(key, None)
+                    _drop_root_copy(library, job.file_name)
+                    _delete_map_track(ctx)
+                    raise BridgeError(
+                        "not_found", "probing found none of %s's parameter ids (%d probed in %d "
+                        "loads). Its ids are probably hashes of its parameter names (JUCE "
+                        "plug-ins: Surge XT, Vital ...), which counting up cannot find; a "
+                        "map for it has to be computed from the names (LiveBridge ships "
+                        "Surge XT's) — nothing was cached"
+                        % (identity.get("name"), len(job.prober.probed), job.loads))
                 data = _finish_job(ctx, job)
                 _JOBS.pop(key, None)
                 _drop_root_copy(library, job.file_name)

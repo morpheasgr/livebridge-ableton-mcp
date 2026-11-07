@@ -205,8 +205,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             wait_seconds.
 
         Gotchas:
-            Probing briefly keeps one extra plug-in instance alive. Plug-ins with hashed
-            ParameterIds (some JUCE builds) cannot be probed — count stays 0; tell the user.
+            Probing briefly keeps one extra plug-in instance alive. Plug-ins whose
+            ParameterIds are hashes of their names (JUCE builds: Surge XT, Vital) cannot be
+            probed: the call fails with not_found and caches nothing — Surge XT's map ships
+            with LiveBridge; for another, tell the user.
         """
         cmd = "plugin_racks.map"
         error = _check_format(plugin_format, cmd)

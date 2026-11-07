@@ -69,7 +69,7 @@ INSTALL_HINT = ("Live's Plug-Ins browser lists no plug-ins. Plug-ins on disk onl
 EXPOSE_ALTERNATIVE = ("No user click needed for VST3 plug-ins: plugin_racks.expose (MCP "
                       "live_plugin_expose(plugin=..., parameters=[...], new_track=true)) loads "
                       "the plug-in in a generated rack that exposes up to 128 chosen parameters. "
-                      "Serum 2, Serum 2 FX and Massive are mapped (parameters=['sound_design']); "
+                      "Serum 2, Serum 2 FX, Massive and Surge XT are mapped (parameters=['sound_design']); "
                       "another VST3 needs plugin_racks.map (live_plugin_param_map) once first. "
                       "Configure by hand is the fallback for AU / VST2.")
 
