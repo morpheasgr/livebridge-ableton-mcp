@@ -467,5 +467,12 @@ MIT — see [LICENSE](LICENSE). LiveBridge was created by
 [Valentijn](https://github.com/valentijnh) ([original repository](https://github.com/valentijnh/livebridge-ableton-mcp)),
 whose work this project is built on and whose copyright notice it keeps. It is developed further and
 maintained by [morpheasgr](https://github.com/morpheasgr): the Max for Live devices, mixing and mastering
-by measurement, plug-in racks and patch writing (Serum 2, Massive), sample search and more. Ableton and Live are trademarks of Ableton AG; Splice is a trademark
+by measurement, plug-in racks and patch writing (Serum 2, Massive), sample search and more.
+It also builds on MIT-licensed work by others, credited with their licences in
+[THIRD_PARTY_NOTICES.md](.claude/skills/livebridge/THIRD_PARTY_NOTICES.md): the Serum 2 preset
+codec from [nicholasbien's ableton-mcp-pro](https://github.com/nicholasbien/ableton-mcp-pro)
+(via [kasperikaivola's fork](https://github.com/kasperikaivola/ableton-mcp-pro)), and production
+know-how from [ableton-skills](https://github.com/glincker/ableton-skills),
+[hellyee](https://github.com/guvense/hellyee) and
+[ableton-auto-mix-mcp](https://github.com/HighVoltSound/ableton-auto-mix-mcp). Ableton and Live are trademarks of Ableton AG; Splice is a trademark
 of Splice. LiveBridge is an independent project and not affiliated with either.
