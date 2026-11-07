@@ -21,7 +21,8 @@ for LiveBridge from Massive's documented architecture and common sound-design pr
 - **Not exposed to the host:** modulation routings (Massive's drag-and-drop) and their
   amounts, LFO waveshapes, stepper steps, performer curves, macro assignments. They live in
   the patch: start from a preset that holds them (below) and drive them through the sources'
-  own levels (`MODn-AMP`, the envelope levels).
+  own levels (`MODn-AMP`, the envelope levels). **Routings can be written into a file**:
+  `live_massive_write` (below, "Writing routings").
 - **Envelope 4 is the amp envelope**: it shapes every note without a routing. Envelopes 1-3
   and slots 5-8 only do something when the patch routes them somewhere.
 - **Setting values** (measured on the user's Massive): the knobs display 0-100 without a unit.
@@ -81,6 +82,27 @@ so a saved Massive sound means "this template plus these values": say which temp
 description (`description="from Massive Init (LB routed); Reese, macro 1 = brightness"`), and
 load it onto an exposure of that same template with `live_sound_load`. For a complete Massive
 preset, the user saves the device from Live (drag it into the User Library).
+
+## Writing routings (`live_massive_write`)
+
+When the template's routings don't fit the sound, write a new preset with different ones:
+
+1. `live_massive_routings()`: the template's routings and the knobs that can be modulated
+   (oscillator pitch/position/second control/amp, filter cutoff/bandwidth/resonance, inserts,
+   master FX, EQ, noise, feedback, modulation oscillator, pan, envelope and slot controls).
+2. `live_massive_write(routings=[{"target": "FILTER1-RES/PRM.3", "source": "env2",
+   "amount": 0.4}, {"target": "OSC1-PITCH", "source": "env3", "semitones": 24},
+   {"target": "PAN (Fltr-Path)", "source": "slot7", "remove": true}], name="LB Acid")`:
+   sources `env1`-`env4`, `slot5`-`slot8`, `macro1`-`macro8`, `ktr`, `vel`, `trr`, `at`;
+   amount -1..1 of the knob's range (negative = downwards). The file goes next to the
+   template.
+3. `live_plugin_expose(plugin="Massive", preset_file=<output_path>, parameters=["sound_design"],
+   ...)`, then set the knobs by name and turn up each source's level as before.
+
+A knob has 1-3 slots (`live_massive_routings` shows them); a full knob is refused, so remove
+one first. The file carries routings only: LFO shapes, stepper steps and slot types stay as
+the template has them (slots 5-8 are sine LFOs). New, from labelled presets — if a written
+preset doesn't load or sounds wrong, say so and fall back to the template.
 
 ## How Massive is laid out
 

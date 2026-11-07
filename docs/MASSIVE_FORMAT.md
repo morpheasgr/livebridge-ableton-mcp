@@ -1,8 +1,8 @@
 # Massive (classic) preset format — research notes
 
 Findings from the user's own files (AdditionMOD.nmsv, its .vstpreset, and two saves of the routed
-template), for a future Massive patch writer. Format analysis of our own presets for
-interoperability; no Massive program code was examined. Nothing here is implemented yet.
+template), implemented in `mcp_server/livebridge_mcp/massive.py` (`live_massive_write`). Format analysis of our own presets for
+interoperability; no Massive program code was examined.
 
 ## Containers
 
@@ -124,3 +124,13 @@ through Live by name after the written patch is loaded; the file carries only wh
 cannot reach (routings, LFO curves, stepper steps, slot types).
 
 Method: save two presets that differ in one known thing, unpack both, compare.
+
+## The knob record, exactly (2026-11-07)
+
+`u32 4, f32 lo, f32 hi, u32 n`, then `n` slots of `f32 amount, i32 source, 2 flag bytes`, then
+the knob's `u32` map index. `n` is fixed per knob (cutoff and oscillator position 3, pitch and
+resonance 2, envelope and slot controls 1), so a write never changes the patch's size. 93
+records in the template; two with index -2 (envelope 4 on the amp) are not map parameters. The
+flag bytes are kept as found (`00 01` on some cutoff slots, meaning unknown). Sizes to fix when
+the compressed stream changes length: every u64 block/chunk size whose extent covers it (five in
+the template: the outer and inner `hsin` blocks and the `DSINt`/`DSINs` chunks).

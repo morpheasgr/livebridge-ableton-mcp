@@ -208,6 +208,8 @@ SAMPLE_ARGS = {
                               "parameters": ["Filter 1 Freq"]},
     "live_plugin_param_map": {"plugin": "Serum 2", "limit": 5},
     "live_plugin_preset_files": {"plugin": "Serum 2", "limit": 5},
+    "live_massive_write": {"routings": [{"target": "FILTER1-RES/PRM.3", "source": "env2",
+                                         "amount": 0.5}], "dry_run": True},
     "live_rack_chains": {"track": "Bass", "device": 1},
     "live_rack_set_chain": {"chain": 0, "track": "Bass", "device": 1, "mute": True},
     "live_rack_insert_chain": {"track": "Bass", "device": 1},
