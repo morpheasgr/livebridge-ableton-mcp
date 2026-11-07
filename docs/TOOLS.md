@@ -1488,7 +1488,7 @@ Write a new Massive `.vstpreset`: a copy of the template with routings added, ch
 | Argument | Type | Default |
 |---|---|---|
 | `routings` | list[object] \| null | `null` |
-| `lfos` | list[object] \| null | `null` |
+| `slots` | list[object] \| null | `null` |
 | `name` | str \| null | `null` |
 | `output_path` | str \| null | `null` |
 | `template` | str \| null | `null` |

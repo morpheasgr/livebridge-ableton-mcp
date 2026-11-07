@@ -17,8 +17,9 @@ def _record(lo, hi, slots, index):
 
 
 def _payload():
-    head = bytes(range(64)) * 3
-    return head + b"\x00\x0b\x00\x00\x00" + \
+    head = bytearray(bytes(range(64)) * 4)
+    head[96:100], head[132:136], head[200:204] = b"hsin", b"DSIN", b"tsrp"
+    return bytes(head) + b"\x00\x0b\x00\x00\x00" + \
         _record(-3.0, 10.0, [(0.65, 0, b"\x00\x01"), (0.0, -1, b"\x00\x00"),
                              (0.0, -1, b"\x00\x01")], 33) + b"\x00\x00\x00\x00\x00" + \
         _record(0.0, 1.0, [(0.0, -1, b"\x00\x00"), (0.0, -1, b"\x00\x00")], 35) + \
@@ -129,15 +130,32 @@ def test_write_tool_writes_next_to_the_template(tmp_path):
     assert "replace the template" in str(same)
 
 
-def test_lfo_curves():
+def test_lfo_curves_and_stepper():
     patch = M.Patch(_preset(_payload()))
+    size, field = len(patch.payload), struct.unpack_from("<Q", patch.payload, 84)[0]
     assert patch.slots()[5] == {"type": "lfo", "curve_a": "sine", "curve_b": "saw"}
-    assert patch.set_curve(6, curve_a="triangle")["curve_a_before"] == "sine"
-    patch.set_curve(7, curve_b="Square")
-    again = M.Patch(patch.to_bytes()).slots()
-    assert (again[6]["curve_a"], again[7]["curve_b"], again[8]["curve_a"]) == \
+    assert patch.set_slot(6, curve_a="triangle")["curve_a_before"] == "sine"
+    patch.set_slot(7, curve_b="Square")
+    change = patch.set_slot(5, type="stepper", steps=[1, 0, 0.5])
+    assert change["type_before"] == "lfo" and len(patch.payload) == size + 120
+    assert struct.unpack_from("<Q", patch.payload, 84)[0] == field + 120
+    again = M.Patch(patch.to_bytes())
+    slots = again.slots()
+    assert slots[5]["type"] == "stepper" and slots[5]["steps"][:4] == [1.0, 0.0, 0.5, 0.0]
+    assert (slots[6]["curve_a"], slots[7]["curve_b"], slots[8]["curve_a"]) == \
         ("triangle", "square", "sine")
+    assert again.routings() == patch.routings()                  # records found again
+    with pytest.raises(ValueError, match="curves are for LFO"):
+        again.set_slot(5, curve_a="sine")
+    with pytest.raises(ValueError, match="steps need"):
+        again.set_slot(6, steps=[1])
+    with pytest.raises(ValueError, match="0..1"):
+        again.set_slot(5, steps=[2])
+    again.set_slot(5, type="lfo")
+    assert len(again.payload) == size and again.slots()[5]["curve_a"] == "sine"
     with pytest.raises(ValueError, match="curve_a must be"):
-        patch.set_curve(5, curve_a="noise")
+        patch.set_slot(6, curve_a="noise")
     with pytest.raises(ValueError, match="5..8"):
-        patch.set_curve(4, curve_a="sine")
+        patch.set_slot(4, curve_a="sine")
+    with pytest.raises(ValueError, match="performer"):
+        patch.set_slot(6, type="performer")

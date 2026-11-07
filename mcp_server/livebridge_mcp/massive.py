@@ -214,30 +214,65 @@ class Patch:
         return out
 
     def slots(self) -> dict[int, dict[str, Any]]:
-        """Mod slots 5-8: {slot: {type, curve_a?, curve_b?}} (curves only for LFO slots)."""
+        """Mod slots 5-8: {slot: {type, curve_a, curve_b} | {type: "stepper", steps}}."""
         out = {}
-        for k, base in enumerate(_slot_table(self.payload)):
-            kind, curve_a, curve_b = struct.unpack_from("<i12xii", self.payload, base)
-            out[5 + k] = {"type": SLOT_TYPES.get(kind, kind),
-                          "curve_a": CURVES[curve_a], "curve_b": CURVES[curve_b]}
+        for k, (base, kind) in enumerate(_slot_walk(self.payload)):
+            if kind == 0:
+                curve_a, curve_b = struct.unpack_from("<ii", self.payload, base + 16)
+                out[5 + k] = {"type": "lfo", "curve_a": CURVES[curve_a],
+                              "curve_b": CURVES[curve_b]}
+            else:
+                steps = struct.unpack_from("<16f", self.payload, base + 8)
+                out[5 + k] = {"type": "stepper", "steps": [round(v, 4) for v in steps]}
         return out
 
-    def set_curve(self, slot: int, curve_a: str | None = None,
-                  curve_b: str | None = None) -> dict[str, Any]:
+    def set_slot(self, slot: int, type: str | None = None, curve_a: str | None = None,
+                 curve_b: str | None = None, steps: list[float] | None = None
+                 ) -> dict[str, Any]:
+        """Change mod slot 5-8: its type (lfo/stepper), LFO curves, stepper steps."""
         if slot not in (5, 6, 7, 8):
             raise ValueError("slot must be 5..8")
-        table = _slot_table(self.payload)
         before = self.slots()[slot]
         change: dict[str, Any] = {"slot": slot}
-        for offset, value, key in ((16, curve_a, "curve_a"), (20, curve_b, "curve_b")):
-            if value is None:
-                continue
-            name = str(value).strip().lower().replace("saw down", "saw")
-            if name not in CURVES:
-                raise ValueError(f"{key} must be one of {', '.join(CURVES)}")
-            struct.pack_into("<i", self.payload, table[slot - 5] + offset, CURVES.index(name))
-            change[key] = name
-            change[key + "_before"] = before[key]
+        if type is not None:
+            kind = str(type).strip().lower()
+            if kind not in ("lfo", "stepper"):
+                raise ValueError("type must be lfo or stepper (performer is not supported "
+                                 "yet)")
+            if kind != before["type"]:
+                base = _slot_walk(self.payload)[slot - 5][0]
+                old, new = (_LFO_BODY, _STEPPER_BODY) if kind == "stepper" else \
+                    (_STEPPER_BODY, _LFO_BODY)
+                fields = _payload_size_fields(self.payload)
+                struct.pack_into("<i", self.payload, base, 2 if kind == "stepper" else 0)
+                self.payload[base + 4:base + 4 + len(old)] = new
+                for p in fields:
+                    struct.pack_into("<Q", self.payload, p,
+                                     struct.unpack_from("<Q", self.payload, p)[0] +
+                                     len(new) - len(old))
+                self.records = _records(self.payload)
+                change.update(type=kind, type_before=before["type"])
+        now = self.slots()[slot]
+        base = _slot_walk(self.payload)[slot - 5][0]
+        if curve_a is not None or curve_b is not None:
+            if now["type"] != "lfo":
+                raise ValueError(f"slot {slot} is a {now['type']}: curves are for LFO slots")
+            for offset, value, key in ((16, curve_a, "curve_a"), (20, curve_b, "curve_b")):
+                if value is None:
+                    continue
+                name = str(value).strip().lower().replace("saw down", "saw")
+                if name not in CURVES:
+                    raise ValueError(f"{key} must be one of {', '.join(CURVES)}")
+                struct.pack_into("<i", self.payload, base + offset, CURVES.index(name))
+                change.update({key: name, key + "_before": now[key]})
+        if steps is not None:
+            if now["type"] != "stepper":
+                raise ValueError(f"slot {slot} is an LFO: steps need type='stepper'")
+            values = [float(v) for v in steps]
+            if not 1 <= len(values) <= 16 or not all(0.0 <= v <= 1.0 for v in values):
+                raise ValueError("steps must be 1..16 values 0..1 (0 = bottom)")
+            struct.pack_into(f"<{len(values)}f", self.payload, base + 8, *values)
+            change.update(steps=[round(v, 4) for v in values], steps_before=now["steps"])
         return change
 
     def targets(self) -> list[str]:
@@ -302,19 +337,53 @@ class Patch:
         return _build_vstpreset(self.class_id, chunks)
 
 
-def _slot_table(payload: bytes) -> list[int]:
-    """Offsets of the four LFO blocks of slots 5-8 (``i32 type, 2, 0, 0, curve A, curve B``,
-    24 bytes apart). Found only when all four slots are LFOs, as in the template."""
+# A slot's data after its i32 type: an LFO's 20 bytes (2, 0, 0, curve A, curve B), or a
+# stepper's 140 (2, 16 f32 steps, 16 zero bytes, 2, 16 x 3 per-step bytes, 0) — the default
+# stepper as Massive saves it (labelled presets 05 and 20).
+_LFO_BODY = struct.pack("<5i", 2, 0, 0, 0, 1)
+_STEPPER_BODY = struct.pack("<i", 2) + bytes(80) + struct.pack("<i", 2) + \
+    b"\x00\x01\x00" * 16 + bytes(4)
+
+
+def _slot_ok(payload: bytes, base: int) -> int | None:
+    """The type at base if a valid LFO (0) or stepper (2) block starts there."""
+    if base + 144 > len(payload):
+        return None
+    kind, two, z1, z2, a, b = struct.unpack_from("<6i", payload, base)
+    if kind == 0 and two == 2 and z1 == z2 == 0 and 0 <= a <= 3 and 0 <= b <= 3:
+        return 0
+    if kind == 2 and two == 2 and struct.unpack_from("<i", payload, base + 88)[0] == 2 and \
+            all(0.0 <= v <= 1.0 for v in struct.unpack_from("<16f", payload, base + 8)) and \
+            set(payload[base + 92:base + 140]) <= {0, 1}:
+        return 2
+    return None
+
+
+def _slot_walk(payload: bytes) -> list[tuple[int, int]]:
+    """[(offset, type)] of mod slots 5-8 (LFOs and steppers; a performer stops the walk)."""
     hits = []
-    for base in range(0, len(payload) - 4 * 24, 4):
-        groups = [struct.unpack_from("<6i", payload, base + 24 * k) for k in range(4)]
-        if all(g[0] == 0 and g[1] == 2 and g[2] == g[3] == 0 and 0 <= g[4] <= 3
-               and 0 <= g[5] <= 3 for g in groups):
-            hits.append(base)
+    for start in range(0, len(payload) - 96, 4):
+        walk, base = [], start
+        for _ in range(4):
+            kind = _slot_ok(payload, base)
+            if kind is None:
+                break
+            walk.append((base, kind))
+            base += 24 if kind == 0 else 144
+        if len(walk) == 4:
+            hits.append(walk)
     if len(hits) != 1:
-        raise ValueError("the LFO slots 5-8 were not found (curves need a template whose "
-                         "slots 5-8 are all LFOs, like 'Massive Init (LB routed)')")
-    return [hits[0] + 24 * k for k in range(4)]
+        raise ValueError("mod slots 5-8 were not found (they must be LFOs or steppers; a "
+                         "performer slot is not supported yet)")
+    return hits[0]
+
+
+def _payload_size_fields(payload: bytes) -> list[int]:
+    """The five u64 sizes in the unpacked patch that cover the mod slots."""
+    if payload[96:100] != b"hsin" or payload[132:136] != b"DSIN" or \
+            payload[200:204] != b"tsrp":
+        raise ValueError("unexpected patch layout: changing a slot type is not safe here")
+    return [0, 84, 124, 180, 192]
 
 
 def _records(payload: bytes) -> dict[int, list[tuple[int, float, float]]]:

@@ -51,7 +51,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Returns:
             `{file_path, routings: [{target, source, amount, slot, semitones?}],
             modulatable: [knob names], sources: [names], slots: {5..8: {type, curve_a,
-            curve_b}}}`. amount is -1..1, a fraction of the
+            curve_b} | {type: "stepper", steps}}}`. amount is -1..1, a fraction of the
             knob's range; on a pitch knob also in semitones (1.0 = 128).
         """
         cmd = "massive.routings"
@@ -75,7 +75,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
     @mcp.tool()
     def live_massive_write(
         routings: list[dict[str, Any]] | None = None,
-        lfos: list[dict[str, Any]] | None = None,
+        slots: list[dict[str, Any]] | None = None,
         name: str | None = None,
         output_path: str | None = None,
         template: str | None = None,
@@ -94,9 +94,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 "macro1".."macro8" | "ktr" | "vel" | "trr" | "at", "amount": -1..1 (fraction
                 of the knob's range) or "semitones" (pitch knobs), or "remove": true}. A source
                 already on the knob gets the new amount; otherwise it takes a free slot.
-            lfos: LFO shapes of slots 5-8: [{"slot": 5, "curve_a": "square", "curve_b":
-                "triangle"}] — "sine" | "saw" (down) | "square" | "triangle". The slot's XFade
-                knob (MODn-CROSSF./GLIDE, set through Live) blends A (0) to B (100).
+            slots: Mod slots 5-8: [{"slot": 5, "curve_a": "square", "curve_b": "triangle"},
+                {"slot": 8, "type": "stepper", "steps": [1, 0, 0.5, 0, ...]}]. LFO curves:
+                "sine" | "saw" (down) | "square" | "triangle"; the slot's XFade knob
+                (MODn-CROSSF./GLIDE, set through Live) blends A (0) to B (100). type: "lfo" |
+                "stepper"; steps: 1..16 values 0..1 (0 = bottom; steps not given stay 0).
+                Rate, sync, restart and amp of the slot are set through Live as before.
             name: File name for the new preset (default "LB Massive"); written next to the
                 template, so it shows in Live's browser beside it.
             output_path: Full path instead of name.
@@ -110,14 +113,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Gotchas: a knob has 1-3 slots (see live_massive_routings); a full knob is refused —
         remove a routing first. The modulation depth also follows the source's own level
         (envelope levels, MOD5-8 AMP, macro values): a routed source at rest is silent.
-        The template's own routings stay unless removed. The file carries routings and LFO curves;
-        stepper steps and slot types are set in Massive's window for now.
+        The template's own routings stay unless removed. Performer slots and the stepper's
+        per-step buttons (glide) are not written yet.
         """
         cmd = "massive.write"
-        routings, lfos = routings or [], lfos or []
+        routings, slots = routings or [], slots or []
         if not isinstance(routings, list) or len(routings) > 64 or \
-                not isinstance(lfos, list) or len(lfos) > 4 or not routings + lfos:
-            return tool_error("give routings (1..64) and/or lfos (1..4)", cmd=cmd)
+                not isinstance(slots, list) or len(slots) > 8 or not routings + slots:
+            return tool_error("give routings (1..64) and/or slots (1..8)", cmd=cmd)
         try:
             source = _expand(template) if template else find_template()
             if isinstance(source, dict):
@@ -131,16 +134,18 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                            amount=entry.get("amount"),
                                            semitones=entry.get("semitones"),
                                            remove=bool(entry.get("remove"))))
-            for entry in lfos:
+            for entry in slots:
                 if not isinstance(entry, dict) or "slot" not in entry:
-                    return tool_error("each lfo needs slot (5..8) and curve_a/curve_b", cmd=cmd)
-                changes.append(patch.set_curve(int(entry["slot"]), entry.get("curve_a"),
-                                               entry.get("curve_b")))
+                    return tool_error("each slots entry needs slot (5..8)", cmd=cmd)
+                changes.append(patch.set_slot(int(entry["slot"]), type=entry.get("type"),
+                                              curve_a=entry.get("curve_a"),
+                                              curve_b=entry.get("curve_b"),
+                                              steps=entry.get("steps")))
             data = patch.to_bytes()
             massive.Patch(data)                          # what we write parses again
             result: dict[str, Any] = {"template": str(source), "changes": changes,
                                       "routings": patch.routings(), "written": False}
-            if lfos:
+            if slots:
                 result["slots"] = patch.slots()
             if output_path:
                 target = _expand(output_path)
