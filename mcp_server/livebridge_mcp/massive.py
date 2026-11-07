@@ -208,6 +208,8 @@ class Patch:
                     entry = {"target": names[index] if index < len(names) else index,
                              "source": SOURCE_NAMES.get(source, source),
                              "amount": round(amount, 4), "slot": slot + 1}
+                    if len(slots) == 3 and slot == 2:
+                        entry["slot"] = "sc"          # the sidechain slot (manual 3.2.3)
                     if _is_pitch(entry["target"]):
                         entry["semitones"] = round(amount * PITCH_RANGE_ST, 2)
                     out.append(entry)
@@ -304,11 +306,17 @@ class Patch:
             struct.pack_into("<i", self.payload, slots[hit] + 4, -1)
             return {"target": name, "source": source, "removed": True, "slot": hit + 1,
                     "before": round(current[hit][0], 4)}
+        # A knob with three slots has two normal ones and the sidechain slot ("SC"): with
+        # SC on, the third scales the other two instead of adding, so it is never filled here.
+        usable = 2 if len(slots) == 3 else len(slots)
+        if hit is not None and hit >= usable:
+            raise ValueError(f"{name}: {SOURCE_NAMES[number]} is in the sidechain (SC) slot — "
+                             "remove it there first (remove=true) to route it normally")
         if hit is None:
-            hit = next((k for k, (_a, s) in enumerate(current) if s == -1), None)
+            hit = next((k for k, (_a, s) in enumerate(current[:usable]) if s == -1), None)
             if hit is None:
-                used = ", ".join(SOURCE_NAMES.get(s, str(s)) for _a, s in current)
-                raise ValueError(f"{name} has no free slot ({len(slots)} slots: {used}) — "
+                used = ", ".join(SOURCE_NAMES.get(s, str(s)) for _a, s in current[:usable])
+                raise ValueError(f"{name} has no free slot ({usable} slots: {used}) — "
                                  "remove one first")
             before = None
         else:

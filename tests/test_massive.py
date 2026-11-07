@@ -159,3 +159,17 @@ def test_lfo_curves_and_stepper():
         patch.set_slot(4, curve_a="sine")
     with pytest.raises(ValueError, match="performer"):
         patch.set_slot(6, type="performer")
+
+
+def test_the_sidechain_slot_is_never_filled():
+    patch = M.Patch(_preset(_payload()))
+    patch.route("FILTER1-CUT/PRM.1", "env2", 0.3)          # slot 2: the last normal one
+    with pytest.raises(ValueError, match="no free slot"):
+        patch.route("FILTER1-CUT/PRM.1", "env3", 0.3)
+    offset = patch.records[33][2][0]
+    struct.pack_into("<fi", patch.payload, offset, 0.5, 13)  # macro 1 on SC, as in Massive
+    assert {"target": "FILTER1-CUT/PRM.1", "source": "macro1", "amount": 0.5,
+            "slot": "sc"} in patch.routings()
+    with pytest.raises(ValueError, match="sidechain"):
+        patch.route("FILTER1-CUT/PRM.1", "macro1", 0.2)
+    assert patch.route("FILTER1-CUT/PRM.1", "macro1", remove=True)["slot"] == 3

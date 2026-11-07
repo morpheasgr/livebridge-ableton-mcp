@@ -105,8 +105,11 @@ When the template's routings don't fit the sound, write a new preset with differ
 3. `live_plugin_expose(plugin="Massive", preset_file=<output_path>, parameters=["sound_design"],
    ...)`, then set the knobs by name and turn up each source's level as before.
 
-A knob has 1-3 slots (`live_massive_routings` shows them); a full knob is refused, so remove
-one first. Not written yet: performer slots and the stepper's per-step buttons (the top one glides
+A knob takes one or two routings (`live_massive_routings` shows them); a full knob is refused,
+so remove one first. Knobs with three slots (cutoff, position, ...) have two normal slots and a
+sidechain slot "SC" (the manual: with SC switched on in Massive, that source scales the other
+two from 0 to 100 % instead of adding); the writer never fills it, and reports a routing found
+there as `slot: "sc"`. Not written yet: performer slots and the stepper's per-step buttons (the top one glides
 into the step). The template's slots 5-8 are LFOs, curve A sine, curve B saw. Verified on the user's Massive: a written
 preset loads, an added routing shows on its knob (semitones exactly: +12 shows as 12.00), a
 removed one is gone, the template's other routings stay. Envelope 4 on Amp Mod and Bypass Mod

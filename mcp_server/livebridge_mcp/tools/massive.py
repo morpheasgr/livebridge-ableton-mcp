@@ -110,7 +110,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Returns:
             `{template, output_path?, changes: [...], routings: [...], slots?, written}`.
 
-        Gotchas: a knob has 1-3 slots (see live_massive_routings); a full knob is refused —
+        Gotchas: a knob takes 1-2 routings (a third slot is the sidechain "SC" slot, never filled); a full knob is refused —
         remove a routing first. The modulation depth also follows the source's own level
         (envelope levels, MOD5-8 AMP, macro values): a routed source at rest is silent.
         The template's own routings stay unless removed. Performer slots and the stepper's

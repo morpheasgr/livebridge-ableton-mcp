@@ -150,3 +150,14 @@ bytes (00 01 00 by default: the two buttons under each step, top = glide), i32 0
 type to 2 and adds 120 to the five u64 sizes in the unpacked patch at 0, 84 (`hsin`), 124
 (`DSIN`), 180 and 192 (`prst`). Verified for slots 5 (20) and 8 (05): the result equals
 Massive's own save. Steps 1, 2 and 16 at +8, +12, +68 from the type (06, 22, 21).
+
+## From the manual (Massive 1.5.5 reference)
+
+- A knob with three slots has two normal slots and the sidechain slot "SC": with SC on, its
+  source scales the marked normal slots (an arrow under the slot) 0-100 % instead of adding.
+  The `00 01` flag bytes (template: filter cutoff slots 1 and 3; the user's screenshot shows the
+  arrow under cutoff slot 1) are most likely these markers — not verified.
+- Stepper: the two rows of boxes under the steps choose which steps follow the Amp Mod and
+  Glide Mod faders (likely the 16 x 3 per-step bytes). The loop range (first and last step,
+  dragged in the step-number bar) sets the sequence length; where it is stored is not known yet.
+- LFO: a Phase fader sets the start phase; each curve also has a popup of more complex shapes.
