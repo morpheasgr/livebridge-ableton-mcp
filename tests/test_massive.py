@@ -136,13 +136,13 @@ def test_lfo_curves_and_stepper():
     assert patch.slots()[5] == {"type": "lfo", "curve_a": "sine", "curve_b": "saw"}
     assert patch.set_slot(6, curve_a="triangle")["curve_a_before"] == "sine"
     patch.set_slot(7, curve_b="Square")
-    change = patch.set_slot(5, type="stepper", steps=[1, 0, 0.5], glide=[1, 16])
+    change = patch.set_slot(5, type="stepper", steps=[1, 0, 0.5], glide=[1, 16], amp=[2])
     assert change["type_before"] == "lfo" and len(patch.payload) == size + 120
     assert struct.unpack_from("<Q", patch.payload, 84)[0] == field + 120
     again = M.Patch(patch.to_bytes())
     slots = again.slots()
     assert slots[5]["type"] == "stepper" and slots[5]["steps"][:4] == [1.0, 0.0, 0.5, 0.0]
-    assert slots[5]["glide"] == [1, 16]
+    assert slots[5]["glide"] == [1, 16] and slots[5]["amp"] == [2]
     with pytest.raises(ValueError, match="1..16"):
         again.set_slot(5, glide=[17])
     assert (slots[6]["curve_a"], slots[7]["curve_b"], slots[8]["curve_a"]) == \

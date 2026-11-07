@@ -51,7 +51,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Returns:
             `{file_path, routings: [{target, source, amount, slot, semitones?}],
             modulatable: [knob names], sources: [names], slots: {5..8: {type, curve_a,
-            curve_b} | {type: "stepper", steps, glide}}}`. amount is -1..1, a fraction of the
+            curve_b} | {type: "stepper", steps, glide, amp}}}`. amount is -1..1, a fraction of the
             knob's range; on a pitch knob also in semitones (1.0 = 128).
         """
         cmd = "massive.routings"
@@ -100,7 +100,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 (MODn-CROSSF./GLIDE, set through Live) blends A (0) to B (100). type: "lfo" |
                 "stepper"; steps: 1..16 values 0..1 (0 = bottom; steps not given stay 0);
                 glide: the step numbers that glide into their value ([1, 16]), with the
-                stepper's Glide Mod fader (in Massive's window) setting how long.
+                stepper's Glide Mod fader (in Massive's window) setting how long; amp: the
+                steps that follow the stepper's Amp Mod fader (the lower row of buttons).
                 Rate, sync, restart and amp of the slot are set through Live as before.
             name: File name for the new preset (default "LB Massive"); written next to the
                 template, so it shows in Live's browser beside it.
@@ -116,7 +117,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         remove a routing first. The modulation depth also follows the source's own level
         (envelope levels, MOD5-8 AMP, macro values): a routed source at rest is silent.
         The template's own routings stay unless removed. Performer slots and the stepper's
-        loop range and Amp Mod row are not written yet.
+        loop range is not written yet.
         """
         cmd = "massive.write"
         routings, slots = routings or [], slots or []
@@ -143,7 +144,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                               curve_a=entry.get("curve_a"),
                                               curve_b=entry.get("curve_b"),
                                               steps=entry.get("steps"),
-                                              glide=entry.get("glide")))
+                                              glide=entry.get("glide"),
+                                              amp=entry.get("amp")))
             data = patch.to_bytes()
             massive.Patch(data)                          # what we write parses again
             result: dict[str, Any] = {"template": str(source), "changes": changes,
