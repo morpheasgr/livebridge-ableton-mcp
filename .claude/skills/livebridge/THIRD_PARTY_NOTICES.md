@@ -43,6 +43,10 @@ values, procedures) comes from these sources:
 Massive map, guide (`MASSIVE.md`) and patch writer (`mcp_server/livebridge_mcp/massive.py`) are
 original, worked out from the user's own labelled presets and the Massive manual.
 
+Surge XT: the patch writer (`mcp_server/livebridge_mcp/surge.py`) is original, worked out from
+patch files (Surge itself is GPL-3.0; none of its code was read or copied). The test fixture
+`tests/data/surge/Init Saw.fxp` is Surge's factory template, CC0 by its own metadata.
+
 ### Studied, not copied
 
 These were read for how Live's API behaves or for feature ideas; no code or text was taken:

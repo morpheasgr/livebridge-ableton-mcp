@@ -41,7 +41,7 @@ These held through the whole build and stay:
 
 | Layer | What | Needs |
 |---|---|---|
-| Remote Script + MCP server | 224 tools: transport, tracks, clips, notes, devices, browser, plug-ins (VST3 maps, Serum 2), racks, automation, arrangement, routing, recording, Splice, theory and audio analysis, session memory | Live 12, **any edition** |
+| Remote Script + MCP server | 226 tools: transport, tracks, clips, notes, devices, browser, plug-ins (VST3 maps, Serum 2), racks, automation, arrangement, routing, recording, Splice, theory and audio analysis, session memory | Live 12, **any edition** |
 | LiveBridge Engine | Claude's ears: loudness, peaks, crest, 8 bands, stereo, per track and on the master; capture, modulation, follow actions | Max for Live |
 | LiveBridge Channel, Master, Phase, Unmask | Channel strip, mastering chain, phase alignment, side-chained dynamic EQ — Ableton's own DSP in Max devices | Max for Live, **Max 9** (Live 12.2+) for Channel and Master |
 | LiveBridge Host | Any VST3 plug-in with all its parameters (past Live's 128) | Max for Live (experimental) |

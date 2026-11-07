@@ -3,7 +3,7 @@
 Findings from Surge XT patches for a future LiveBridge patch writer: the user's own labelled
 patches (LB StepSeq, LB Sources 1/2), Surge's 16 factory templates and five free patches
 (CC0/free). Surge is GPL-3.0: format worked out from the files only, no Surge code read or
-copied. Nothing here is implemented yet.
+copied. Implemented in `mcp_server/livebridge_mcp/surge.py` (`live_surge_write`).
 
 ## File layout (`.fxp`)
 
