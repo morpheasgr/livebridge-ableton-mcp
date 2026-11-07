@@ -1483,7 +1483,7 @@ Bridge: `plugin_racks.presets`
 
 #### `live_massive_write`
 
-Write a new Massive `.vstpreset`: a copy of the template with routings added, changed or removed; every other setting kept. Then load it with live_plugin_expose(plugin="Massive", preset_file=<output_path>, parameters= ["sound_design"]) and set knobs, wavetables and types through Live by name.
+Write a new Massive `.vstpreset`: a copy of the template with routings added, changed or removed; every other setting kept. Then load it with live_plugin_expose(plugin="Massive", preset_file=<output_path>, parameters= ["sound_design"]) and set knobs, wavetables and types through Live by name. To keep the finished sound as one complete file (routings and knobs), save it through the plug-in host: live_plugin_host_load -> live_plugin_host_preset -> live_plugin_host_set -> live_plugin_host_save (MASSIVE.md, "Saving a complete patch").
 
 | Argument | Type | Default |
 |---|---|---|

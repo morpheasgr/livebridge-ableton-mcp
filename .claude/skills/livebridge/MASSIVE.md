@@ -80,8 +80,26 @@ parameters=["sound_design"], new_track=true, track_name="Bass")`; find the path 
 **Saving a sound.** `live_sound_save` keeps the exposed controls' values only, not the routings,
 so a saved Massive sound means "this template plus these values": say which template in the
 description (`description="from Massive Init (LB routed); Reese, macro 1 = brightness"`), and
-load it onto an exposure of that same template with `live_sound_load`. For a complete Massive
-preset, the user saves the device from Live (drag it into the User Library).
+load it onto an exposure of that same template with `live_sound_load`.
+
+**Saving a complete patch** (routings, curves, steps *and* every knob in one `.vstpreset`):
+use the plug-in host, which can write the plug-in's whole state.
+
+1. `live_plugin_host_load(plugin="Massive", track_name="LB Massive save")` — a new, temporary
+   track, so the user's tracks stay untouched.
+2. `live_plugin_host_preset(source_path=<the written or template .vstpreset>,
+   track="LB Massive save")`.
+3. `live_plugin_host_set(values={...}, track="LB Massive save")` with the knob values of the
+   finished sound (read them from the rack with `live_device_parameters`; names as
+   `live_plugin_host_parameters` lists them).
+4. `live_plugin_host_save(track="LB Massive save", name="LB Stepped Acid")` — the file lands in
+   User Library > LiveBridge Presets > Plug-in Presets > Massive and loads with
+   `live_plugin_expose(preset_file=...)` or from Live's browser.
+5. Load it once to check it sounds the same, then delete the temporary track. (Verified on the
+   user's Massive: the saved patch loaded and sounded identical.)
+
+When the user asks to "save the patch", this is the way — `live_sound_save` alone keeps only
+the exposed values. (The user can also drag the Massive device into the User Library.)
 
 ## Writing routings (`live_massive_write`)
 
