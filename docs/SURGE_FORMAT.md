@@ -62,6 +62,12 @@ MPE Timbre, Alternate, Latest Key. Multi-output LFOs (formula) pick the output w
   (linear; default 0, only non-zero steps written), loop counted from 0 (7 = step 8), swing,
   envelope-retrigger masks. The arpeggiator (revision 30+) is too new to write; its data is kept.
 
+## LFO rate
+
+`a_lfoN_rate` is log2 of the frequency: 0 = 1 Hz. With `temposync="1"` the same number is read at
+120 BPM, so it names a note length: 1/8 = 2 (4 Hz at 120), 1/16 = 3, 1/4 = 1, 1 bar = -1
+(user's patches: 1/8 -> 2, 1/16 -> 3). The step sequencer moves one step per LFO cycle.
+
 ## Folders
 
 User patches: `Documents\Surge Synth Team\Surge XT\Patches\<category>` (Windows).

@@ -41,6 +41,20 @@ SOURCE_NAMES = {n: s for s, n in SOURCES.items()}
 STEPSEQ_SHAPE = 7
 
 
+def synced_rate(text: str) -> float:
+    """A tempo-synced LFO rate as stored: log2 of its frequency at 120 BPM ("1/16" -> 3,
+    "1/8" -> 2, "1/4" -> 1, "1/1" -> -1; "1/8d" dotted, "1/8t" triplet). From the user's
+    labelled patches (1/8 = 2, 1/16 = 3)."""
+    match = re.fullmatch(r"\s*(\d+)\s*/\s*(\d+)\s*([dt]?)\s*", str(text).lower())
+    if not match or int(match.group(1)) == 0 or int(match.group(2)) == 0:
+        raise ValueError(f"rate {text!r}: use a note length like '1/16', '1/8d', '1/4t', '2/1'")
+    beats = 4.0 * int(match.group(1)) / int(match.group(2))      # length in quarter notes
+    beats *= {"": 1.0, "d": 1.5, "t": 2.0 / 3.0}[match.group(3)]
+    hertz = 2.0 / beats                                         # 120 BPM = 2 beats a second
+    import math
+    return math.log2(hertz)
+
+
 def source_number(source: str | int) -> int:
     if isinstance(source, int) and source > 0:
         return source
@@ -161,8 +175,8 @@ class Patch:
         return {"parameter": name, "value": param.get("value"), "before": before}
 
     def set_step_sequence(self, lfo: int, steps: list[float], scene: str = "a",
-                          loop: list[int] | None = None, shuffle: float | None = None
-                          ) -> dict[str, Any]:
+                          loop: list[int] | None = None, shuffle: float | None = None,
+                          rate: str | None = None) -> dict[str, Any]:
         """Make voice LFO ``lfo`` (1-6) or scene LFO (7-12 = S-LFO 1-6) a step sequencer."""
         if scene not in ("a", "b"):
             raise ValueError("scene must be 'a' or 'b'")
@@ -173,6 +187,10 @@ class Patch:
             raise ValueError("steps must be 1..16 values -1..1 (0 = middle)")
         index = int(lfo) - 1
         self.parameter(f"{scene}_lfo{index}_shape").set("value", str(STEPSEQ_SHAPE))
+        if rate is not None:
+            rate_param = self.parameter(f"{scene}_lfo{index}_rate")
+            rate_param.set("value", f"{synced_rate(rate):.14f}")
+            rate_param.set("temposync", "1")
         holder = self.root.find("stepsequences")
         if holder is None:
             holder = ET.SubElement(self.root, "stepsequences")
@@ -199,7 +217,11 @@ class Patch:
                     "trigmask_32to47"):
             rest.setdefault(key, "0")
         seq.attrib.update(rest)
-        return {"scene": scene, "lfo": _lfo_label(index), "steps": values, "loop": [first, last]}
+        result = {"scene": scene, "lfo": _lfo_label(index), "steps": values,
+                  "loop": [first, last]}
+        if rate is not None:
+            result["rate"] = rate
+        return result
 
     def warnings(self) -> list[str]:
         """What will keep the written routings / step sequences from being heard."""

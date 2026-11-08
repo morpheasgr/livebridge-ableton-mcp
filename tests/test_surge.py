@@ -117,3 +117,17 @@ def test_warnings_for_an_off_filter_and_a_free_running_step_sequencer():
     patch.set_parameter("a_filter1_type", 1)
     patch.params.find("a_lfo0_rate").set("temposync", "1")
     assert patch.warnings() == []
+
+
+def test_synced_rates_match_the_users_patches():
+    assert S.synced_rate("1/8") == 2.0 and S.synced_rate("1/16") == 3.0
+    assert S.synced_rate("1/4") == 1.0 and S.synced_rate("1/1") == -1.0
+    assert S.synced_rate("1/8d") == pytest.approx(1.415037, abs=1e-5)
+    assert S.synced_rate("1/8t") == pytest.approx(2.584963, abs=1e-5)
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_step_sequence(1, [1, -1], rate="1/16")
+    rate = patch.params.find("a_lfo0_rate")
+    assert float(rate.get("value")) == 3.0 and rate.get("temposync") == "1"
+    assert not any("runs free" in w for w in patch.warnings())
+    with pytest.raises(ValueError, match="note length"):
+        S.synced_rate("fast")

@@ -104,7 +104,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 lfo1-6, slfo1-6, releasevelocity, lowestkey, highestkey; depth in the target's
                 units (semitones for pitch and cutoff, 1.0 = 100 %), or "remove": true.
             step_sequences: [{"lfo": 1, "steps": [1, 0, 0.5, ...], "loop": [1, 8],
-                "shuffle": 0.2, "scene": "a"}] — lfo 1-6 = voice LFOs, 7-12 = scene LFOs
+                "rate": "1/16", "shuffle": 0.2, "scene": "a"}] — rate syncs the LFO to the
+                tempo, one step per note length ("1/16", "1/8d" dotted, "1/8t" triplet) — lfo 1-6 = voice LFOs, 7-12 = scene LFOs
                 (S-LFO 1-6); steps -1..1 (0 = middle), up to 16; sets the LFO's shape to step
                 sequencer. Route that LFO somewhere to hear it.
             parameters: {"a_filter1_cutoff": -12.0, "a_osc1_type": 0} — raw patch values in
@@ -152,7 +153,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 changes.append(patch.set_step_sequence(int(entry["lfo"]), entry["steps"],
                                                        scene=entry.get("scene", "a"),
                                                        loop=entry.get("loop"),
-                                                       shuffle=entry.get("shuffle")))
+                                                       shuffle=entry.get("shuffle"),
+                                                       rate=entry.get("rate")))
             for entry in routings:
                 if not isinstance(entry, dict) or "target" not in entry or "source" not in entry:
                     return tool_error("each routing needs target and source", cmd=cmd)
