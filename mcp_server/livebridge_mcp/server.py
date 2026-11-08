@@ -167,6 +167,10 @@ COMPANIONS = (
     ("MASSIVE.md", "livebridge://massive", "livebridge_massive",
      "LiveBridge Massive sound design (MASSIVE.md): what the shipped map exposes, the routed "
      "template, how Massive is laid out, recipes (sub, Reese, wobble, pluck, pad, lead)"),
+    ("SURGE_XT.md", "livebridge://surge-xt", "livebridge_surge_xt",
+     "LiveBridge Surge XT sound design (SURGE_XT.md): writing patches (routings, step "
+     "sequencers, tempo sync, wavetables, types) with live_surge_write, loading and tweaking in "
+     "Live, knob names per oscillator type, recipes (stepped filter, pad, FM bass, Reese, pluck)"),
     ("WORKFLOWS.md", "livebridge://workflows", "livebridge_workflows",
      "LiveBridge workflows (WORKFLOWS.md): extend an arrangement, co-write parts, start a "
      "project, MIDI cleanup, chords, mix doctor, side-chain, reference match, pre-master audit, "
