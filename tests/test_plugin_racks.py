@@ -893,7 +893,7 @@ def test_surge_fxp_patches_are_listed(tmp_path, monkeypatch):
 
 def test_an_unreadable_map_is_kept_not_overwritten(tmp_path):
     path = tmp_path / "x_vst3.json"
-    path.write_text("{ not json at all, but someone's hand-made map ............ }",
+    path.write_text("{ not json at all, but someone's hand-made map " + "." * 80 + " }",
                     encoding="utf-8")
     lib.save_map(str(path), {"plugin": "X", "parameters": [["A", 1]]})
     assert lib.load_map(str(path))["parameters"] == [["A", 1]]
