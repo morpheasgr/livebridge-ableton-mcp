@@ -186,6 +186,10 @@ class Patch:
 
     def parameter(self, name: str) -> ET.Element:
         element = self.params.find(name)
+        if element is None and re.fullmatch(r"fx\d+_(type|p\d+)", name):
+            raise ValueError(f"{name}: this FX slot is empty in the template, and Surge keeps "
+                             "empty slots out of the file — start from a patch that uses it, "
+                             "or set the FX type in Live after loading (FX A1 FX Type ...)")
         if element is None:
             raise ValueError(f"no Surge parameter {name!r} in this patch (names as in the "
                              "patch: a_filter1_cutoff, a_osc1_pitch, fx1_type ...)")
@@ -223,9 +227,13 @@ class Patch:
         match = re.fullmatch(r"([ab])_filter([12])_(type|subtype)", name)
         if match and isinstance(value, str):
             value = _filter_index(self, match.group(1), match.group(2), match.group(3), value)
+        elif isinstance(value, str) and re.fullmatch(r"[ab]_osc[123]_type", name):
+            value = _list_index(OSC_TYPES, value, "oscillator type")
+        elif isinstance(value, str) and re.fullmatch(r"fx\d+_type", name):
+            value = _list_index(FX_TYPES, value, "FX type")
         elif isinstance(value, str):
-            raise ValueError(f"{name}: give a number in the patch's units (names are only "
-                             "understood for filter types and subtypes)")
+            raise ValueError(f"{name}: give a number in the patch's units (names are understood "
+                             "for filter, oscillator and FX types and filter subtypes)")
         if param.get("type") == "0":
             param.set("value", str(int(value)))
         else:
@@ -376,6 +384,16 @@ def _fxp_from_vstpreset(data: bytes) -> bytes:
     raise ValueError("the .vstpreset has no Surge state (Comp chunk)")
 
 
+# Oscillator and FX types in Surge's numbering (patch values), read in Live by local Claude
+# (Surge XT 1.4.0) and checked against the factory templates.
+OSC_TYPES = ["Classic", "Sine", "Wavetable", "S&H Noise", "Audio Input", "FM3", "FM2",
+             "Window", "Modern", "String", "Twist", "Alias"]
+FX_TYPES = ["Off", "Delay", "Reverb 1", "Phaser", "Rotary", "Distortion", "EQ", "Freq Shift",
+            "Conditioner", "Chorus", "Vocoder", "Reverb 2", "Flanger", "Ring Mod", "Airwindows",
+            "Neuron", "Graphic EQ", "Resonator", "CHOW", "Exciter", "Ensemble", "Combulator",
+            "Nimbus", "Tape", "Treemonster", "Waveshaper", "Mid-Side Tool", "Spring Reverb",
+            "Bonsai", "Audio In", "Floaty Delay", "Convolution"]
+
 # Patch value -> Live's 0..1 value. Floats are linear in the patch's units between these
 # ends (measured in Live by local Claude: display at 0 / 0.5 / 1 of every sound_design control,
 # converted: Hz -> semitones from 440, rates and times -> log2, % -> fraction).
@@ -390,9 +408,12 @@ _FLOAT_RANGES = [
     (r"[ab]_lfo\d+_rate", -7.0, 9.0), (r"[ab]_lfo\d+_(magnitude|phase)", 0.0, 1.0),
     (r"[ab]_lfo\d+_deform", -1.0, 1.0), (r"[ab]_portamento", -8.0, 2.0),
     (r"[ab]_drift", 0.0, 1.0), (r"[ab]_(width|pan)", -1.0, 1.0), (r"volume", -48.0, 0.0),
+    # levels: 0..1 in the patch, shown as dB on a curve (measured 0.5 = -18 dB, 1 = 0 dB)
+    (r"[ab]_level_(o[123]|noise|ring12|ring23)", 0.0, 1.0), (r"[ab]_volume", 0.0, 1.0),
 ]
 _MENUS = [  # (pattern, first value, count)
     (r"[ab]_filter[12]_type", 0, 36), (r"[ab]_filter[12]_subtype", 0, 16),
+    (r"[ab]_osc[123]_type", 0, 12), (r"fx\d+_type", 0, 32),
     (r"[ab]_(osc[123]_)?octave", -3, 7), (r"[ab]_lfo\d+_trigmode", 0, 3),
     (r"[ab]_lfo\d+_unipolar", 0, 2), (r"[ab]_mute_(o[123]|noise)", 0, 2),
 ]
@@ -428,6 +449,13 @@ def host_values(patch: "Patch", storage_names: dict[str, str], names: list[str]
 
 def _norm(text: str) -> str:
     return re.sub(r"[\s\-_]", "", text.lower()).replace("notch", "n")
+
+
+def _list_index(names: list[str], value: str, what: str) -> int:
+    for index, label in enumerate(names):
+        if _norm(label) == _norm(value):
+            return index
+    raise ValueError(f"unknown {what} {value!r} — one of: " + ", ".join(names))
 
 
 def _filter_index(patch: "Patch", scene: str, number: str, kind: str, name: str) -> int:

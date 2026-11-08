@@ -112,7 +112,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             parameters: {"a_filter1_type": "LP 24 dB", "a_filter1_subtype": "Driven",
                 "a_filter1_cutoff": -12.0} — numbers in the patch's own units (cutoff:
                 semitones from 440 Hz, -60..70; LFO rate: log2 Hz; envelope times: log2 s;
-                levels 0..1); filter types and subtypes also by name (LP/HP/BP/N 12 dB and
+                levels 0..1); filter, oscillator and FX types and filter subtypes also by name
+                ("a_osc1_type": "Wavetable", "fx1_type": "Reverb 2"); filter types (LP/HP/BP/N 12 dB and
                 24 dB, LP Vintage Ladder, LP OB-Xd 24 dB, LP K35, LP Diode Ladder, MULTI Fast
                 SVF, FX Comb + ...). Parameters are applied in the order given: type first.
             wavetables: [{"osc": 2, "file": ".../Growl.wt", "scene": "a", "window": false}] —

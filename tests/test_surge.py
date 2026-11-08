@@ -163,6 +163,9 @@ def test_host_values_match_the_values_measured_in_live():
     assert S.host_value("a_env1_attack", 0.263034) == pytest.approx(0.636, abs=1e-3)
     assert S.host_value("a_filter1_type", 2) == pytest.approx(0.061571, abs=1e-6)
     assert S.host_value("a_osc1_param0", 0.5) is None          # depends on the osc type
+    assert S.host_value("a_osc1_type", 2) == pytest.approx(0.185)      # Wavetable (measured)
+    assert S.host_value("fx1_type", 11) == pytest.approx(0.35629, abs=1e-5)   # Reverb 2
+    assert S.host_value("a_level_o2", 0.5) == 0.5
     patch = S.Patch.load(INIT_SAW)
     patch.set_parameter("a_filter1_cutoff", -12.0)
     values, skipped = S.host_values(
@@ -241,3 +244,19 @@ def test_wavetable_keeps_nightly_data_after_the_tables():
     patch.set_wavetable(3, _wt(), "T")
     out = patch.to_bytes()
     assert out.endswith(b"(\xb5/\xfd-nightly") and S.Patch(out).wavetables[2][:4] == bytes(4)
+
+
+def test_oscillator_and_fx_types_by_name():
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_parameter("a_osc1_type", "Wavetable")
+    patch.set_parameter("b_osc3_type", "s&h noise")
+    assert patch.params.find("a_osc1_type").get("value") == "2"
+    assert patch.params.find("b_osc3_type").get("value") == "3"
+    patch.params.append(S.ET.Element("fx1_type", {"type": "0", "value": "0"}))
+    patch.set_parameter("fx1_type", "Reverb 2")
+    assert patch.params.find("fx1_type").get("value") == "11"
+    with pytest.raises(ValueError, match="FX slot is empty"):
+        patch.set_parameter("fx2_type", "Delay")
+    with pytest.raises(ValueError, match="unknown oscillator type"):
+        patch.set_parameter("a_osc1_type", "Supersaw")
+    assert len(S.OSC_TYPES) == 12 and len(S.FX_TYPES) == 32

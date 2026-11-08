@@ -87,10 +87,11 @@ async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file
     result["restored"] = len(values)
     if skipped:
         result["warning"] = (
-            "Surge XT applies a preset after Live reads the exposed parameters; %d were set "
-            "again from the preset, these could not be (keep their template values, set them "
-            "yourself): %s" % (len(values), ", ".join(skipped[:12]) +
-                               (" ..." if len(skipped) > 12 else "")))
+            "Surge XT's exposed parameters start at the template's values (it applies a preset "
+            "after Live reads them); LiveBridge set %d again from the preset but cannot convert "
+            "these yet, so they keep the template's values — set them yourself, or leave them "
+            "unexposed (unexposed controls keep the preset's values): %s"
+            % (len(values), ", ".join(skipped[:12]) + (" ..." if len(skipped) > 12 else "")))
 
 
 def register(mcp: Any, bridge: BridgeClient) -> None:
