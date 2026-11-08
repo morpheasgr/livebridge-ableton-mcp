@@ -2185,7 +2185,7 @@ Make a big plug-in (Serum 2, any mapped VST3) fully controllable: load it in a g
 | `editor_open` | bool \| null | `null` |
 | `wait_seconds` | float | `30.0` |
 
-Bridge: `devices.set_parameters`, `plugin_racks.expose`, `plugins.set`
+Bridge: `devices.parameters`, `devices.set_parameters`, `plugin_racks.expose`, `plugins.set`
 
 #### `live_plugin_param_map`
 
@@ -3686,7 +3686,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `devices.list` |  | track=null, tree=false, detail="minimal", max_depth=4 | `live_device_list`, `live_master_auto`, `live_mix_auto`, `live_mix_balance`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_host_bank`, `live_plugin_host_expose`, `live_theory_analyze` | List the devices of a track (flat, or as a tree through racks) |
 | `devices.modulation` | M | op="get", track=null, device=null, target=null, source=null, amount=null, parameter=null | `live_device_modulation` | Wavetable modulation matrix: read, set an amount, add a parameter as target |
 | `devices.move` | M | track=null, device=null, target_track=null, target_chain=null, position=-1 | `live_device_move`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask` | Move a device to another position/track/chain |
-| `devices.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, only_changed=false, detail="summary" | `live_audio_align`, `live_device_parameters`, `live_mix_auto`, `live_sound_check`, `live_sound_load`, `live_sound_save` | List a device's parameters (paged, filterable, with display values) |
+| `devices.parameters` |  | track=null, device=null, filter=null, offset=0, limit=64, only_changed=false, detail="summary" | `live_audio_align`, `live_device_parameters`, `live_mix_auto`, `live_plugin_expose`, `live_sound_check`, `live_sound_load`, `live_sound_save` | List a device's parameters (paged, filterable, with display values) |
 | `devices.properties` |  | track=null, device=null, include_lists=false | `live_device_properties` | Class-specific device properties (Wavetable, Drift, Hybrid Reverb, Looper ...) |
 | `devices.randomize` | M | track=null, device=null, parameters=null, seed=null, amount=1.0, include_quantized=true | `live_device_randomize` | Randomize device parameters (optional seed) |
 | `devices.reset_parameters` | M | track=null, device=null, parameters=null | `live_device_reset_parameters` | Reset parameters to their default values |

@@ -518,6 +518,50 @@ OSC_PARAM_RANGES: dict[int, list[Any]] = {
     11: [None, (0, 1), (0, 1), (0, 1), (1, 8), (0, 1), _VOICES],                      # Alias
 }
 
+# What Surge calls the seven oscillator controls per type (Live renames the exposed knobs to
+# these once Surge has switched type); the map only has the Classic names. Read in Live by
+# local Claude.
+GENERIC_OSC_LABELS = ["Shape", "Width 1", "Width 2", "Sub Mix", "Sync", "Unison Detune",
+                      "Unison Voices"]
+OSC_LABELS: dict[int, list[str]] = {
+    0: GENERIC_OSC_LABELS,
+    1: ["Shape", "Feedback", "Behavior", "Low Cut", "High Cut", "Unison Detune", "Unison Voices"],
+    2: ["Morph", "Skew Vertical", "Saturate", "Formant", "Skew Horizontal", "Unison Detune",
+        "Unison Voices"],
+    5: ["M1 Amount", "M1 Ratio", "M2 Amount", "M2 Ratio", "M3 Amount", "M3 Frequency",
+        "Feedback"],
+    6: ["M1 Amount", "M1 Ratio", "M2 Amount", "M2 Ratio", "M1/2 Offset", "M1/2 Phase",
+        "Feedback"],
+    7: ["Morph", "Formant", "Window", "Low Cut", "High Cut", "Unison Detune", "Unison Voices"],
+    8: ["Sawtooth", "Pulse", "Triangle", "Width", "Sync", "Unison Detune", "Unison Voices"],
+    9: ["Exciter", "Exciter Level", "String 1 Decay", "String 2 Decay", "String 2 Detune",
+        "String Balance", "Stiffness"],
+    10: ["Engine", "Detune", "Square Shape", "Saw Shape", "Sync Mix", "LPG Response",
+         "LPG Decay"],
+    11: ["Shape", "Wrap", "Mask", "Threshold", "Bitcrush", "Unison Detune", "Unison Voices"],
+}
+
+
+def generic_names(names: list[str], patch: "Patch | None" = None) -> list[str]:
+    """Translate type-specific oscillator labels ("A Osc 1 M1 Amount") to the map's names
+    ("A Osc 1 Shape"), by each oscillator's type in ``patch`` (Classic when no patch)."""
+    out = []
+    for name in names:
+        match = re.fullmatch(r"([AB]) Osc ([123]) (.+)", name.strip(), re.IGNORECASE)
+        if not match:
+            out.append(name)
+            continue
+        scene, number, label = match.group(1).upper(), match.group(2), match.group(3)
+        kind = patch.params.find(f"{scene.lower()}_osc{number}_type") if patch else None
+        osc_type = int(float(kind.get("value", "0"))) if kind is not None else 0
+        labels = [x.lower() for x in OSC_LABELS.get(osc_type, GENERIC_OSC_LABELS)]
+        if label.lower() in labels and label.lower() not in \
+                [x.lower() for x in GENERIC_OSC_LABELS]:
+            label = GENERIC_OSC_LABELS[labels.index(label.lower())]
+        out.append(f"{scene} Osc {number} {label}")
+    return out
+
+
 # Patch value -> Live's 0..1 value. Floats are linear in the patch's units between these
 # ends (measured in Live by local Claude: display at 0 / 0.5 / 1 of every sound_design control,
 # converted: Hz -> semitones from 440, rates and times -> log2, % -> fraction).

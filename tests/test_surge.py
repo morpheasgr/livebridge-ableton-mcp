@@ -189,22 +189,25 @@ def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path)
 
     def fake_call(bridge, cmd, args, timeout=None):
         calls.append((cmd, args))
-        return {"count": len(args["values"]),
-                "parameters": [{"name": v["parameter"], "value": v["value"],
-                                "display": "after"} for v in args["values"]]}
+        if cmd == "devices.parameters":               # the re-read after Surge relabels
+            return {"parameters": [{"index": 1, "name": "A Filter 1 Cutoff", "value": 0.369231,
+                                    "display": "after"}]}
+        return {"count": len(args["values"])}
 
     monkeypatch.setattr(racks, "bridge_call", fake_call)
     monkeypatch.setattr(racks, "_SURGE_SETTLE_S", 0)
+    monkeypatch.setattr(racks, "_SURGE_RELABEL_S", 0)
     result = {"plugin": "Surge XT", "device": "tracks 0 devices 0 chains 0 devices 0",
-              "warning": "reset", "parameters": [{"name": "A Filter 1 Cutoff",
+              "warning": "reset", "parameters": [{"index": 1, "name": "A Filter 1 Cutoff",
                                                    "value": 0.48, "display": "before"},
                                                   {"name": "A Filter 1 Type"},
                                                   {"name": "A Osc 1 Shape"}]}
     asyncio.run(racks._restore_surge_values(None, result, str(preset)))
-    (cmd, args), = calls
+    (cmd, args), (reread, _a) = calls
+    assert reread == "devices.parameters"
     sent = {v["parameter"]: v["value"] for v in args["values"]}
     assert cmd == "devices.set_parameters" and args["normalized"] is True
-    assert sent == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6),
+    assert sent == {1: pytest.approx(0.369231, abs=1e-6),       # by index: survives relabels
                     "A Filter 1 Type": pytest.approx(0.061571, abs=1e-6),
                     "A Osc 1 Shape": 0.5}
     assert result["restored"] == 3 and "warning" not in result
@@ -287,3 +290,14 @@ def test_oscillator_controls_convert_per_type_and_sends():
     assert S.host_value("a_osc1_param0", 0.5, osc_type=9) is None              # String exciter
     assert S.host_value("a_osc1_param0", 0.5) is None                          # type unknown
     assert S.host_value("a_send_fx_1", 0.5) == pytest.approx(0.31498, abs=1e-5)
+
+
+def test_type_specific_oscillator_labels_translate_to_map_names():
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_parameter("a_osc1_type", "FM2")
+    patch.set_parameter("b_osc2_type", "Sine")
+    got = S.generic_names(["A Osc 1 M1 Amount", "A Osc 1 Feedback", "B Osc 2 Feedback",
+                           "A Osc 1 Shape", "A Filter 1 Cutoff", "a osc 1 m1 ratio"], patch)
+    assert got == ["A Osc 1 Shape", "A Osc 1 Unison Voices", "B Osc 2 Width 1",
+                   "A Osc 1 Shape", "A Filter 1 Cutoff", "A Osc 1 Width 1"]
+    assert S.generic_names(["A Osc 1 M1 Amount"]) == ["A Osc 1 M1 Amount"]   # Classic: no alias

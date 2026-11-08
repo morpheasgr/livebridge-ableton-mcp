@@ -3119,7 +3119,8 @@
   "Init Saw's filters are Off (type 0): set a filter type before routing to cutoff. An LFO step sequencer advances one step per LFO cycle (rate 0 = 1 Hz): sync it to tempo for rhythmic steps.",
   "Setting values (measured): every exposed control is 0..1 in Live, linear in Surge's patch units (cutoff -60..70 semitones from 440 Hz, LFO rate -7..9 = log2 Hz, envelope times -8..5 = log2 s, osc pitch -7..7). Display text works: '220 Hz', '1.5 kHz', '50 %', '+5 st', '4 Hz', '1.2 s', 'LP 24 dB'. Osc pitch only spans +/-7 semitones: use Octave for more. Tempo sync is not a host parameter (LFO rates show in Hz): write it with live_surge_write rate='1/16'.",
   "Menus (types, modes): 0..1 split into equal bands, value 0.005 + 0.99*i/(count-1); text lands near a band edge, so prefer the band centre. Filter subtypes always have 16 slots: past a type's last one Surge shows 'None'.",
-  "Macros M1-M8: after a set, the display lags one read (read twice)."
+  "Macros M1-M8: after a set, the display lags one read (read twice).",
+  "Oscillator knobs are renamed by Surge per oscillator type once it has switched (Live follows): 'A Osc 1 Shape' becomes 'A Osc 1 M1 Amount' for FM2, 'A Osc 1 Morph' for Wavetable ... The map keeps the Classic names; live_plugin_expose(plugin='Surge XT') translates a type's own labels (from the preset's oscillator types). After a type change, address an exposed knob by its index (the expose result lists them), not its old name."
  ],
  "groups": {
   "sound_design": [

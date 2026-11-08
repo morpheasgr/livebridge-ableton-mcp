@@ -49,8 +49,21 @@ def _check_format(plugin_format: str | None, cmd: str) -> dict[str, Any] | None:
 
 
 _SURGE_SETTLE_S = 1.5
+_SURGE_RELABEL_S = 0.5
 _SURGE_MAP = Path(__file__).resolve().parents[3] / "remote_script" / "LiveBridge" / \
     "plugin_maps" / "surgext_vst3.json"
+
+
+def _surge_generic_names(parameters: list[str], preset_file: str | None) -> list[str]:
+    """Surge renames oscillator knobs per type; the map has the Classic names."""
+    from .. import surge
+    patch = None
+    if preset_file:
+        try:
+            patch = surge.Patch.load(Path(preset_file).expanduser())
+        except Exception:
+            patch = None
+    return surge.generic_names(parameters, patch)
 
 
 async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file: str) -> None:
@@ -63,26 +76,35 @@ async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file
     except Exception as exc:             # not a Surge patch file (.adv/.adg): keep the warning
         result["restore_note"] = f"exposed values not restored: {str(exc)[:200]}"
         return
-    names = [p.get("name") for p in result.get("parameters") or [] if isinstance(p, dict)]
+    entries = [p for p in result.get("parameters") or [] if isinstance(p, dict)]
+    index_of = {p.get("name"): p["index"] for p in entries if p.get("index") is not None}
+    names = [p.get("name") for p in entries]
     values, skipped = surge.host_values(patch, shipped.get("storage_names") or {}, names)
     if values:
         await asyncio.sleep(_SURGE_SETTLE_S)          # let Surge finish loading the preset
         done = await asyncio.to_thread(
             bridge_call, bridge, "devices.set_parameters",
             {"device": result["device"], "normalized": True,
-             "values": [{"parameter": n, "value": v, "normalized": True}
+             "values": [{"parameter": index_of.get(n, n), "value": v, "normalized": True}
                         for n, v in values.items()]}, _CALL_TIMEOUT)
         if _is_error(done):
             result["restore_note"] = "setting the preset's values again failed: " + \
                 str(done.get("error", done))[:300]
             return
-        now = {p.get("name"): p for p in (done.get("parameters") or [])
-               if isinstance(p, dict)}
-        for entry in result.get("parameters") or []:     # report the values after the restore
-            if isinstance(entry, dict) and entry.get("name") in now:
-                for key in ("value", "display"):
-                    if key in now[entry["name"]]:
-                        entry[key] = now[entry["name"]][key]
+        # Surge relabels knobs after a type change (and shows the new values) a moment later:
+        # read them again so the result shows final names, values and displays
+        await asyncio.sleep(_SURGE_RELABEL_S)
+        reread = await asyncio.to_thread(
+            bridge_call, bridge, "devices.parameters",
+            {"device": result["device"], "offset": 0, "limit": 1000}, _CALL_TIMEOUT)
+        now = {p.get("index"): p for p in (reread or {}).get("parameters") or []
+               if isinstance(p, dict)} if not _is_error(reread) else {}
+        for entry in entries:
+            fresh = now.get(entry.get("index"))
+            if fresh:
+                for key in ("name", "value", "display"):
+                    if key in fresh:
+                        entry[key] = fresh[key]
     result.pop("warning", None)
     result["restored"] = len(values)
     if skipped:
@@ -178,6 +200,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             return tool_error(f"wait_seconds must be 0..{_MAX_WAIT:g}", cmd=cmd)
         if new_track and track is not None:
             return tool_error("pass either track or new_track, not both", cmd=cmd)
+        if parameters and str(plugin or "").lower().replace(" ", "") == "surgext":
+            parameters = _surge_generic_names(parameters, preset_file)
         args = {**drop_none(parameters=parameters, track=track, plugin=plugin, macros=macros,
                             preset_file=preset_file, name=name, track_name=track_name,
                             plugin_format=plugin_format, editor_open=editor_open),
