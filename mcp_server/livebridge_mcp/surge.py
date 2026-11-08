@@ -165,11 +165,17 @@ class Patch:
         out = []
         for seq in self.root.iter("sequence"):
             steps = [float(seq.get(f"s{k}", "0")) for k in range(16)]
-            out.append({"scene": "ab"[int(seq.get("scene", "0"))],
-                        "lfo": _lfo_label(int(seq.get("i", "0"))),
-                        "steps": steps, "loop": [int(seq.get("loop_start", "0")) + 1,
-                                                 int(seq.get("loop_end", "15")) + 1],
-                        "shuffle": float(seq.get("shuffle", "0"))})
+            scene, index = "ab"[int(seq.get("scene", "0"))], int(seq.get("i", "0"))
+            entry = {"scene": scene, "lfo": _lfo_label(index),
+                     "steps": steps, "loop": [int(seq.get("loop_start", "0")) + 1,
+                                              int(seq.get("loop_end", "15")) + 1],
+                     "shuffle": float(seq.get("shuffle", "0"))}
+            rate = self.params.find(f"{scene}_lfo{index}_rate")
+            if rate is not None:
+                value = float(rate.get("value", "0"))
+                entry["rate"] = _note_length(value) if rate.get("temposync") == "1" \
+                    else f"{2 ** value:.3g} Hz"
+            out.append(entry)
         return out
 
     def parameter(self, name: str) -> ET.Element:
@@ -410,6 +416,17 @@ def _filter_index(patch: "Patch", scene: str, number: str, kind: str, name: str)
     raise ValueError(f"{label} has no subtype {name!r}"
                      + (" — one of: " + ", ".join(subtypes) if subtypes else
                         " (it has none)") + "; set the type first")
+
+
+def _note_length(value: float) -> str:
+    """The note length a synced rate names ("1/16", "1/8d" ...), or its value at 120 BPM."""
+    for top, bottom in ((4, 1), (2, 1), (1, 1), (1, 2), (1, 4), (1, 8), (1, 16), (1, 32),
+                        (1, 64)):
+        for suffix in ("", "d", "t"):
+            label = f"{top}/{bottom}{suffix}"
+            if abs(synced_rate(label) - value) < 1e-4:
+                return label
+    return f"{2 ** value:.3g} Hz at 120 BPM (synced)"
 
 
 def _lfo_label(index: int) -> str:

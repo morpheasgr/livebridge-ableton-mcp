@@ -76,6 +76,13 @@ async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file
             result["restore_note"] = "setting the preset's values again failed: " + \
                 str(done.get("error", done))[:300]
             return
+        now = {p.get("name"): p for p in (done.get("parameters") or [])
+               if isinstance(p, dict)}
+        for entry in result.get("parameters") or []:     # report the values after the restore
+            if isinstance(entry, dict) and entry.get("name") in now:
+                for key in ("value", "display"):
+                    if key in now[entry["name"]]:
+                        entry[key] = now[entry["name"]][key]
     result.pop("warning", None)
     result["restored"] = len(values)
     if skipped:

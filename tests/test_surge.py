@@ -129,6 +129,9 @@ def test_synced_rates_match_the_users_patches():
     rate = patch.params.find("a_lfo0_rate")
     assert float(rate.get("value")) == 3.0 and rate.get("temposync") == "1"
     assert not any("runs free" in w for w in patch.warnings())
+    assert patch.step_sequences()[0]["rate"] == "1/16"
+    patch.set_step_sequence(2, [1], rate="1/8d")
+    assert patch.step_sequences()[1]["rate"] == "1/8d"
     with pytest.raises(ValueError, match="note length"):
         S.synced_rate("fast")
 
@@ -182,12 +185,15 @@ def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path)
 
     def fake_call(bridge, cmd, args, timeout=None):
         calls.append((cmd, args))
-        return {"count": len(args["values"])}
+        return {"count": len(args["values"]),
+                "parameters": [{"name": v["parameter"], "value": v["value"],
+                                "display": "after"} for v in args["values"]]}
 
     monkeypatch.setattr(racks, "bridge_call", fake_call)
     monkeypatch.setattr(racks, "_SURGE_SETTLE_S", 0)
     result = {"plugin": "Surge XT", "device": "tracks 0 devices 0 chains 0 devices 0",
-              "warning": "reset", "parameters": [{"name": "A Filter 1 Cutoff"},
+              "warning": "reset", "parameters": [{"name": "A Filter 1 Cutoff",
+                                                   "value": 0.48, "display": "before"},
                                                   {"name": "A Filter 1 Type"},
                                                   {"name": "A Osc 1 Shape"}]}
     asyncio.run(racks._restore_surge_values(None, result, str(preset)))
@@ -197,3 +203,5 @@ def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path)
     assert sent == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6),
                     "A Filter 1 Type": pytest.approx(0.061571, abs=1e-6)}
     assert result["restored"] == 2 and "A Osc 1 Shape" in result["warning"]
+    assert result["parameters"][0]["display"] == "after"         # reported after the restore
+    assert result["parameters"][0]["value"] == pytest.approx(0.369231, abs=1e-6)
