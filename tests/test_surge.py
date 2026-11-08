@@ -376,9 +376,63 @@ def test_fx_warnings_and_host_values():
     assert S.host_value("fx5_p9", 0.33, fx_type=11) == pytest.approx(0.33)
     assert S.host_value("fx1_p3", 0.0, fx_type=None) is None
     patch.set_fx("A1", "Delay", {"Mix": 0.5})
-    values, skipped = S.host_values(patch, {"FX A1 Param 11": "fx1_p10",
-                                            "FX A1 Param 10": "fx1_p9"},
-                                    ["FX A1 Param 11", "FX A1 Param 10"])
-    assert values == {"FX A1 Param 11": 0.5} and skipped == ["FX A1 Param 10"]
+    patch.set_fx("A2", "Ensemble")
+    names = {"FX A1 Param 11": "fx1_p10", "FX A1 Param 10": "fx1_p9", "FX A2 Param 6": "fx2_p5"}
+    values, skipped = S.host_values(patch, names, list(names))
+    assert values == {"FX A1 Param 11": 0.5}            # p9 unused: neither set nor reported
+    assert skipped == ["FX A2 Param 6"]                  # Ensemble's delay type: unknown menu
     assert S.generic_names(["FX A1 Mix", "FX A1 Param 3", "FX S1 Decay Time"], patch) == \
         ["FX A1 Param 11", "FX A1 Param 3", "FX S1 Param 3"]
+
+
+def test_fx_values_with_units():
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_fx("A1", "Reverb 2", {"Decay Time": "2 s", "Pre-Delay": "62.5 ms", "Mix": "30 %",
+                                    "Width": "+3 dB"})
+    get = lambda k: float(patch.params.find(f"fx1_p{k}").get("value"))
+    assert get(2) == pytest.approx(1.0) and get(0) == pytest.approx(-4.0)
+    assert get(9) == pytest.approx(0.3) and get(8) == pytest.approx(3.0)
+    patch.set_fx("A2", "Delay", {"Low Cut": "220 Hz", "High Cut": "1.76 kHz", "Mod Rate": "4 Hz",
+                                 "Mod Depth": "50 cents"})
+    get = lambda k: float(patch.params.find(f"fx2_p{k}").get("value"))
+    assert get(4) == pytest.approx(-12.0) and get(5) == pytest.approx(24.0, abs=1e-6)
+    assert get(6) == pytest.approx(2.0) and get(7) == pytest.approx(0.5)
+    patch.set_fx("A3", "Resonator", {"Gain 1": "-6 dB", "Gain 2": "-inf dB"})
+    assert float(patch.params.find("fx9_p2").get("value")) == pytest.approx(2 ** (-1 / 3))
+    assert float(patch.params.find("fx9_p5").get("value")) == 0.0
+    patch.set_fx("A4", "Ring Mod", {"Frequency": "440 Hz"})
+    assert float(patch.params.find("fx10_p1").get("value")) == pytest.approx(69.0)
+    with pytest.raises(ValueError, match="does not fit"):
+        patch.set_fx("A1", values={"Decay Time": "30 %"})
+    with pytest.raises(ValueError, match="patch's units"):
+        patch.set_fx("A1", values={"Decay Time": "long"})
+    # Surge's own labels work too ("Section - Name")
+    patch.set_fx("B1", "Neuron", {"Comb - Frequency": "880 Hz", "Output - Gain": -6})
+    assert float(patch.params.find("fx3_p5").get("value")) == pytest.approx(12.0)
+
+
+def test_restore_warns_with_the_knobs_final_names(tmp_path, monkeypatch):
+    import asyncio
+    from livebridge_mcp.tools import plugin_racks as racks
+
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_fx("A2", "Ensemble", {"Mix": "50 %"})
+    preset = tmp_path / "E.vstpreset"
+    preset.write_bytes(patch.to_vstpreset())
+    monkeypatch.setattr(racks, "_SURGE_SETTLE_S", 0)
+    monkeypatch.setattr(racks, "_SURGE_RELABEL_S", 0)
+    final = {0: "A2 Output - Mix", 1: "A2 Delay - Type"}
+
+    def fake_call(_bridge, cmd, args, _timeout=None):
+        if cmd == "devices.parameters":
+            return {"parameters": [{"index": i, "name": n, "value": 0.5, "display": "x"}
+                                   for i, n in final.items()]}
+        assert [v["parameter"] for v in args["values"]] == [0]
+        return {"ok": True}
+
+    monkeypatch.setattr(racks, "bridge_call", fake_call)
+    result = {"device": 1, "parameters": [{"index": 0, "name": "FX A2 Param 11"},
+                                          {"index": 1, "name": "FX A2 Param 6"}]}
+    asyncio.run(racks._restore_surge_values(None, result, str(preset)))
+    assert result["restored"] == 1
+    assert "A2 Delay - Type" in result["warning"] and "Param 6" not in result["warning"]

@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, VERIFIED
+from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, VERIFIED, fx_unit
 
 PLUGIN_ID = b"cjs3"
 CLASS_ID = "ABCDEF019182FAEB566D624153675854"          # Surge XT's VST3 class id
@@ -307,6 +307,8 @@ class Patch:
             for key, value in values.items():
                 k = fx_control(current, key)
                 element = self.parameter(f"fx{number}_p{k}")
+                if isinstance(value, str):
+                    value = fx_patch_value(current, k, value)
                 if element.get("type") == "0":
                     element.set("value", str(int(value)))
                 else:
@@ -750,6 +752,8 @@ def host_values(patch: "Patch", storage_names: dict[str, str], names: list[str]
         if match:
             kind = patch.params.find(f"{match.group(1)}_type")
             fx_type = int(float(kind.get("value", "0"))) if kind is not None else None
+        if fx_type is not None and _unused_fx_control(fx_type, key):
+            continue                                  # shows "-": nothing to set
         value = host_value(key, float(element.get("value", "0")), osc_type, fx_type) \
             if element is not None else None
         if value is None:
@@ -757,6 +761,50 @@ def host_values(patch: "Patch", storage_names: dict[str, str], names: list[str]
         else:
             values[name] = round(value, 6)
     return values, skipped
+
+
+_UNIT_TEXT = re.compile(r"\s*([-+]?(?:\d+\.?\d*|\.\d+)|-inf)\s*(ms|s|khz|hz|%|cents?|ct|db)\s*",
+                        re.IGNORECASE)
+
+
+def fx_patch_value(fx_type: int, k: int, text: str) -> float:
+    """An FX control's patch value from text with a unit: "2 s", "250 ms", "1.5 kHz",
+    "30 %", "-6 dB", "10 cents" (Hz controls -> semitones from 440, times and rates -> log2,
+    % -> fraction, levels -> Surge's level curve)."""
+    import math
+    kind = fx_unit(fx_type, k)
+    match = _UNIT_TEXT.fullmatch(text)
+    if kind is None or not match:
+        raise ValueError(f"{text!r}: give a number in the patch's units"
+                         + ("" if kind is None else f" or a value with its unit ({_UNIT_HINT[kind]})"))
+    number, unit = match.group(1), match.group(2).lower()
+    x = float("-inf") if number == "-inf" else float(number)
+    if kind == "time" and unit in ("s", "ms") and x > 0:
+        return math.log2(x / 1000 if unit == "ms" else x)
+    if kind in ("rate", "hz", "note") and unit in ("hz", "khz") and x > 0:
+        hz = x * 1000 if unit == "khz" else x
+        return {"rate": math.log2(hz), "hz": 12 * math.log2(hz / 440),
+                "note": 69 + 12 * math.log2(hz / 440)}[kind]
+    if kind == "percent" and unit == "%":
+        return x / 100
+    if kind == "cents" and unit in ("cent", "cents", "ct"):
+        return x / 100
+    if kind == "db" and unit == "db":
+        return x
+    if kind == "amp" and unit == "db":
+        return 0.0 if x == float("-inf") else 2 ** (x / 18)
+    raise ValueError(f"{text!r} does not fit this control ({_UNIT_HINT[kind]})")
+
+
+_UNIT_HINT = {"time": "s or ms", "rate": "Hz", "hz": "Hz or kHz", "note": "Hz",
+              "percent": "%", "cents": "cents", "db": "dB", "amp": "dB"}
+
+
+def _unused_fx_control(fx_type: int, storage_name: str) -> bool:
+    match = re.fullmatch(r"fx\d+_p(\d+)", storage_name)
+    entries = FX_PARAMS.get(fx_type)
+    return bool(match and entries and int(match.group(1)) < 12
+                and entries[int(match.group(1))][0] is None)
 
 
 def fx_slot(slot: int | str) -> int:
@@ -778,8 +826,8 @@ def fx_control(fx_type: int, key: str | int) -> int:
     else:
         match = re.fullmatch(r"\s*p(?:aram)?\s*(\d+)\s*", str(key), re.IGNORECASE)
         names = [label for label, _range in FX_PARAMS.get(fx_type, [])]
-        wanted = _norm(str(key).split(" - ")[-1])
-        hits = [i for i, label in enumerate(names) if label and _norm(label) == wanted]
+        wanted = {_norm(str(key)), _norm(str(key).split(" - ")[-1])}
+        hits = [i for i, label in enumerate(names) if label and _norm(label) in wanted]
         if hits:
             return hits[0]
         if not match:

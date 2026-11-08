@@ -4,7 +4,7 @@ their ranges in patch units, and the values Surge starts a fresh effect with.
 Facts only. The start values and the display at 0 / 0.5 / 1 of every control come from a
 survey in Live by local Claude (Surge XT 1.4.0). Unused controls, which show "-", are written
 as 0. Names come from the Surge XT manual's effect sections, matched to the slots by their
-units. Rotary, Waveshaper, Bonsai, Audio In and Floaty Delay were read off Surge's own labels.
+units; the types in ``VERIFIED`` were read off Surge's own labels in Live.
 A range is (low, high) in patch units (Live's 0..1 is linear between them), or ("menu",
 first, count), or None when unknown.
 """
@@ -87,8 +87,8 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
     14: [("Effect", None)] + [(f"Param {k}", None) for k in range(1, 11)]
         + [(None, None)],                                                          # Airwindows
     15: [("Drive", _DB24), ("Squash", _PCT), ("Stab", _PCT), ("Asymmetry", _PCT),
-         ("Bias", _PCT), ("Comb Freq", _HZ), ("Comb Separation", None),
-         ("LFO Waveform", _WAVES), ("LFO Rate", _RATE), ("LFO Depth", _PCT),
+         ("Bias", _PCT), ("Comb Frequency", _HZ), ("Comb Separation", None),
+         ("Waveform", _WAVES), ("Rate", _RATE), ("Depth", _PCT),
          ("Width", _DB24), ("Output Gain", _DB24)],                                # Neuron
     16: [(f"Band {k}", _DB24) for k in range(1, 12)] + [("Output Gain", _DB48)],  # Graphic EQ
     17: [("Frequency 1", (_st(60), _st(300))), ("Resonance 1", _PCT), ("Gain 1", _AMP),
@@ -99,9 +99,9 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
          ("Mix", _PCT)] + [(None, None)] * 8,                                      # CHOW
     19: [("Drive", _PCT), ("Tone", _PCT), ("Attack", _PCT), ("Release", _PCT), ("Mix", _PCT)]
         + [(None, None)] * 7,                                                      # Exciter
-    20: [("Anti-Alias Filter", _HZ), ("Mod Freq 1", (math.log2(0.01), math.log2(20))),
-         ("Mod Depth 1", _PCT), ("Mod Freq 2", (math.log2(0.01), math.log2(20))),
-         ("Mod Depth 2", _PCT), ("Delay Type", None), ("Clock Rate", (1.5, 100.0)),
+    20: [("Anti-Alias Filter", _HZ), ("Frequency 1", (math.log2(0.01), math.log2(20))),
+         ("Depth 1", _PCT), ("Frequency 2", (math.log2(0.01), math.log2(20))),
+         ("Depth 2", _PCT), ("Delay Type", None), ("Clock Rate", (1.5, 100.0)),
          ("Saturation", _PCT), ("Feedback", _PCT), ("Width", _BI), ("Mix", _PCT),
          ("Reconstruction Filter", _HZ)],                                          # Ensemble
     21: [("Extra Noise", _PCT), ("Center", (_st(0.5), 70.0)), ("Offset 1", (-60.0, 60.0)),
@@ -151,7 +151,7 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
 }
 
 # Types whose names were read off Surge itself; the others are matched from the manual.
-VERIFIED = {4, 25, 28, 29, 30}
+VERIFIED = {4, 11, 15, 20, 25, 28, 29, 30}
 
 # The values Surge starts each FX type with (unused controls as 0).
 FX_DEFAULTS: dict[int, list[dict[str, str]]] = {
@@ -590,3 +590,34 @@ FX_DEFAULTS: dict[int, list[dict[str, str]]] = {
         {"type": "0", "value": "0"},
     ],
 }
+
+
+# What a control's value means, for values given with a unit ("2 s", "6 kHz", "30 %"):
+# found from its range, with the exceptions below.
+_TIMES = {_TIME, (-4.0, 6.0), (-8.0, 1.0), (math.log2(0.02), 3.0)}
+_RATES = {_RATE, (math.log2(0.01), math.log2(20)), (-3.0, 4.0)}
+_FREQS = {_HZ, (_st(60), _st(300)), (_st(300), _st(1500)), (_st(1500), _st(7500)),
+          (_st(0.5), 70.0), (-36.0, 36.0), (0.0, 60.0)}
+_PERCENTS = {_PCT, _BI, (0.0, 2.0), (0.0, 0.9), (0.0, 0.5), (0.5, 2.0)}
+_DECIBELS = {_DB24, _DB48, (-12.0, 12.0), (-48.0, 0.0), (-96.0, 0.0), (-48.0, 12.0)}
+_UNIT_EXCEPTIONS: dict[tuple[int, int], str | None] = {
+    (1, 7): "cents", (13, 2): "cents", (13, 1): "note",
+    (17, 2): "amp", (17, 5): "amp", (17, 8): "amp",
+    (21, 6): "amp", (21, 7): "amp", (21, 8): "amp",
+    (19, 2): None, (19, 3): None, (27, 1): None,          # ms / s shown on a curve
+}
+
+
+def fx_unit(fx_type: int, k: int) -> str | None:
+    """time | rate | hz | note | percent | cents | db | amp, or None (numbers only)."""
+    if (fx_type, k) in _UNIT_EXCEPTIONS:
+        return _UNIT_EXCEPTIONS[(fx_type, k)]
+    entries = FX_PARAMS.get(fx_type) or []
+    spec = entries[k][1] if k < len(entries) else None
+    if not isinstance(spec, tuple) or spec[0] == "menu":
+        return None
+    for kind, ranges in (("time", _TIMES), ("rate", _RATES), ("hz", _FREQS),
+                         ("percent", _PERCENTS), ("db", _DECIBELS)):
+        if spec in ranges:
+            return kind
+    return None

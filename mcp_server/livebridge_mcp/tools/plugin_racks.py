@@ -79,6 +79,7 @@ async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file
     entries = [p for p in result.get("parameters") or [] if isinstance(p, dict)]
     index_of = {p.get("name"): p["index"] for p in entries if p.get("index") is not None}
     names = [p.get("name") for p in entries]
+    by_name = {p.get("name"): p for p in entries}
     values, skipped = surge.host_values(patch, shipped.get("storage_names") or {}, names)
     if values:
         await asyncio.sleep(_SURGE_SETTLE_S)          # let Surge finish loading the preset
@@ -107,6 +108,7 @@ async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file
                         entry[key] = fresh[key]
     result.pop("warning", None)
     result["restored"] = len(values)
+    skipped = [str((by_name.get(n) or {}).get("name") or n) for n in skipped]   # final names
     if skipped:
         result["warning"] = (
             "Surge XT's exposed parameters start at the template's values (it applies a preset "

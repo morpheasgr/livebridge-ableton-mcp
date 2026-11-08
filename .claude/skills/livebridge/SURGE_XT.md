@@ -50,8 +50,8 @@ live_surge_write(
 
 ```python
 live_surge_write(name="LB Wet Pad", fx=[
-    {"slot": "A1", "type": "Chorus", "values": {"Rate": -1.0, "Depth": 0.4, "Mix": 0.5}},
-    {"slot": "A2", "type": "Reverb 2", "values": {"Decay Time": 2.0, "Mix": 0.3}},
+    {"slot": "A1", "type": "Chorus", "values": {"Rate": "0.5 Hz", "Depth": "40 %", "Mix": "50 %"}},
+    {"slot": "A2", "type": "Reverb 2", "values": {"Decay Time": "2 s", "Mix": "30 %"}},
 ], parameters={...})
 ```
 
@@ -62,10 +62,14 @@ live_surge_write(name="LB Wet Pad", fx=[
   same type again keeps the slot's values; `"type": "Off"` clears it. `values` alone changes
   the slot's current effect.
 - **Control names** per type are what `live_surge_routings` lists under `effects` (and the
-  error lists when a name is wrong); `"p0"`..`"p11"` always work. Rotary, Waveshaper, Bonsai,
-  Audio In and Floaty Delay names were read off Surge; the others come from Surge's manual,
-  matched to the controls by their units (the result says `names: from the Surge manual`).
-- **Units** as everywhere: Hz controls (low/high cut, EQ freq, filters) in semitones from 440
+  error lists when a name is wrong); `"p0"`..`"p11"` always work, and so do Surge's own labels
+  as Live shows them ("Comb - Frequency"). Rotary, Reverb 2, Neuron, Ensemble, Waveshaper,
+  Bonsai, Audio In and Floaty Delay names were read off Surge; the others come from Surge's
+  manual, matched to the controls by their units (the result says `names: from the Surge manual`).
+- **Give values with their unit** — `"2 s"`, `"250 ms"`, `"4 Hz"`, `"1.5 kHz"`, `"30 %"`,
+  `"-6 dB"`, `"10 cents"` — and the writer converts them. A bare number is the patch's own
+  unit, which is easy to get wrong: Decay Time `2.0` is 2^2 = **4 s**.
+- **Patch units** (bare numbers): Hz controls (low/high cut, EQ freq, filters) in semitones from 440
   Hz (-60..70), times log2 seconds (Delay `Time Left` -1 = 0.5 s, Reverb 2 `Decay Time` 1 = 2 s,
   `Pre-Delay` -4 = 62 ms), rates log2 Hz, % as 0..1 (bipolar -1..1), dB as dB, EQ bandwidth in
   octaves, Delay `Width` / Reverb `Width` in dB.
@@ -90,9 +94,11 @@ live_surge_write(name="LB Wet Pad", fx=[
 | Bonsai | Input Gain, Bass Boost, Bass Distort, Bias Filter, Saturation Type, Saturation, Noise Sensitivity, Noise Gain, Dull, Output Gain, Mix |
 | Tape | Drive, Saturation, Bias, Tone, Speed, Gap, Spacing, Thickness, Depth, Amount, Variance, Mix |
 | Rotary | Horn Rate, Doppler, Tremolo, Rotor Rate, Drive, Model, Width, Mix |
+| Neuron | Drive, Squash, Stab, Asymmetry, Bias, Comb Frequency, Comb Separation, Waveform, Rate, Depth, Width, Output Gain |
+| Ensemble | Anti-Alias Filter, Frequency 1, Depth 1, Frequency 2, Depth 2, Delay Type, Clock Rate, Saturation, Feedback, Width, Mix, Reconstruction Filter |
 
-The rest (Freq Shift, Conditioner, Vocoder, Ring Mod, Neuron, Graphic EQ, Resonator, CHOW,
-Exciter, Ensemble, Combulator, Nimbus, Treemonster, Mid-Side Tool, Spring Reverb, Audio In,
+The rest (Freq Shift, Conditioner, Vocoder, Ring Mod, Graphic EQ, Resonator, CHOW,
+Exciter, Combulator, Nimbus, Treemonster, Mid-Side Tool, Spring Reverb, Audio In,
 Floaty Delay, Convolution) are named the same way: read them from an error or from
 `live_surge_routings` after a dry run.
 
@@ -134,8 +140,9 @@ live_plugin_expose(plugin="Surge XT", preset_file="<vstpreset_path>",
 - **Restore**: Surge applies a preset after Live has read the exposed knobs, so LiveBridge
   sets them again from the preset (result `restored: N`). A knob it cannot convert is named in
   `warning` (rare oscillator controls: Sine feedback, Window shape, FM3's first ratio, String
-  exciter, Twist engine, Alias shape; a few FX menus and Airwindows' controls) — unexposed
-  controls always keep the preset's values. FX controls convert per FX type.
+  exciter, Twist engine, Alias shape; Ensemble's Delay Type, Neuron's Comb Separation, a few
+  other FX menus, Airwindows' controls) — unexposed controls always keep the preset's values.
+  FX controls convert per FX type.
 - **Knob names follow the oscillator type**: Surge renames `A Osc 1 Shape` to `A Osc 1 M1
   Amount` (FM2), `A Osc 1 Morph` (Wavetable) ... Expose by either name; afterwards address
   knobs by the index the expose result lists.

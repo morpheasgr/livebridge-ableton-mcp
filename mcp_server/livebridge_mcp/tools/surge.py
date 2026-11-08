@@ -127,12 +127,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 Wavetable oscillator (Window with "window": true); its position and other
                 controls are set in Live afterwards (A Osc 2 Shape is the position for the
                 Wavetable type).
-            fx: [{"slot": "A1", "type": "Reverb 2", "values": {"Decay Time": 1.5, "Mix": 0.3}}]
+            fx: [{"slot": "A1", "type": "Reverb 2", "values": {"Decay Time": "2 s", "Mix": "30 %"}}]
                 — puts an effect in any slot, empty or not (A1-A4 / B1-B4 scene inserts,
                 S1-S4 sends, G1-G4 global; or 1-16 in patch order), starting from Surge's own
                 values for that type, then sets controls by name (as live_surge_routings lists
-                them under effects) or "p0".."p11", in patch units: Hz controls in semitones
-                from 440 Hz (-60..70), times log2 s, rates log2 Hz, % as 0..1, dB as dB.
+                them under effects) or "p0".."p11". Values with a unit ("2 s", "250 ms",
+                "4 Hz", "1.5 kHz", "30 %", "-6 dB") are converted; bare numbers are patch
+                units: Hz controls in semitones from 440 Hz (-60..70), times log2 s (2.0 = 4 s),
+                rates log2 Hz, % as 0..1, dB as dB.
                 Without "type" it changes the slot's current effect. Route modulation onto an
                 effect with targets fx1_p0..fx16_p11 (A1 = fx1, the order above).
             template: The `.fxp` or Surge `.vstpreset` to start from (default: Surge's
