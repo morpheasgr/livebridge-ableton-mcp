@@ -18,6 +18,15 @@ copied. Implemented in `mcp_server/livebridge_mcp/surge.py` (`live_surge_write`)
   only the XML, copies everything after it unchanged and fixes the XML size and chunk size.
   Revisions seen: 21, 22, 24, 26, 30, 31.
 
+## Wavetable flags and `.wt` files
+
+Confirmed by reading Surge's `scripts/patch-tool` and `scripts/wt-tool` for facts (no code
+used): the header word our patches show as 4 is a flags field — 0x01 the oscillator holds a
+sample, 0x02 the sample loops, 0x04 samples are 16-bit integers (otherwise 32-bit floats), 0x08
+full-range 16-bit (0x0C). A standalone `.wt` file has the same 12-byte header with the ident
+`vawt` in place of the leading zero word, then the samples. The writer copies embedded tables
+byte for byte, so every variant survives.
+
 ## As a `.vstpreset`
 
 Surge XT's VST3 state (class id `ABCDEF019182FAEB566D624153675854`) is the `.fxp` body without

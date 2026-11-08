@@ -54,7 +54,9 @@ the Remote Script references in `docs/LIVE_API_VERIFIED.md` (ahujasid/ableton-mc
 bschoepke/ableton-live-mcp, Ziforge/ableton-liveapi-tools, jpoindexter/ableton-mcp,
 ideoforms/AbletonOSC, gluon's decompiled MIDI Remote Scripts, NSUSpray's Live API doc),
 Producer Pal's plug-in-host spike (GPL-3, re-implemented from its notes), fadelabs/phantom
-(AGPL-3.0, feature list only) and LivePilot (BSL, ideas only).
+(AGPL-3.0, feature list only), LivePilot (BSL, ideas only) and Surge XT's
+`scripts/patch-tool` and `scripts/wt-tool` (GPL-3.0, read for file-format facts only, after
+LiveBridge's Surge writer was built from patch files).
 
 ## ableton-mcp-pro
 
