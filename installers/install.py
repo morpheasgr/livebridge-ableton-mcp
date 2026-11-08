@@ -68,6 +68,10 @@ ENGINE_SOURCE = REPO_ROOT / "max_for_live" / ENGINE_NAME
 #: Where Live's browser shows Max audio effects of the User Library.
 ENGINE_PRESETS = ("Presets", "Audio Effects", "Max Audio Effect")
 MIDI_NAME = "LiveBridge MIDI"
+#: Presets LiveBridge ships (the Massive writer's templates ...), copied to
+#: <User Library>/LiveBridge Presets/<same path>; a file the user changed is left alone.
+PRESETS_SOURCE = REPO_ROOT / "presets"
+PRESETS_DEST = "LiveBridge Presets"
 #: The Max for Live devices: (name, source folder, User Library folder, the file besides the
 #: .amxd that marks it as ours, manifest key, what Claude gets).
 M4L_DEVICES = (
@@ -889,6 +893,7 @@ class Installer(Ops):
             self.install_remote_script(remote_scripts)
             if self.args.engine:
                 self.install_m4l_devices(remote_scripts.parent)
+            self.install_presets(remote_scripts.parent)
         self.write_user_config()
         if self.args.mcp:
             self.mcp_command = self.install_mcp_server()
@@ -1183,6 +1188,31 @@ class Installer(Ops):
                         continue
             self.manifest[key] = str(dest)
             self.devices.append((name, tuple(presets), use))
+
+    def install_presets(self, user_library: Path) -> None:
+        """Copy the shipped presets (``presets/``: the Massive writer's templates) into
+        ``<User Library>/LiveBridge Presets``. New files are added, unchanged ones skipped;
+        an existing file that differs is the user's and stays as it is."""
+        files = tree_files(PRESETS_SOURCE) if PRESETS_SOURCE.is_dir() else {}
+        if not files:
+            return
+        self.step("Installing LiveBridge's presets")
+        base = user_library / PRESETS_DEST
+        for rel, data in sorted(files.items()):
+            dest = base / rel
+            if dest.is_file() and dest.read_bytes() == data:
+                self.info("unchanged: %s" % dest)
+                continue
+            if dest.exists():
+                self.info("kept your version of %s (it differs from the shipped one)" % dest)
+                continue
+            self.action("install %s" % dest)
+            if not self.dry:
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(data)
+                except OSError as error:
+                    self.warn("could not copy %s (%s)" % (dest, error))
 
     # -- MCP side config -----------------------------------------------------
     def write_user_config(self) -> None:

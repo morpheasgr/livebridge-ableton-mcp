@@ -36,7 +36,8 @@ for LiveBridge from Massive's documented architecture and common sound-design pr
 
 ## Starting points (templates)
 
-Two Live presets of Massive, made once by the user and kept in the User Library:
+Two Massive presets, made by the user and shipped with LiveBridge: the installer puts them in
+User Library > LiveBridge Presets > Massive (a copy you changed there is kept):
 
 - **"Massive Init"**: the user's plain init. For static sounds — bass, lead, sub, keys with a
   fixed tone.

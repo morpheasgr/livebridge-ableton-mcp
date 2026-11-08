@@ -1659,3 +1659,20 @@ def test_checklist_says_whether_the_skill_needs_uploading_again(tmp_path):
     assert "Skill unchanged since the last install" in checklist()
     (host.home / ".livebridge" / "livebridge-skill.zip").write_bytes(b"older skill")
     assert "The skill was UPDATED" in checklist()
+
+
+def test_shipped_presets_go_to_livebridge_presets_and_user_edits_stay(tmp_path, monkeypatch):
+    source = tmp_path / "shipped"
+    (source / "Massive").mkdir(parents=True)
+    (source / "Massive" / "Massive Init.vstpreset").write_bytes(b"VST3 init")
+    (source / "Massive" / "Massive Init (LB routed).vstpreset").write_bytes(b"VST3 routed")
+    monkeypatch.setattr(install, "PRESETS_SOURCE", source)
+    host = mac_host(tmp_path)
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert code == 0, out
+    dest = remote_dir_mac(host).parent.parent / "LiveBridge Presets" / "Massive"
+    assert (dest / "Massive Init.vstpreset").read_bytes() == b"VST3 init"
+    (dest / "Massive Init (LB routed).vstpreset").write_bytes(b"VST3 mine")
+    code, out, _ = run_install(host, ["--no-desktop", "--no-claude-code"])
+    assert code == 0 and "kept your version" in out
+    assert (dest / "Massive Init (LB routed).vstpreset").read_bytes() == b"VST3 mine"

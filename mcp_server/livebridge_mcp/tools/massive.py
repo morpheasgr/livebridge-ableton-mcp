@@ -35,9 +35,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         for preset in (found or {}).get("presets") or []:
             if str(preset.get("path", "")).lower().endswith(".vstpreset"):
                 return Path(preset["path"])
-        return tool_error("no 'Massive Init (LB routed)' .vstpreset found — pass template=, "
-                          "or save one: drag the Massive device into the User Library "
-                          "(MASSIVE.md, Templates)", type="not_found", cmd="massive.write")
+        return tool_error("no 'Massive Init (LB routed)' .vstpreset found — the installer puts "
+                          "it in User Library/LiveBridge Presets/Massive (run the installer "
+                          "or Update LiveBridge again), or pass template=", type="not_found",
+                          cmd="massive.write")
 
     @mcp.tool()
     def live_massive_routings(file_path: str | None = None) -> Any:

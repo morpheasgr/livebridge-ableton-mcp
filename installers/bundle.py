@@ -35,7 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TOP_FOLDER = "LiveBridge"
 
 #: Top-level entries that go into the bundle (missing ones are skipped).
-INCLUDE = ("remote_script", "mcp_server", "installers", "max_for_live", "docs", "tests",
+INCLUDE = ("remote_script", "mcp_server", "installers", "max_for_live", "presets", "docs", "tests",
            ".claude/skills", "examples", "README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md",
            "CLAUDE.md", "PLAN.md")
 #: Directory names never packed, wherever they are.
