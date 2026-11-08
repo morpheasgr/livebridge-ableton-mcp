@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, fx_unit
+from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, FX_MENUS, fx_unit
 
 PLUGIN_ID = b"cjs3"
 CLASS_ID = "ABCDEF019182FAEB566D624153675854"          # Surge XT's VST3 class id
@@ -770,6 +770,8 @@ def fx_patch_value(fx_type: int, k: int, text: str) -> float:
     "30 %", "-6 dB", "10 cents" (Hz controls -> semitones from 440, times and rates -> log2,
     % -> fraction, levels -> Surge's level curve)."""
     import math
+    if (fx_type, k) in FX_MENUS:
+        return float(_list_index(FX_MENUS[(fx_type, k)], text, "entry"))
     kind = fx_unit(fx_type, k)
     match = _UNIT_TEXT.fullmatch(text)
     if kind is None or not match:

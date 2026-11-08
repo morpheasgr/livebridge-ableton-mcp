@@ -379,8 +379,9 @@ def test_fx_warnings_and_host_values():
     patch.set_fx("A2", "Ensemble")
     names = {"FX A1 Param 11": "fx1_p10", "FX A1 Param 10": "fx1_p9", "FX A2 Param 6": "fx2_p5"}
     values, skipped = S.host_values(patch, names, list(names))
-    assert values == {"FX A1 Param 11": 0.5}            # p9 unused: neither set nor reported
-    assert skipped == ["FX A2 Param 6"]                  # Ensemble's delay type: unknown menu
+    assert values["FX A1 Param 11"] == 0.5 and "FX A1 Param 10" not in values   # p9 unused
+    assert skipped == []                                 # Ensemble's delay type: 7 entries
+    assert values["FX A2 Param 6"] == pytest.approx(0.005 + 0.99 * 2 / 6)  # BBD 256
     assert S.generic_names(["FX A1 Mix", "FX A1 Param 3", "FX S1 Decay Time"], patch) == \
         ["FX A1 Param 11", "FX A1 Param 3", "FX S1 Param 3"]
 
@@ -418,11 +419,12 @@ def test_restore_warns_with_the_knobs_final_names(tmp_path, monkeypatch):
 
     patch = S.Patch.load(INIT_SAW)
     patch.set_fx("A2", "Ensemble", {"Mix": "50 %"})
+    patch.set_fx("B1", "Airwindows")                   # its controls: not convertible
     preset = tmp_path / "E.vstpreset"
     preset.write_bytes(patch.to_vstpreset())
     monkeypatch.setattr(racks, "_SURGE_SETTLE_S", 0)
     monkeypatch.setattr(racks, "_SURGE_RELABEL_S", 0)
-    final = {0: "A2 Output - Mix", 1: "A2 Delay - Type"}
+    final = {0: "A2 Output - Mix", 1: "B1 AD Clip - Boost"}
 
     def fake_call(_bridge, cmd, args, _timeout=None):
         if cmd == "devices.parameters":
@@ -433,10 +435,11 @@ def test_restore_warns_with_the_knobs_final_names(tmp_path, monkeypatch):
 
     monkeypatch.setattr(racks, "bridge_call", fake_call)
     result = {"device": 1, "parameters": [{"index": 0, "name": "FX A2 Param 11"},
-                                          {"index": 1, "name": "FX A2 Param 6"}]}
+                                          {"index": 1, "name": "FX B1 Param 2"}]}
     asyncio.run(racks._restore_surge_values(None, result, str(preset)))
     assert result["restored"] == 1
-    assert "A2 Delay - Type" in result["warning"] and "Param 6" not in result["warning"]
+    assert "B1 AD Clip - Boost" in result["warning"] and "Param 2" not in result["warning"]
+    assert S.host_value("fx3_p6", 12.0, fx_type=15) == pytest.approx(108 / 192)   # Neuron
 
 
 def test_fx_names_are_surges_labels():
@@ -446,3 +449,6 @@ def test_fx_names_are_surges_labels():
     assert S.fx_control(26, "Mid Filter - Gain") == 2                            # Mid-Side Tool
     assert S.fx_control(16, "1 kHz") == 5 and S.fx_control(14, "Param 4") == 5   # GEQ, Airwindows
     assert S.fx_control(31, "Impulse Response - Reverse From") == 3
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_fx("A1", "Ensemble", {"Delay - Type": "BBD 1024 Stages"})
+    assert patch.params.find("fx1_p5").get("value") == "4"

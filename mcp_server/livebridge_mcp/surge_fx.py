@@ -87,7 +87,7 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
     14: [("FX", None)] + [(f"Param {k}", None) for k in range(10)]
         + [(None, None)],                                                          # Airwindows
     15: [("Drive", _DB24), ("Squash", _PCT), ("Stab", _PCT), ("Asymmetry", _PCT),
-         ("Bias", _PCT), ("Comb Frequency", _HZ), ("Comb Separation", None),
+         ("Bias", _PCT), ("Comb Frequency", _HZ), ("Comb Separation", (-96.0, 96.0)),   # semitones (user's patches)
          ("Waveform", _WAVES), ("Rate", _RATE), ("Depth", _PCT),
          ("Width", _DB24), ("Output Gain", _DB24)],                                # Neuron
     16: [(band, _DB24) for band in ("30 Hz", "60 Hz", "120 Hz", "250 Hz", "500 Hz", "1 kHz",
@@ -103,7 +103,7 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
         + [(None, None)] * 7,                                                      # Exciter
     20: [("Anti-Alias Filter", _HZ), ("Frequency 1", (math.log2(0.01), math.log2(20))),
          ("Depth 1", _PCT), ("Frequency 2", (math.log2(0.01), math.log2(20))),
-         ("Depth 2", _PCT), ("Delay Type", None), ("Clock Rate", (1.5, 100.0)),
+         ("Depth 2", _PCT), ("Delay Type", ("menu", 0, 7)), ("Clock Rate", (1.5, 100.0)),
          ("Saturation", _PCT), ("Feedback", _PCT), ("Width", _BI), ("Mix", _PCT),
          ("Reconstruction Filter", _HZ)],                                          # Ensemble
     21: [("Extra Noise", _PCT), ("Center", (_st(0.5), 70.0)), ("Offset 2", (-60.0, 60.0)),
@@ -625,3 +625,10 @@ def fx_unit(fx_type: int, k: int) -> str | None:
         if spec in ranges:
             return kind
     return None
+
+
+# Menus whose entries are known (read in Surge by the user): set by name.
+FX_MENUS: dict[tuple[int, int], list[str]] = {
+    (20, 5): ["Digital Delay", "BBD 128 Stages", "BBD 256 Stages", "BBD 512 Stages",
+              "BBD 1024 Stages", "BBD 2048 Stages", "BBD 4096 Stages"],     # Ensemble type
+}

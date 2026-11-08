@@ -112,6 +112,9 @@ live_surge_write(name="LB Wet Pad", fx=[
 | Floaty Delay | Time, Playrate, Feedback, Cutoff, Resonance, Warp Rate, Warp Width, Pitch Depth, Filter Depth, Low Cut, Mix |
 | Convolution | Pre-Delay, Size, Start, Reverse From, Tilt Center, Tilt Slope, Low Cut, High Cut, Mix |
 
+Ensemble's Delay Type takes its entry by name: `"Digital Delay"`, `"BBD 128 Stages"` ...
+`"BBD 4096 Stages"`.
+
 Airwindows' Param 0-9 are the chosen Airwindows effect's controls (AD Clip: Boost, Soften,
 Enhance, Mode); Surge relabels them per effect.
 
@@ -153,8 +156,7 @@ live_plugin_expose(plugin="Surge XT", preset_file="<vstpreset_path>",
 - **Restore**: Surge applies a preset after Live has read the exposed knobs, so LiveBridge
   sets them again from the preset (result `restored: N`). A knob it cannot convert is named in
   `warning` (rare oscillator controls: Sine feedback, Window shape, FM3's first ratio, String
-  exciter, Twist engine, Alias shape; Ensemble's Delay Type, Neuron's Comb Separation, a few
-  other FX menus, Airwindows' controls) — unexposed controls always keep the preset's values.
+  exciter, Twist engine, Alias shape; a few FX menus, Airwindows' controls) — unexposed controls always keep the preset's values.
   FX controls convert per FX type.
 - **Knob names follow the oscillator type**: Surge renames `A Osc 1 Shape` to `A Osc 1 M1
   Amount` (FM2), `A Osc 1 Morph` (Wavetable) ... Expose by either name; afterwards address
