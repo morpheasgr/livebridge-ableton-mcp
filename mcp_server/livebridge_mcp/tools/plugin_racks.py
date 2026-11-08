@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 import time as _time
 from typing import Any
@@ -109,6 +110,8 @@ async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file
     result.pop("warning", None)
     result["restored"] = len(values)
     skipped = [str((by_name.get(n) or {}).get("name") or n) for n in skipped]   # final names
+    # Surge labels a control the current effect does not use "Param N" (Airwindows): skip it
+    skipped = [n for n in skipped if not re.search(r" - Param \d+$", n)]
     if skipped:
         result["warning"] = (
             "Surge XT's exposed parameters start at the template's values (it applies a preset "

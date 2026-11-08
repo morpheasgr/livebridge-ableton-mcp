@@ -424,6 +424,15 @@ class Patch:
             if all(e is None or float(e.get("value", "0")) == 0 for e in levels):
                 out.append(f"FX {FX_SLOTS[number - 1]} is a send effect and both scenes send "
                            f"nothing to it: set a_send_fx_{send} (0..1.59, 1 = 0 dB)")
+        mode, active = (self.params.find(n) for n in ("scenemode", "scene_active"))
+        if mode is not None and active is not None and mode.get("value") == "0":
+            silent = "b" if active.get("value") == "0" else "a"
+            used = [e["slot"] for e in self.effects() if e["slot"][0].lower() == silent]
+            if used:
+                out.append(f"FX {', '.join(used)} sit on scene {silent.upper()}, which does not "
+                           f"play: the patch is in Single scene mode with scene "
+                           f"{'AB'[silent == 'a']} active — use the {'AB'[silent == 'a']} "
+                           "slots, or G1-G4 for both")
         for entry in self.effects():
             if entry["type"] == "Convolution":
                 out.append(f"FX {entry['slot']} Convolution needs an impulse response: "

@@ -191,7 +191,8 @@ Each is one `live_surge_write` call plus a few knobs in Live.
 
 ## When something sounds wrong
 
-- **An effect not heard**: a send slot (S1-S4) with the scene's send at 0; Mix at 0.
+- **An effect not heard**: a send slot (S1-S4) with the scene's send at 0; a B slot while
+  only scene A plays (Single scene mode, the default: use A or G slots); Mix at 0.
 - **Silence / no movement**: a filter that is Off, an LFO at 1 Hz free-running, an
   oscillator muted (`a_mute_o2` = 1 in Init Saw for osc 2 and 3), a routing with a tiny depth.
 - **Exposed knob back to a default**: it was not converted on load (see `warning`); set it

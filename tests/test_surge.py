@@ -371,6 +371,10 @@ def test_fx_warnings_and_host_values():
     assert "a_send_fx_1" in text and "impulse response" in text
     patch.set_parameter("a_send_fx_1", 1.0)
     assert "a_send_fx_1" not in " ".join(patch.warnings())
+    patch.set_fx("B1", "Combulator")
+    assert "FX B1 sit on scene B, which does not play" in " ".join(patch.warnings())
+    patch.set_parameter("scenemode", 3)                              # Dual: both scenes play
+    assert "does not play" not in " ".join(patch.warnings())
     # Reverb 2 Decay Time: log2 s -4..6; Mix 0..1; FX Delay mod rate log2 Hz -7..9
     assert S.host_value("fx5_p2", 1.0, fx_type=11) == pytest.approx(0.5)
     assert S.host_value("fx5_p9", 0.33, fx_type=11) == pytest.approx(0.33)
@@ -424,7 +428,7 @@ def test_restore_warns_with_the_knobs_final_names(tmp_path, monkeypatch):
     preset.write_bytes(patch.to_vstpreset())
     monkeypatch.setattr(racks, "_SURGE_SETTLE_S", 0)
     monkeypatch.setattr(racks, "_SURGE_RELABEL_S", 0)
-    final = {0: "A2 Output - Mix", 1: "B1 AD Clip - Boost"}
+    final = {0: "A2 Output - Mix", 1: "B1 AD Clip - Boost", 2: "B1 AD Clip - Param 4"}
 
     def fake_call(_bridge, cmd, args, _timeout=None):
         if cmd == "devices.parameters":
@@ -435,10 +439,12 @@ def test_restore_warns_with_the_knobs_final_names(tmp_path, monkeypatch):
 
     monkeypatch.setattr(racks, "bridge_call", fake_call)
     result = {"device": 1, "parameters": [{"index": 0, "name": "FX A2 Param 11"},
-                                          {"index": 1, "name": "FX B1 Param 2"}]}
+                                          {"index": 1, "name": "FX B1 Param 2"},
+                                          {"index": 2, "name": "FX B1 Param 6"}]}
     asyncio.run(racks._restore_surge_values(None, result, str(preset)))
     assert result["restored"] == 1
     assert "B1 AD Clip - Boost" in result["warning"] and "Param 2" not in result["warning"]
+    assert "Param 4" not in result["warning"]                       # unused for AD Clip
     assert S.host_value("fx3_p6", 12.0, fx_type=15) == pytest.approx(108 / 192)   # Neuron
 
 
