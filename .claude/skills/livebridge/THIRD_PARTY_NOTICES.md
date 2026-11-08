@@ -48,6 +48,9 @@ patch files (Surge itself is GPL-3.0; none of its code was read or copied). The 
 `tests/data/surge/Init Saw.fxp` is Surge's factory template, CC0 by its own metadata. Effect
 control names are Surge's labels as Live shows them (names only, as facts).
 
+Massive: the two templates in `presets/Massive` are the user's own presets (Massive's
+init sound, saved from Live; the routed one adds the user's routings).
+
 ### Studied, not copied
 
 These were read for how Live's API behaves or for feature ideas; no code or text was taken:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -176,3 +177,16 @@ def test_the_sidechain_slot_is_never_filled():
     with pytest.raises(ValueError, match="sidechain"):
         patch.route("FILTER1-CUT/PRM.1", "macro1", 0.2)
     assert patch.route("FILTER1-CUT/PRM.1", "macro1", remove=True)["slot"] == 3
+
+
+def test_shipped_templates_load_and_take_a_write():
+    from livebridge_mcp import massive as M
+    base = Path(__file__).resolve().parent.parent / "presets" / "Massive"
+    plain = M.Patch.load(base / "Massive Init.vstpreset")
+    routed = M.Patch.load(base / "Massive Init (LB routed).vstpreset")
+    assert plain.routings() == [] and len(routed.routings()) == 14
+    assert {s["type"] for s in routed.slots().values()} == {"lfo"}
+    with pytest.raises(ValueError, match="no free slot"):            # the template fills it
+        routed.route("FILTER1-CUT/PRM.1", "macro1", amount=0.5)
+    plain.route("FILTER1-CUT/PRM.1", "macro1", amount=0.5)
+    assert M.Patch(plain.to_bytes()).routings() == plain.routings() != []
