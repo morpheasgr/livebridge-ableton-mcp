@@ -83,6 +83,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         routings: list[dict[str, Any]] | None = None,
         step_sequences: list[dict[str, Any]] | None = None,
         parameters: dict[str, Any] | None = None,
+        wavetables: list[dict[str, Any]] | None = None,
         template: str | None = None,
         output_path: str | None = None,
         formats: list[str] | None = None,
@@ -114,6 +115,11 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 levels 0..1); filter types and subtypes also by name (LP/HP/BP/N 12 dB and
                 24 dB, LP Vintage Ladder, LP OB-Xd 24 dB, LP K35, LP Diode Ladder, MULTI Fast
                 SVF, FX Comb + ...). Parameters are applied in the order given: type first.
+            wavetables: [{"osc": 2, "file": ".../Growl.wt", "scene": "a", "window": false}] —
+                embeds a Surge `.wt` wavetable in that oscillator (1-3) and makes it a
+                Wavetable oscillator (Window with "window": true); its position and other
+                controls are set in Live afterwards (A Osc 2 Shape is the position for the
+                Wavetable type).
             template: The `.fxp` or Surge `.vstpreset` to start from (default: Surge's
                 "Init Saw").
             output_path: Full path (.fxp or .vstpreset) instead of Patches/LiveBridge/<name>;
@@ -137,8 +143,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         cmd = "surge.write"
         routings, step_sequences, parameters = routings or [], step_sequences or [], \
             parameters or {}
-        if not (routings or step_sequences or parameters):
-            return tool_error("give routings, step_sequences and/or parameters", cmd=cmd)
+        wavetables = wavetables or []
+        if not (routings or step_sequences or parameters or wavetables):
+            return tool_error("give routings, step_sequences, parameters and/or wavetables",
+                              cmd=cmd)
         stem = (name or "").strip().removesuffix(".fxp")
         if not stem or any(c in stem for c in '\\/:*?"<>|'):
             return tool_error("name must be a plain patch name", cmd=cmd)
@@ -149,6 +157,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                   ".fxp), e.g. one saved from Surge", type="not_found", cmd=cmd)
             patch = surge.Patch.load(source)
             changes: list[dict[str, Any]] = []
+            for entry in wavetables:
+                if not isinstance(entry, dict) or "osc" not in entry or "file" not in entry:
+                    return tool_error("each wavetable needs osc and file", cmd=cmd)
+                table = Path(str(entry["file"])).expanduser()
+                changes.append(patch.set_wavetable(int(entry["osc"]), table.read_bytes(),
+                                                   table.stem, scene=entry.get("scene", "a"),
+                                                   window=bool(entry.get("window"))))
             for key, value in parameters.items():
                 changes.append(patch.set_parameter(key, value))
             for entry in step_sequences:

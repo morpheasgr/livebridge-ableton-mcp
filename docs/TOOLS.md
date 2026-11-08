@@ -3131,6 +3131,7 @@ Write a new Surge XT patch: a copy of the template with routings, step sequences
 | `routings` | list[object] \| null | `null` |
 | `step_sequences` | list[object] \| null | `null` |
 | `parameters` | object \| null | `null` |
+| `wavetables` | list[object] \| null | `null` |
 | `template` | str \| null | `null` |
 | `output_path` | str \| null | `null` |
 | `formats` | list[str] \| null | `null` |

@@ -122,9 +122,15 @@ class Patch:
         xml_size = struct.unpack_from("<I", chunk, 4)[0]
         self.wavetable_sizes = struct.unpack_from("<6I", chunk, 8)
         self.xml = chunk[32:32 + xml_size]
-        self.tail = chunk[32 + xml_size:]           # wavetables + nightly data, kept as is
-        if sum(self.wavetable_sizes) > len(self.tail):
+        rest = chunk[32 + xml_size:]               # wavetables, then nightly data (kept)
+        if sum(self.wavetable_sizes) > len(rest):
             raise ValueError("the patch is truncated (wavetables missing)")
+        self.wavetables: list[bytes] = []
+        offset = 0
+        for size in self.wavetable_sizes:
+            self.wavetables.append(rest[offset:offset + size])
+            offset += size
+        self.extra = rest[offset:]
         self.root = ET.fromstring(self.xml)
         if self.root.tag != "patch":
             raise ValueError("the patch XML has no <patch> root")
@@ -298,6 +304,29 @@ class Patch:
                            "the tempo in Surge/Live for rhythmic steps")
         return list(dict.fromkeys(out))
 
+    @property
+    def tail(self) -> bytes:
+        return b"".join(self.wavetables) + self.extra
+
+    def set_wavetable(self, osc: int, data: bytes, name: str, scene: str = "a",
+                      window: bool = False) -> dict[str, Any]:
+        """Put a wavetable (the bytes of a ``.wt`` file) into oscillator ``osc`` (1-3) and
+        make it a Wavetable oscillator (or Window with ``window=True``)."""
+        if scene not in ("a", "b") or int(osc) not in (1, 2, 3):
+            raise ValueError("scene must be 'a' or 'b', osc 1-3")
+        block, frames, length, flags = wavetable_block(data)
+        slot = "ab".index(scene) * 3 + int(osc) - 1
+        before = len(self.wavetables[slot])
+        self.wavetables[slot] = block
+        osc_type = self.parameter(f"{scene}_osc{osc}_type")
+        osc_type.set("value", "7" if window else "2")
+        extra = self.root.find(f"extraoscdata/osc_extra_sc{'ab'.index(scene)}_osc{int(osc) - 1}")
+        if extra is not None:
+            extra.set("wavetable_display_name", name)
+        return {"scene": scene, "osc": int(osc), "wavetable": name, "frames": frames,
+                "samples_per_frame": length, "format": "float32" if not flags & 4 else "int16",
+                "replaced_bytes": before, "type": "Window" if window else "Wavetable"}
+
     def set_name(self, name: str) -> None:
         meta = self.root.find("meta")
         if meta is not None:
@@ -310,7 +339,8 @@ class Patch:
         xml = ('<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + body).encode()
         ET.fromstring(xml)                                    # what we write parses again
         chunk = b"sub3" + struct.pack("<I", len(xml)) + \
-            struct.pack("<6I", *self.wavetable_sizes) + xml + self.tail
+            struct.pack("<6I", *(len(t) for t in self.wavetables)) + xml + \
+            b"".join(self.wavetables) + self.extra
         head = bytearray(self.head)
         struct.pack_into(">I", head, 56, len(chunk))
         return bytes(head) + chunk
@@ -416,6 +446,23 @@ def _filter_index(patch: "Patch", scene: str, number: str, kind: str, name: str)
     raise ValueError(f"{label} has no subtype {name!r}"
                      + (" — one of: " + ", ".join(subtypes) if subtypes else
                         " (it has none)") + "; set the type first")
+
+
+def wavetable_block(data: bytes) -> tuple[bytes, int, int, int]:
+    """A ``.wt`` file (``vawt``, u32 samples per frame, u16 frames, u16 flags, samples) as
+    the block a patch embeds (same header, a zero word in place of ``vawt``)."""
+    if len(data) < 12 or data[:4] != b"vawt":
+        raise ValueError("not a Surge wavetable (.wt files start with 'vawt')")
+    length, frames, flags = struct.unpack_from("<IHH", data, 4)
+    if flags & 1:
+        raise ValueError("this .wt holds a sample, not a wavetable")
+    if not (length and length & (length - 1) == 0 and length <= 4096) or not 1 <= frames <= 512:
+        raise ValueError(f"unsupported wavetable: {frames} frames of {length} samples")
+    width = 2 if flags & 4 else 4
+    size = 12 + frames * length * width
+    if len(data) < size:
+        raise ValueError("the .wt file is truncated")
+    return bytes(4) + data[4:size], frames, length, flags
 
 
 def _note_length(value: float) -> str:

@@ -205,3 +205,39 @@ def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path)
     assert result["restored"] == 2 and "A Osc 1 Shape" in result["warning"]
     assert result["parameters"][0]["display"] == "after"         # reported after the restore
     assert result["parameters"][0]["value"] == pytest.approx(0.369231, abs=1e-6)
+
+
+def _wt(frames=4, length=256, flags=4):
+    samples = bytes(frames * length * (2 if flags & 4 else 4))
+    return b"vawt" + struct.pack("<IHH", length, frames, flags) + samples
+
+
+def test_wavetables_go_into_the_right_oscillator(tmp_path):
+    patch = S.Patch.load(INIT_SAW)
+    info = patch.set_wavetable(2, _wt(), "Growl")
+    assert info["frames"] == 4 and info["format"] == "int16"
+    patch.set_wavetable(1, _wt(8, 512, 0), "Float", scene="b", window=True)
+    patch.route("a_pan", "lfo1", 0.5)
+    again = S.Patch(patch.to_bytes())
+    assert [len(t) for t in again.wavetables] == [0, 12 + 4 * 256 * 2, 0,
+                                                  12 + 8 * 512 * 4, 0, 0]
+    assert again.wavetables[1][:4] == bytes(4)               # zero word, not 'vawt'
+    assert again.params.find("a_osc2_type").get("value") == "2"
+    assert again.params.find("b_osc1_type").get("value") == "7"
+    name = again.root.find("extraoscdata/osc_extra_sc0_osc1").get("wavetable_display_name")
+    assert name == "Growl" and again.routings()[0]["target"] == "a_pan"
+    with pytest.raises(ValueError, match="vawt"):
+        patch.set_wavetable(1, b"RIFF" + bytes(20), "x")
+    with pytest.raises(ValueError, match="sample"):
+        patch.set_wavetable(1, _wt(flags=5), "x")
+    with pytest.raises(ValueError, match="truncated"):
+        patch.set_wavetable(1, _wt()[:100], "x")
+
+
+def test_wavetable_keeps_nightly_data_after_the_tables():
+    data = bytearray(INIT_SAW.read_bytes()) + b"(\xb5/\xfd-nightly"
+    struct.pack_into(">I", data, 56, len(data) - 60)
+    patch = S.Patch(bytes(data))
+    patch.set_wavetable(3, _wt(), "T")
+    out = patch.to_bytes()
+    assert out.endswith(b"(\xb5/\xfd-nightly") and S.Patch(out).wavetables[2][:4] == bytes(4)

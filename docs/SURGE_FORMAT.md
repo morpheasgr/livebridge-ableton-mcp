@@ -25,7 +25,9 @@ used): the header word our patches show as 4 is a flags field — 0x01 the oscil
 sample, 0x02 the sample loops, 0x04 samples are 16-bit integers (otherwise 32-bit floats), 0x08
 full-range 16-bit (0x0C). A standalone `.wt` file has the same 12-byte header with the ident
 `vawt` in place of the leading zero word, then the samples. The writer copies embedded tables
-byte for byte, so every variant survives.
+byte for byte, so every variant survives, and embeds a `.wt` file by writing its header with a
+zero word in place of `vawt` (as Surge's own patches store it) into the oscillator's slot;
+oscillator type 2 is Wavetable, 7 Window (both read the table; from the factory templates).
 
 ## As a `.vstpreset`
 
