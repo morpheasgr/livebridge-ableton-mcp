@@ -8,7 +8,7 @@ Everything here was worked out from patch files and checked in Live on the user'
 
 | What | How |
 |---|---|
-| Routings (any source onto any knob), step sequencers, tempo sync, wavetables, oscillator / filter / FX types, any patch value | write a patch: `live_surge_write` |
+| Routings (any source onto any knob), step sequencers, tempo sync, wavetables, effects in any slot, oscillator / filter / FX types, any patch value | write a patch: `live_surge_write` |
 | Tweaking while listening, automation, macros, undo | expose knobs in Live: `live_plugin_expose(plugin="Surge XT", preset_file=...)`, then `live_device_set_parameters` |
 
 Typical run: write the patch, load its `.vstpreset` with the knobs you want to play with, tweak,
@@ -44,8 +44,57 @@ live_surge_write(
   `"Distortion"`, `"Waveshaper"`, `"Phaser"`, `"Flanger"` ... (32). Types apply first.
 - **Oscillator type switch**: the oscillator's seven controls start from Surge's own values for
   that type (String, Twist and Alias keep the previous ones: set them in Live).
-- **FX**: only slots the template already uses can be changed (Init Saw has none: empty slots
-  are not in the file). Otherwise set the FX type in Live after loading (`FX A1 FX Type`).
+- **FX**: any slot, empty or not, with `fx=` (next section).
+
+### Effects (`fx=`)
+
+```python
+live_surge_write(name="LB Wet Pad", fx=[
+    {"slot": "A1", "type": "Chorus", "values": {"Rate": -1.0, "Depth": 0.4, "Mix": 0.5}},
+    {"slot": "A2", "type": "Reverb 2", "values": {"Decay Time": 2.0, "Mix": 0.3}},
+], parameters={...})
+```
+
+- **Slots**: `A1`-`A4` scene A inserts, `B1`-`B4` scene B, `S1`-`S4` sends, `G1`-`G4` global
+  (master). A send only sounds when the scene sends to it: `a_send_fx_1`..`4` for S1-S4 (0..1.59,
+  1 = 0 dB, Init Saw sends nothing; `warnings` says so). Prefer the inserts.
+- **A new type starts from Surge's own values** for it (measured in Surge XT 1.4.0); the
+  same type again keeps the slot's values; `"type": "Off"` clears it. `values` alone changes
+  the slot's current effect.
+- **Control names** per type are what `live_surge_routings` lists under `effects` (and the
+  error lists when a name is wrong); `"p0"`..`"p11"` always work. Rotary, Waveshaper, Bonsai,
+  Audio In and Floaty Delay names were read off Surge; the others come from Surge's manual,
+  matched to the controls by their units (the result says `names: from the Surge manual`).
+- **Units** as everywhere: Hz controls (low/high cut, EQ freq, filters) in semitones from 440
+  Hz (-60..70), times log2 seconds (Delay `Time Left` -1 = 0.5 s, Reverb 2 `Decay Time` 1 = 2 s,
+  `Pre-Delay` -4 = 62 ms), rates log2 Hz, % as 0..1 (bipolar -1..1), dB as dB, EQ bandwidth in
+  octaves, Delay `Width` / Reverb `Width` in dB.
+- **Modulate** an effect with a routing onto `fx<N>_p<k>`: N is the slot in patch order
+  (A1=1, A2=2, B1=3, B2=4, S1=5, S2=6, G1=7, G2=8, A3=9, A4=10, B3=11, B4=12, S3=13, S4=14,
+  G3=15, G4=16), k the control (Reverb 2 Mix = p9).
+- Not written: Airwindows' effect parameters (they change per Airwindows effect: name them
+  `p1`..), Nimbus' labels change with its mode, Convolution needs an impulse response loaded in
+  Surge.
+
+| Type | Controls (p0, p1, ...) |
+|---|---|
+| Delay | Time Left, Time Right, Feedback, Crossfeed, Low Cut, High Cut, Mod Rate, Mod Depth, Channel, -, Mix, Width |
+| Reverb 1 | Pre-Delay, Room Shape, Size, Decay Time, HF Damping, Low Cut, Peak Freq, Peak Gain, High Cut, Mix, Width |
+| Reverb 2 | Pre-Delay, Room Size, Decay Time, Diffusion, Buildup, Modulation, LF Damping, HF Damping, Width, Mix |
+| Chorus | Time, Rate, Depth, Feedback, Low Cut, High Cut, Mix, Width |
+| Phaser | Center, Feedback, Sharpness, Rate, Depth, Stereo, Mix, Width, Count, Spread, Waveform, Tone |
+| Flanger | Mode, Waveform, Rate, Depth, Count, Base Pitch, Spacing, Feedback, LF Damping, Width, Mix |
+| Distortion | Pre-EQ Gain/Freq/BW/High Cut, Drive, Feedback, Post-EQ Gain/Freq/BW/High Cut, Output Gain, Model |
+| EQ | Band 1-3 Gain/Freq/BW, Output Gain, Mix |
+| Waveshaper | Pre Low Cut, Pre High Cut, Shape, Bias, Drive, Post Low Cut, Post High Cut, Gain, Mix |
+| Bonsai | Input Gain, Bass Boost, Bass Distort, Bias Filter, Saturation Type, Saturation, Noise Sensitivity, Noise Gain, Dull, Output Gain, Mix |
+| Tape | Drive, Saturation, Bias, Tone, Speed, Gap, Spacing, Thickness, Depth, Amount, Variance, Mix |
+| Rotary | Horn Rate, Doppler, Tremolo, Rotor Rate, Drive, Model, Width, Mix |
+
+The rest (Freq Shift, Conditioner, Vocoder, Ring Mod, Neuron, Graphic EQ, Resonator, CHOW,
+Exciter, Ensemble, Combulator, Nimbus, Treemonster, Mid-Side Tool, Spring Reverb, Audio In,
+Floaty Delay, Convolution) are named the same way: read them from an error or from
+`live_surge_routings` after a dry run.
 
 ### Routings
 
@@ -85,7 +134,8 @@ live_plugin_expose(plugin="Surge XT", preset_file="<vstpreset_path>",
 - **Restore**: Surge applies a preset after Live has read the exposed knobs, so LiveBridge
   sets them again from the preset (result `restored: N`). A knob it cannot convert is named in
   `warning` (rare oscillator controls: Sine feedback, Window shape, FM3's first ratio, String
-  exciter, Twist engine, Alias shape) — unexposed controls always keep the preset's values.
+  exciter, Twist engine, Alias shape; a few FX menus and Airwindows' controls) — unexposed
+  controls always keep the preset's values. FX controls convert per FX type.
 - **Knob names follow the oscillator type**: Surge renames `A Osc 1 Shape` to `A Osc 1 M1
   Amount` (FM2), `A Osc 1 Morph` (Wavetable) ... Expose by either name; afterwards address
   knobs by the index the expose result lists.
@@ -101,11 +151,11 @@ Each is one `live_surge_write` call plus a few knobs in Live.
 
 - **Stepped filter (acid / trance gate)**: the example above. Resonance 0.5-0.7, cutoff
   -24..-12, depth 24-36, rate 1/16; for a gate route the step LFO to `a_volume` instead and use
-  steps of 1 and -1.
+  steps of 1 and -1. Add `fx=[{"slot": "A1", "type": "Delay", "values": {"Mix": 0.25}}]`.
 - **Wavetable pad**: wavetable on osc 1 and 2 (different tables), `a_osc2_pitch` 0.1 (slight
   detune), Amp EG attack 0..1 (1-2 s), release 1..2, slow LFO (`a_lfo0_rate` -3 ≈ 0.125 Hz)
-  on `a_osc1_param0` (position) depth 0.5, filter `"LP 12 dB"` cutoff 20..30, then FX Reverb 2
-  in Live.
+  on `a_osc1_param0` (position) depth 0.5, filter `"LP 12 dB"` cutoff 20..30, FX Chorus on A1
+  and Reverb 2 on A2 (`Decay Time` 2-3, `Mix` 0.3-0.4).
 - **FM bass**: `a_osc1_type` `"FM2"`, `a_osc1_param0` 0.3-0.5 (M1 amount), Filter EG
   (`filtereg`) onto `a_osc1_param0` depth 0.4 with a short decay (`a_env2_decay` -4), mono
   (`a_polymode` in Live: Mono), octave -1.
@@ -119,6 +169,7 @@ Each is one `live_surge_write` call plus a few knobs in Live.
 
 ## When something sounds wrong
 
+- **An effect not heard**: a send slot (S1-S4) with the scene's send at 0; Mix at 0.
 - **Silence / no movement**: a filter that is Off, an LFO at 1 Hz free-running, an
   oscillator muted (`a_mute_o2` = 1 in Init Saw for osc 2 and 3), a routing with a tiny depth.
 - **Exposed knob back to a default**: it was not converted on load (see `warning`); set it

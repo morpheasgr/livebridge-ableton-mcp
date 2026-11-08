@@ -18,6 +18,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, VERIFIED
+
 PLUGIN_ID = b"cjs3"
 CLASS_ID = "ABCDEF019182FAEB566D624153675854"          # Surge XT's VST3 class id
 _INFO = ("<?xml version='1.0' encoding='utf-8'?>\n<MetaInfo>" + "".join(
@@ -187,9 +189,8 @@ class Patch:
     def parameter(self, name: str) -> ET.Element:
         element = self.params.find(name)
         if element is None and re.fullmatch(r"fx\d+_(type|p\d+)", name):
-            raise ValueError(f"{name}: this FX slot is empty in the template, and Surge keeps "
-                             "empty slots out of the file — start from a patch that uses it, "
-                             "or set the FX type in Live after loading (FX A1 FX Type ...)")
+            raise ValueError(f"{name}: this FX slot is empty — give its type first "
+                             f"({name.split('_')[0]}_type, or fx=[{{'slot': ..., 'type': ...}}])")
         if element is None:
             raise ValueError(f"no Surge parameter {name!r} in this patch (names as in the "
                              "patch: a_filter1_cutoff, a_osc1_pitch, fx1_type ...)")
@@ -222,6 +223,9 @@ class Patch:
         return {"target": target, "source": label, "depth": float(depth), "before": before}
 
     def set_parameter(self, name: str, value: float | int | str) -> dict[str, Any]:
+        fx = re.fullmatch(r"fx(\d+)_type", name)
+        if fx:
+            return self.set_fx(int(fx.group(1)), value)
         param = self.parameter(name)
         before = param.get("value")
         osc = None
@@ -233,8 +237,6 @@ class Patch:
         osc = re.fullmatch(r"([ab]_osc[123])_type", name)
         if osc and int(float(before or 0)) != int(value):
             note = self._reset_osc_controls(osc.group(1), int(value))
-        elif isinstance(value, str) and re.fullmatch(r"fx\d+_type", name):
-            value = _list_index(FX_TYPES, value, "FX type")
         elif isinstance(value, str):
             raise ValueError(f"{name}: give a number in the patch's units (names are understood "
                              "for filter, oscillator and FX types and filter subtypes)")
@@ -246,6 +248,89 @@ class Patch:
         if osc and int(float(before or 0)) != int(value):
             result["controls"] = note
         return result
+
+    # --------------------------------------------------------------- effects
+    def effects(self) -> list[dict[str, Any]]:
+        """The used FX slots: type and every named control's value (patch units)."""
+        out = []
+        for number in range(1, 17):
+            kind = self.params.find(f"fx{number}_type")
+            if kind is None or int(kind.get("value", "0")) == 0:
+                continue
+            fx_type = int(kind.get("value", "0"))
+            entry: dict[str, Any] = {"slot": FX_SLOTS[number - 1], "fx": number,
+                                     "type": FX_TYPES[fx_type] if fx_type < len(FX_TYPES)
+                                     else fx_type, "values": {}}
+            for k, (label, _range) in enumerate(FX_PARAMS.get(fx_type, [])):
+                element = self.params.find(f"fx{number}_p{k}")
+                if label and element is not None:
+                    value = float(element.get("value", "0"))
+                    entry["values"][label] = int(value) if element.get("type") == "0" \
+                        else round(value, 6)
+            out.append(entry)
+        return out
+
+    def set_fx(self, slot: int | str, fx_type: int | str | None = None,
+               values: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Put an effect in a slot (1-16 or "A1".."G4"), empty or not, and/or set its controls
+        by name ({"Decay Time": 1.5, "Mix": 0.3}, patch units) or by number ("p3")."""
+        number = fx_slot(slot)
+        result: dict[str, Any] = {"slot": FX_SLOTS[number - 1], "fx": number}
+        kind = self.params.find(f"fx{number}_type")
+        before = int(kind.get("value", "0")) if kind is not None else 0
+        if fx_type is not None:
+            new = _list_index(FX_TYPES, fx_type, "FX type") if isinstance(fx_type, str) \
+                else int(fx_type)
+            if not 0 <= new < len(FX_TYPES):
+                raise ValueError(f"FX type must be 0-{len(FX_TYPES) - 1} or a name")
+            if kind is None:
+                kind = self._new_fx_slot(number)
+            kind.set("value", str(new))
+            if new != before or self.params.find(f"fx{number}_p0") is None:
+                for k in range(12):
+                    element = self.params.find(f"fx{number}_p{k}")
+                    if element is None:              # a slot written without its controls
+                        element = ET.Element(f"fx{number}_p{k}")
+                        self.params.insert(list(self.params).index(kind) + 1 + k, element)
+                    element.attrib.clear()
+                    element.attrib.update(FX_DEFAULTS.get(new, [{"type": "0", "value": "0"}]
+                                                       * 12)[k])
+                result["controls"] = "Surge's start values" if new else "cleared"
+            result.update(type=FX_TYPES[new], before=FX_TYPES[before]
+                          if before < len(FX_TYPES) else before)
+        current = int(kind.get("value", "0")) if kind is not None else 0
+        if values:
+            if current == 0:
+                raise ValueError(f"FX {FX_SLOTS[number - 1]} is empty: give its type")
+            names = FX_PARAMS.get(current, [])
+            written = {}
+            for key, value in values.items():
+                k = fx_control(current, key)
+                element = self.parameter(f"fx{number}_p{k}")
+                if element.get("type") == "0":
+                    element.set("value", str(int(value)))
+                else:
+                    element.set("value", f"{float(value):.14f}")
+                written[names[k][0] or f"p{k}"] = value
+            result["values"] = written
+        if current and current not in VERIFIED and (values or fx_type is not None):
+            result["names"] = "from the Surge manual, matched by units"
+        return result
+
+    def _new_fx_slot(self, number: int) -> ET.Element:
+        """Create fxN_type and fxN_p0..p11 after the previous slot (Surge omits empty ones)."""
+        children = list(self.params)
+        anchor = next((i for i, e in enumerate(children) if e.tag == "fx_bypass"), None)
+        for i, element in enumerate(children):
+            match = re.fullmatch(r"fx(\d+)_(type|p\d+)", element.tag)
+            if match and int(match.group(1)) < number:
+                anchor = i
+        at = (anchor + 1) if anchor is not None else len(children)
+        made = [ET.Element(f"fx{number}_type", {"type": "0", "value": "0"})]
+        made += [ET.Element(f"fx{number}_p{k}", {"type": "0", "value": "0"}) for k in range(12)]
+        for offset, element in enumerate(made):
+            self.params.insert(at + offset, element)
+        return made[0]
 
     def _reset_osc_controls(self, osc: str, osc_type: int) -> str:
         """Start the oscillator's seven controls from the new type's own init values."""
@@ -331,6 +416,18 @@ class Patch:
                 out.append(f"{seq['lfo']} (scene {seq['scene'].upper()}) runs free at "
                            f"{hertz:.3g} Hz and moves one step per cycle: sync its rate to "
                            "the tempo in Surge/Live for rhythmic steps")
+        for number, send in SEND_OF_SLOT.items():
+            kind = self.params.find(f"fx{number}_type")
+            if kind is None or kind.get("value", "0") == "0":
+                continue
+            levels = [self.params.find(f"{s}_send_fx_{send}") for s in "ab"]
+            if all(e is None or float(e.get("value", "0")) == 0 for e in levels):
+                out.append(f"FX {FX_SLOTS[number - 1]} is a send effect and both scenes send "
+                           f"nothing to it: set a_send_fx_{send} (0..1.59, 1 = 0 dB)")
+        for entry in self.effects():
+            if entry["type"] == "Convolution":
+                out.append(f"FX {entry['slot']} Convolution needs an impulse response: "
+                           "load one in Surge's FX editor")
         return list(dict.fromkeys(out))
 
     @property
@@ -547,6 +644,18 @@ def generic_names(names: list[str], patch: "Patch | None" = None) -> list[str]:
     ("A Osc 1 Shape"), by each oscillator's type in ``patch`` (Classic when no patch)."""
     out = []
     for name in names:
+        fx = re.fullmatch(r"FX ([ABSG][1-4]) (.+)", name.strip(), re.IGNORECASE)
+        if fx and patch is not None and not re.fullmatch(r"(FX Type|Param \d+)", fx.group(2),
+                                                         re.IGNORECASE):
+            number = FX_SLOTS.index(fx.group(1).upper()) + 1
+            kind = patch.params.find(f"fx{number}_type")
+            try:
+                k = fx_control(int(kind.get("value", "0")) if kind is not None else 0,
+                               fx.group(2))
+                out.append(f"FX {fx.group(1).upper()} Param {k + 1}")
+                continue
+            except ValueError:
+                pass
         match = re.fullmatch(r"([AB]) Osc ([123]) (.+)", name.strip(), re.IGNORECASE)
         if not match:
             out.append(name)
@@ -600,10 +709,16 @@ def _convert(spec: Any, patch_value: float) -> float | None:
     return min(1.0, max(0.0, (float(patch_value) - low) / (high - low)))
 
 
-def host_value(storage_name: str, patch_value: float, osc_type: int | None = None
-               ) -> float | None:
+def host_value(storage_name: str, patch_value: float, osc_type: int | None = None,
+               fx_type: int | None = None) -> float | None:
     """Live's 0..1 value of a patch value, or None when the conversion is not known.
-    Oscillator controls (``a_osc1_param0``...) need the oscillator's type."""
+    Oscillator controls (``a_osc1_param0``...) need the oscillator's type, FX controls
+    (``fx1_p0``...) the effect's type."""
+    match = re.fullmatch(r"fx\d+_p(\d+)", storage_name)
+    if match:
+        entries = FX_PARAMS.get(fx_type) if fx_type is not None else None
+        return _convert(entries[int(match.group(1))][1], patch_value) \
+            if entries and int(match.group(1)) < 12 else None
     match = re.fullmatch(r"[ab]_osc[123]_param([0-6])", storage_name)
     if match:
         ranges = OSC_PARAM_RANGES.get(osc_type) if osc_type is not None else None
@@ -630,13 +745,51 @@ def host_values(patch: "Patch", storage_names: dict[str, str], names: list[str]
         if match:
             kind = patch.params.find(f"{match.group(1)}_type")
             osc_type = int(float(kind.get("value", "0"))) if kind is not None else None
-        value = host_value(key, float(element.get("value", "0")), osc_type) \
+        fx_type = None
+        match = re.fullmatch(r"(fx\d+)_p\d+", key or "")
+        if match:
+            kind = patch.params.find(f"{match.group(1)}_type")
+            fx_type = int(float(kind.get("value", "0"))) if kind is not None else None
+        value = host_value(key, float(element.get("value", "0")), osc_type, fx_type) \
             if element is not None else None
         if value is None:
             skipped.append(name)
         else:
             values[name] = round(value, 6)
     return values, skipped
+
+
+def fx_slot(slot: int | str) -> int:
+    """An FX slot as its patch number 1-16 (fx1..fx16) from 1-16 or "A1".."G4"."""
+    if isinstance(slot, str) and slot.strip().upper() in FX_SLOTS:
+        return FX_SLOTS.index(slot.strip().upper()) + 1
+    if isinstance(slot, str) and slot.strip().isdigit():
+        slot = int(slot.strip())
+    if isinstance(slot, int) and 1 <= slot <= 16:
+        return slot
+    raise ValueError(f"FX slot {slot!r}: 1-16 (patch order) or A1-A4, B1-B4, S1-S4 "
+                     "(sends), G1-G4 (global)")
+
+
+def fx_control(fx_type: int, key: str | int) -> int:
+    """The index 0-11 of an FX control: its name for that type, "p3", or 3."""
+    if isinstance(key, int) or (isinstance(key, str) and key.strip().isdigit()):
+        k = int(key)
+    else:
+        match = re.fullmatch(r"\s*p(?:aram)?\s*(\d+)\s*", str(key), re.IGNORECASE)
+        names = [label for label, _range in FX_PARAMS.get(fx_type, [])]
+        wanted = _norm(str(key).split(" - ")[-1])
+        hits = [i for i, label in enumerate(names) if label and _norm(label) == wanted]
+        if hits:
+            return hits[0]
+        if not match:
+            label = FX_TYPES[fx_type] if 0 <= fx_type < len(FX_TYPES) else fx_type
+            raise ValueError(f"{label} has no control {key!r} — one of: "
+                             + ", ".join(n for n in names if n) + " (or p0-p11)")
+        k = int(match.group(1))
+    if not 0 <= k < 12:
+        raise ValueError("FX controls are p0-p11")
+    return k
 
 
 def _norm(text: str) -> str:

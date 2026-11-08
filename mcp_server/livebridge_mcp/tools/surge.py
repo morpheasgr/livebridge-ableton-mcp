@@ -8,6 +8,7 @@ new patch into the user's Surge patches folder, where Surge's own browser lists 
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +54,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
     @mcp.tool()
     def live_surge_routings(file_path: str) -> Any:
-        """List a Surge XT patch's modulation routings and step sequences. Reads the file only.
+        """List a Surge XT patch's modulation routings, step sequences and effects. Reads the
+        file only.
 
         Args:
             file_path: The `.fxp` (Surge's patches: Documents/Surge Synth Team/Surge XT/Patches)
@@ -62,6 +64,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         Returns:
             `{file_path, name, revision, routings: [{target, source, depth, output?, muted?}],
             step_sequences: [{scene, lfo, steps (16, -1..1), loop: [first, last], shuffle}],
+            effects: [{slot: "A1", fx: 1, type, values: {control name: patch value}}],
             sources: [names]}`. depth is in the target's units: semitones for pitch and
             filter cutoff, 1.0 = 100 % for levels and other % targets.
         """
@@ -71,7 +74,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             patch = surge.Patch.load(path)
             return {"file_path": str(path), "name": patch.name, "revision": patch.revision,
                     "routings": patch.routings(), "step_sequences": patch.step_sequences(),
-                    "sources": list(surge.SOURCES)}
+                    "effects": patch.effects(), "sources": list(surge.SOURCES)}
         except FileNotFoundError:
             return tool_error(f"no such file: {file_path}", type="not_found", cmd=cmd)
         except Exception as exc:
@@ -84,6 +87,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         step_sequences: list[dict[str, Any]] | None = None,
         parameters: dict[str, Any] | None = None,
         wavetables: list[dict[str, Any]] | None = None,
+        fx: list[dict[str, Any]] | None = None,
         template: str | None = None,
         output_path: str | None = None,
         formats: list[str] | None = None,
@@ -123,6 +127,14 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 Wavetable oscillator (Window with "window": true); its position and other
                 controls are set in Live afterwards (A Osc 2 Shape is the position for the
                 Wavetable type).
+            fx: [{"slot": "A1", "type": "Reverb 2", "values": {"Decay Time": 1.5, "Mix": 0.3}}]
+                — puts an effect in any slot, empty or not (A1-A4 / B1-B4 scene inserts,
+                S1-S4 sends, G1-G4 global; or 1-16 in patch order), starting from Surge's own
+                values for that type, then sets controls by name (as live_surge_routings lists
+                them under effects) or "p0".."p11", in patch units: Hz controls in semitones
+                from 440 Hz (-60..70), times log2 s, rates log2 Hz, % as 0..1, dB as dB.
+                Without "type" it changes the slot's current effect. Route modulation onto an
+                effect with targets fx1_p0..fx16_p11 (A1 = fx1, the order above).
             template: The `.fxp` or Surge `.vstpreset` to start from (default: Surge's
                 "Init Saw").
             output_path: Full path (.fxp or .vstpreset) instead of Patches/LiveBridge/<name>;
@@ -133,7 +145,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{template, output_path, vstpreset_path?, changes, routings, step_sequences,
-            warnings?, written}` — warnings name what will keep a change from being heard
+            effects?, warnings?, written}` — warnings name what will keep a change from being heard
             (a routed filter that is Off, a free-running step sequencer).
 
         Gotchas: loading the .vstpreset with live_plugin_expose resets the EXPOSED parameters
@@ -146,10 +158,10 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         cmd = "surge.write"
         routings, step_sequences, parameters = routings or [], step_sequences or [], \
             parameters or {}
-        wavetables = wavetables or []
-        if not (routings or step_sequences or parameters or wavetables):
-            return tool_error("give routings, step_sequences, parameters and/or wavetables",
-                              cmd=cmd)
+        wavetables, fx = wavetables or [], fx or []
+        if not (routings or step_sequences or parameters or wavetables or fx):
+            return tool_error("give routings, step_sequences, parameters, wavetables and/or "
+                              "fx", cmd=cmd)
         stem = (name or "").strip().removesuffix(".fxp")
         if not stem or any(c in stem for c in '\\/:*?"<>|'):
             return tool_error("name must be a plain patch name", cmd=cmd)
@@ -167,6 +179,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 changes.append(patch.set_wavetable(int(entry["osc"]), table.read_bytes(),
                                                    table.stem, scene=entry.get("scene", "a"),
                                                    window=bool(entry.get("window"))))
+            for entry in fx:
+                if not isinstance(entry, dict) or "slot" not in entry or \
+                        not ("type" in entry or "values" in entry):
+                    return tool_error("each fx entry needs slot and type and/or values",
+                                      cmd=cmd)
+                changes.append(patch.set_fx(entry["slot"], entry.get("type"),
+                                            entry.get("values")))
             ordered = sorted(parameters.items(), key=lambda kv: not kv[0].endswith("_type"))
             for key, value in ordered:                # types first: they reset their controls
                 changes.append(patch.set_parameter(key, value))
@@ -204,6 +223,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                       "routings": patch.routings(),
                                       "step_sequences": patch.step_sequences(),
                                       "written": False}
+            if fx or any(re.match(r"fx\d+_", k) for k in parameters):
+                result["effects"] = patch.effects()
             warnings = patch.warnings()
             if warnings:
                 result["warnings"] = warnings

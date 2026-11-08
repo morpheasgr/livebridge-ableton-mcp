@@ -3113,7 +3113,7 @@ Surge XT patch files: read and write modulation routings, step sequences and par
 
 #### `live_surge_routings`
 
-List a Surge XT patch's modulation routings and step sequences. Reads the file only.
+List a Surge XT patch's modulation routings, step sequences and effects. Reads the file only.
 
 | Argument | Type | Default |
 |---|---|---|
@@ -3132,6 +3132,7 @@ Write a new Surge XT patch: a copy of the template with routings, step sequences
 | `step_sequences` | list[object] \| null | `null` |
 | `parameters` | object \| null | `null` |
 | `wavetables` | list[object] \| null | `null` |
+| `fx` | list[object] \| null | `null` |
 | `template` | str \| null | `null` |
 | `output_path` | str \| null | `null` |
 | `formats` | list[str] \| null | `null` |

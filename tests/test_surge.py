@@ -97,6 +97,16 @@ def test_write_tool(tmp_path):
     again = tools["live_surge_write"]("Pluck", parameters={"a_pan": 0.1},
                                       template=str(INIT_SAW), output_path=str(out))
     assert "exists" in str(again)
+    wet = tools["live_surge_write"](
+        "Wet", fx=[{"slot": "A1", "type": "Reverb 2", "values": {"Mix": 0.4}}],
+        routings=[{"target": "fx1_p9", "source": "modwheel", "depth": 0.5}],
+        template=str(INIT_SAW), output_path=str(tmp_path / "Wet.fxp"))
+    assert wet["written"] and wet["effects"][0]["type"] == "Reverb 2"
+    read = tools["live_surge_routings"](str(tmp_path / "Wet.vstpreset"))
+    assert read["effects"][0]["values"]["Mix"] == 0.4
+    assert read["routings"] == [{"target": "fx1_p9", "source": "modwheel", "depth": 0.5}]
+    assert "slot" in str(tools["live_surge_write"]("X", fx=[{"type": "Delay"}],
+                                                   template=str(INIT_SAW)))
 
 
 def test_vstpreset_round_trip_keeps_the_state():
@@ -260,8 +270,9 @@ def test_oscillator_and_fx_types_by_name():
     patch.params.append(S.ET.Element("fx1_type", {"type": "0", "value": "0"}))
     patch.set_parameter("fx1_type", "Reverb 2")
     assert patch.params.find("fx1_type").get("value") == "11"
+    assert patch.params.find("fx1_p11") is not None                 # controls filled in
     with pytest.raises(ValueError, match="FX slot is empty"):
-        patch.set_parameter("fx2_type", "Delay")
+        patch.set_parameter("fx2_p0", 0.5)
     with pytest.raises(ValueError, match="unknown oscillator type"):
         patch.set_parameter("a_osc1_type", "Supersaw")
     assert len(S.OSC_TYPES) == 12 and len(S.FX_TYPES) == 32
@@ -301,3 +312,73 @@ def test_type_specific_oscillator_labels_translate_to_map_names():
     assert got == ["A Osc 1 Shape", "A Osc 1 Unison Voices", "B Osc 2 Width 1",
                    "A Osc 1 Shape", "A Filter 1 Cutoff", "A Osc 1 Width 1"]
     assert S.generic_names(["A Osc 1 M1 Amount"]) == ["A Osc 1 M1 Amount"]   # Classic: no alias
+
+
+def test_fx_in_an_empty_slot_starts_from_surges_values():
+    patch = S.Patch.load(INIT_SAW)
+    assert patch.params.find("fx9_type") is None                     # Init Saw has no FX
+    change = patch.set_fx("A3", "Reverb 2", {"Decay Time": 2.0, "mix": 0.25})
+    assert change["slot"] == "A3" and change["fx"] == 9 and change["type"] == "Reverb 2"
+    assert change["values"] == {"Decay Time": 2.0, "Mix": 0.25}
+    tags = [e.tag for e in patch.params]
+    assert tags[tags.index("fx_bypass") + 1:tags.index("fx_bypass") + 14] == \
+        ["fx9_type"] + [f"fx9_p{k}" for k in range(12)]
+    patch.set_fx(1, "Delay")                                         # A1 goes before A3
+    tags = [e.tag for e in patch.params]
+    assert tags.index("fx1_p11") < tags.index("fx9_type")
+    assert patch.params.find("fx1_p0").get("value") == "-2.00000000000000"
+    assert patch.params.find("fx1_p9").attrib == {"type": "0", "value": "0"}
+    again = S.Patch(patch.to_bytes())
+    fx = {e["slot"]: e for e in again.effects()}
+    assert fx["A3"]["values"]["Decay Time"] == 2.0 and fx["A3"]["values"]["Mix"] == 0.25
+    assert fx["A1"]["type"] == "Delay" and "Time Left" in fx["A1"]["values"]
+
+
+def test_fx_type_change_resets_its_controls_and_names_are_checked():
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_fx("A1", "Delay", {"Feedback": 0.9})
+    patch.set_fx("A1", "Delay")                                      # same type: kept
+    assert patch.params.find("fx1_p2").get("value").startswith("0.9")
+    patch.set_parameter("fx1_type", "Phaser")                        # other type: reset
+    assert patch.params.find("fx1_p2").get("value") == "0.00000000000000"
+    patch.set_fx("A1", values={"p8": 6, "Speaker - Rate": 1.0})       # number / label tail
+    assert patch.params.find("fx1_p8").get("value") == "6"
+    with pytest.raises(ValueError, match="Phaser has no control 'Decay'"):
+        patch.set_fx("A1", values={"Decay": 1})
+    with pytest.raises(ValueError, match="FX slot"):
+        patch.set_fx("Z9", "Delay")
+    with pytest.raises(ValueError, match="empty"):
+        patch.set_fx("B1", values={"Mix": 1})
+    assert patch.set_fx("A1", "Off")["controls"] == "cleared"
+    assert patch.effects() == []
+
+
+def test_fx_tables_cover_every_type():
+    from livebridge_mcp import surge_fx as F
+    assert set(F.FX_PARAMS) == set(F.FX_DEFAULTS) == set(range(1, len(S.FX_TYPES)))
+    for fx_type, entries in F.FX_PARAMS.items():
+        assert len(entries) == 12 and len(F.FX_DEFAULTS[fx_type]) == 12
+        for (label, _r), start in zip(entries, F.FX_DEFAULTS[fx_type]):
+            if label is None:
+                assert start == {"type": "0", "value": "0"}
+
+
+def test_fx_warnings_and_host_values():
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_fx("S1", "Reverb 2")
+    patch.set_fx("G1", "Convolution")
+    text = " ".join(patch.warnings())
+    assert "a_send_fx_1" in text and "impulse response" in text
+    patch.set_parameter("a_send_fx_1", 1.0)
+    assert "a_send_fx_1" not in " ".join(patch.warnings())
+    # Reverb 2 Decay Time: log2 s -4..6; Mix 0..1; FX Delay mod rate log2 Hz -7..9
+    assert S.host_value("fx5_p2", 1.0, fx_type=11) == pytest.approx(0.5)
+    assert S.host_value("fx5_p9", 0.33, fx_type=11) == pytest.approx(0.33)
+    assert S.host_value("fx1_p3", 0.0, fx_type=None) is None
+    patch.set_fx("A1", "Delay", {"Mix": 0.5})
+    values, skipped = S.host_values(patch, {"FX A1 Param 11": "fx1_p10",
+                                            "FX A1 Param 10": "fx1_p9"},
+                                    ["FX A1 Param 11", "FX A1 Param 10"])
+    assert values == {"FX A1 Param 11": 0.5} and skipped == ["FX A1 Param 10"]
+    assert S.generic_names(["FX A1 Mix", "FX A1 Param 3", "FX S1 Decay Time"], patch) == \
+        ["FX A1 Param 11", "FX A1 Param 3", "FX S1 Param 3"]
