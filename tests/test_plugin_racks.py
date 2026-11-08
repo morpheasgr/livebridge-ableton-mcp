@@ -898,3 +898,25 @@ def test_an_unreadable_map_is_kept_not_overwritten(tmp_path):
     lib.save_map(str(path), {"plugin": "X", "parameters": [["A", 1]]})
     assert lib.load_map(str(path))["parameters"] == [["A", 1]]
     assert "hand-made" in (tmp_path / "x_vst3.json.unreadable").read_text(encoding="utf-8")
+
+
+def test_expose_warns_when_the_plugin_loads_its_state_late(bridge, env, song, tmp_path,
+                                                           monkeypatch):
+    """Surge XT applies a preset after Live read the exposed parameters: say so."""
+    original = lib.load_map
+
+    def flagged(path):
+        data = original(path)
+        if data is not None:
+            data["state_loads_late"] = True
+        return data
+
+    monkeypatch.setattr(lib, "load_map", flagged)
+    preset = tmp_path / "Late.vstpreset"
+    preset.write_bytes(lib.build_vstpreset(SERUM_CID, {"Comp": b"\x01", "Cont": b""}))
+    result = expose(bridge, plugin="Serum 2", new_track=True, parameters=["Filter 1 Freq"],
+                    preset_file=str(preset))
+    assert "were reset to its template values" in result["warning"]
+    assert "Filter 1 Freq" in result["warning"]
+    plain = expose(bridge, plugin="Serum 2", new_track=True, parameters=["Filter 1 Freq"])
+    assert "warning" not in plain                     # no preset file: nothing to lose

@@ -119,9 +119,13 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
 
         Returns:
             `{template, output_path, vstpreset_path?, changes, routings, step_sequences,
-            written}`.
+            warnings?, written}` — warnings name what will keep a change from being heard
+            (a routed filter that is Off, a free-running step sequencer).
 
-        Gotchas: the arpeggiator (Surge nightlies) is kept but not written. A depth of 0 is
+        Gotchas: loading the .vstpreset with live_plugin_expose resets the EXPOSED parameters
+        to the template's values (Surge applies the preset after Live reads them): expose few
+        and set them again, or use live_plugin_host_load + live_plugin_host_preset. Init
+        Saw's filters are Off. The arpeggiator (Surge nightlies) is kept but not written. A depth of 0 is
         refused (Surge drops such routings). Parameter values are written as given — copy them
         from patches that sound right.
         """
@@ -175,6 +179,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                                       "routings": patch.routings(),
                                       "step_sequences": patch.step_sequences(),
                                       "written": False}
+            warnings = patch.warnings()
+            if warnings:
+                result["warnings"] = warnings
             if "fxp" in outputs:
                 result["output_path"] = str(outputs["fxp"][0])
             if "vstpreset" in outputs:

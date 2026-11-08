@@ -3114,7 +3114,9 @@
   "Surge XT. Names: A/B = scene; 'LFO 1-6' are the voice LFOs, 'Scene LFO 1-6' the scene LFOs (in patch files lfo0-5 and lfo6-11). FX slots: A1-A4 and B1-B4 are the scene inserts, S1-S4 the sends, G1-G4 global; 'FX A1 Param 1' is the first control of that slot's effect (what it does depends on the FX type).",
   "Macros show as 'M1: -'..'M8: -' until the patch names them ('M1: Cutoff'): the name in Live changes with the patch.",
   "Modulation routings, step sequences and MSEGs are not host parameters: write them into a patch with live_surge_write (routings, step_sequences) and load its .vstpreset with live_plugin_expose(preset_file=...).",
-  "VST3 ids are hashes of Surge's storage names (id_rule); 2080 'MIDI CC' proxy parameters are left out. 'Bypass Surge XT' is not mapped."
+  "VST3 ids are hashes of Surge's storage names (id_rule); 2080 'MIDI CC' proxy parameters are left out. 'Bypass Surge XT' is not mapped.",
+  "Surge applies a loaded preset after Live has read the parameters: with live_plugin_expose(preset_file=...) every EXPOSED parameter keeps the template's value (verified on the user's Surge; the rest of the preset is intact, the patch shows '*'). Expose few parameters and set them again, or use the plug-in host (live_plugin_host_load + live_plugin_host_preset).",
+  "Init Saw's filters are Off (type 0): set a filter type before routing to cutoff. An LFO step sequencer advances one step per LFO cycle (rate 0 = 1 Hz): sync it to tempo for rhythmic steps."
  ],
  "groups": {
   "sound_design": [
@@ -5215,5 +5217,6 @@
   "B LFO 6 Unipolar": "b_lfo5_unipolar",
   "B Feedback": "b_feedback",
   "B LFO 5 Attack": "b_lfo4_attack"
- }
+ },
+ "state_loads_late": true
 }

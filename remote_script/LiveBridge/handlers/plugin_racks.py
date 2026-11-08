@@ -148,7 +148,7 @@ def load_param_map(identity, library):
         return None, None
     data, source = found[0]
     if len(found) > 1:   # a probed cache keeps the shipped groups / template / folders
-        for key in ("groups", "template_state", "preset_folders", "notes"):
+        for key in ("groups", "template_state", "preset_folders", "notes", "state_loads_late"):
             if key not in data and key in found[1][0]:
                 data[key] = found[1][0][key]
     return data, source
@@ -476,7 +476,8 @@ def _finish_job(ctx, job):
     cached, shipped_path = _map_paths(identity, job.library)
     shipped = lib.load_map(shipped_path)
     if shipped:   # keep the curated groups / template state / preset folders
-        for key in ("groups", "template_state", "preset_folders", "notes"):
+        for key in ("groups", "template_state", "preset_folders", "notes",
+                    "state_loads_late"):
             if key in shipped:
                 data[key] = shipped[key]
     lib.save_map(cached, data)
@@ -952,6 +953,17 @@ def plugin_racks_expose(ctx, track=None, plugin=None, parameters=None, macros=No
         result["replaced"] = replaced
     if state["source"] == "preset_file":
         result["state_note"] = "sound from %s" % state.get("file")
+        if data.get("state_loads_late") and exposed:
+            # The plug-in applies a loaded state later (queued); Live reads the exposed
+            # parameters before that and writes them back: they keep the template's values.
+            result["warning"] = (
+                "%s loads a preset after Live has read its exposed parameters, so these %d "
+                "were reset to its template values (the rest of the preset is intact): %s. "
+                "Set them again (live_device_set_parameters), expose fewer, or load the preset "
+                "into the plug-in host (live_plugin_host_load + live_plugin_host_preset), "
+                "which keeps every value." % (identity.get("name"), len(exposed),
+                                              ", ".join([p["name"] for p in exposed][:12]) +
+                                              (" ..." if len(exposed) > 12 else "")))
     elif state["source"] == "template":
         result["state_note"] = ("the plug-in starts from the template state %r — Live's API "
                                 "cannot read the previous sound; pass preset_file to keep a "

@@ -201,6 +201,29 @@ class Patch:
         seq.attrib.update(rest)
         return {"scene": scene, "lfo": _lfo_label(index), "steps": values, "loop": [first, last]}
 
+    def warnings(self) -> list[str]:
+        """What will keep the written routings / step sequences from being heard."""
+        out = []
+        for routing in self.routings():
+            match = re.match(r"([ab])_filter([12])_(cutoff|resonance|envmod|keytrack)$",
+                             routing["target"])
+            if match:
+                scene, number = match.group(1), match.group(2)
+                kind = self.params.find(f"{scene}_filter{number}_type")
+                if kind is not None and kind.get("value") == "0":
+                    out.append(f"{routing['target']}: filter {number} of scene "
+                               f"{scene.upper()} is Off (type 0) — set a filter type (in Live "
+                               f"by name, or parameters={{'{scene}_filter{number}_type': ...}})")
+        for seq in self.step_sequences():
+            index = int(seq["lfo"][-1]) - 1 + (6 if seq["lfo"].startswith("slfo") else 0)
+            rate = self.params.find(f"{seq['scene']}_lfo{index}_rate")
+            if rate is not None and rate.get("temposync") != "1":
+                hertz = 2 ** float(rate.get("value", "0"))
+                out.append(f"{seq['lfo']} (scene {seq['scene'].upper()}) runs free at "
+                           f"{hertz:.3g} Hz and moves one step per cycle: sync its rate to "
+                           "the tempo in Surge/Live for rhythmic steps")
+        return list(dict.fromkeys(out))
+
     def set_name(self, name: str) -> None:
         meta = self.root.find("meta")
         if meta is not None:

@@ -106,3 +106,14 @@ def test_vstpreset_round_trip_keeps_the_state():
     assert again.to_bytes()[60:] == INIT_SAW.read_bytes()[60:]      # state == fxp body
     with pytest.raises(ValueError, match="not Surge"):
         S.Patch(vst[:8] + b"0" * 32 + vst[40:])
+
+
+def test_warnings_for_an_off_filter_and_a_free_running_step_sequencer():
+    patch = S.Patch.load(INIT_SAW)
+    patch.route("a_filter1_cutoff", "lfo1", 12)
+    patch.set_step_sequence(1, [1, -1])
+    text = " ".join(patch.warnings())
+    assert "filter 1 of scene A is Off" in text and "runs free at 1 Hz" in text
+    patch.set_parameter("a_filter1_type", 1)
+    patch.params.find("a_lfo0_rate").set("temposync", "1")
+    assert patch.warnings() == []
