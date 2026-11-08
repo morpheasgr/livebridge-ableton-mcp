@@ -82,7 +82,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
         name: str,
         routings: list[dict[str, Any]] | None = None,
         step_sequences: list[dict[str, Any]] | None = None,
-        parameters: dict[str, float] | None = None,
+        parameters: dict[str, Any] | None = None,
         template: str | None = None,
         output_path: str | None = None,
         formats: list[str] | None = None,
@@ -108,8 +108,12 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 tempo, one step per note length ("1/16", "1/8d" dotted, "1/8t" triplet) — lfo 1-6 = voice LFOs, 7-12 = scene LFOs
                 (S-LFO 1-6); steps -1..1 (0 = middle), up to 16; sets the LFO's shape to step
                 sequencer. Route that LFO somewhere to hear it.
-            parameters: {"a_filter1_cutoff": -12.0, "a_osc1_type": 0} — raw patch values in
-                the patch's own units (read an existing patch to see them).
+            parameters: {"a_filter1_type": "LP 24 dB", "a_filter1_subtype": "Driven",
+                "a_filter1_cutoff": -12.0} — numbers in the patch's own units (cutoff:
+                semitones from 440 Hz, -60..70; LFO rate: log2 Hz; envelope times: log2 s;
+                levels 0..1); filter types and subtypes also by name (LP/HP/BP/N 12 dB and
+                24 dB, LP Vintage Ladder, LP OB-Xd 24 dB, LP K35, LP Diode Ladder, MULTI Fast
+                SVF, FX Comb + ...). Parameters are applied in the order given: type first.
             template: The `.fxp` or Surge `.vstpreset` to start from (default: Surge's
                 "Init Saw").
             output_path: Full path (.fxp or .vstpreset) instead of Patches/LiveBridge/<name>;

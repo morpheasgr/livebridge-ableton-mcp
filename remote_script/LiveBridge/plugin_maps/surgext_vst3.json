@@ -3116,7 +3116,10 @@
   "Modulation routings, step sequences and MSEGs are not host parameters: write them into a patch with live_surge_write (routings, step_sequences) and load its .vstpreset with live_plugin_expose(preset_file=...).",
   "VST3 ids are hashes of Surge's storage names (id_rule); 2080 'MIDI CC' proxy parameters are left out. 'Bypass Surge XT' is not mapped.",
   "Surge applies a loaded preset after Live has read the parameters: with live_plugin_expose(preset_file=...) every EXPOSED parameter keeps the template's value (verified on the user's Surge; the rest of the preset is intact, the patch shows '*'). Expose few parameters and set them again, or use the plug-in host (live_plugin_host_load + live_plugin_host_preset).",
-  "Init Saw's filters are Off (type 0): set a filter type before routing to cutoff. An LFO step sequencer advances one step per LFO cycle (rate 0 = 1 Hz): sync it to tempo for rhythmic steps."
+  "Init Saw's filters are Off (type 0): set a filter type before routing to cutoff. An LFO step sequencer advances one step per LFO cycle (rate 0 = 1 Hz): sync it to tempo for rhythmic steps.",
+  "Setting values (measured): every exposed control is 0..1 in Live, linear in Surge's patch units (cutoff -60..70 semitones from 440 Hz, LFO rate -7..9 = log2 Hz, envelope times -8..5 = log2 s, osc pitch -7..7). Display text works: '220 Hz', '1.5 kHz', '50 %', '+5 st', '4 Hz', '1.2 s', 'LP 24 dB'. Osc pitch only spans +/-7 semitones: use Octave for more. Tempo sync is not a host parameter (LFO rates show in Hz): write it with live_surge_write rate='1/16'.",
+  "Menus (types, modes): 0..1 split into equal bands, value 0.005 + 0.99*i/(count-1); text lands near a band edge, so prefer the band centre. Filter subtypes always have 16 slots: past a type's last one Surge shows 'None'.",
+  "Macros M1-M8: after a set, the display lags one read (read twice)."
  ],
  "groups": {
   "sound_design": [

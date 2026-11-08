@@ -62,6 +62,22 @@ MPE Timbre, Alternate, Latest Key. Multi-output LFOs (formula) pick the output w
   (linear; default 0, only non-zero steps written), loop counted from 0 (7 = step 8), swing,
   envelope-retrigger masks. The arpeggiator (revision 30+) is too new to write; its data is kept.
 
+## Filter types
+
+`a_filterN_type` 0-35 in Surge's own order (not the menu's), `a_filterN_subtype` 0-15; the list
+with every subtype is `FILTER_TYPES` in `mcp_server/livebridge_mcp/surge.py` (read in Live by
+local Claude, Surge XT 1.4.0): 0 Off, 1 LP 12 dB, 2 LP 24 dB, 3 LP Legacy Ladder, 4 HP 12 dB,
+5 HP 24 dB, 6 BP 12 dB, 7 N 12 dB, 8 FX Comb +, 9 FX Sample & Hold, 10 LP Vintage Ladder, 11-12
+LP OB-Xd 12/24 dB, 13-14 LP/HP K35, 15 LP Diode Ladder, 16-19 LP/HP/N/BP Cutoff Warp, 20-22
+HP/N/BP OB-Xd 12 dB, 23 BP 24 dB, 24 N 24 dB, 25 FX Comb -, 26 FX Allpass, 27 FX Cutoff Warp AP,
+28-31 LP/HP/N/BP Res Warp, 32 FX Res Warp AP, 33 MULTI Tri-pole, 34 MULTI Fast SVF, 35 MULTI
+Xpander.
+
+## Host values
+
+In Live every control is 0..1, linear in the patch units: `(value - min) / (max - min)` for
+floats, `0.005 + 0.99 * i / (count - 1)` for menus.
+
 ## LFO rate
 
 `a_lfoN_rate` is log2 of the frequency: 0 = 1 Hz. With `temposync="1"` the same number is read at

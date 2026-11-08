@@ -39,6 +39,46 @@ _ALIASES = {"vel": "velocity", "kt": "keytrack", "polyaftertouch": "polyat",
             "aenv": "ampeg", **{f"scenelfo{i}": f"slfo{i}" for i in range(1, 7)}}
 SOURCE_NAMES = {n: s for s, n in SOURCES.items()}
 STEPSEQ_SHAPE = 7
+# Filter types in Surge's own numbering (the patch's a_filterN_type), with their subtypes —
+# read from Surge XT 1.4.0 in Live by local Claude (type 0-35, subtype 0-15 per type).
+FILTER_TYPES: list[tuple[str, list[str]]] = [
+    ('Off', []),
+    ('LP 12 dB', ['Standard', 'Driven', 'Clean']),
+    ('LP 24 dB', ['Standard', 'Driven', 'Clean']),
+    ('LP Legacy Ladder', ['6 dB', '12 dB', '18 dB', '24 dB']),
+    ('HP 12 dB', ['Standard', 'Driven', 'Clean']),
+    ('HP 24 dB', ['Standard', 'Driven', 'Clean']),
+    ('BP 12 dB', ['Standard', 'Driven', 'Clean', 'Driven (Legacy)', 'Clean (Legacy)']),
+    ('N 12 dB', ['Standard', 'Mild']),
+    ('FX Comb +', ['50% Wet', '100% Wet']),
+    ('FX Sample & Hold', []),
+    ('LP Vintage Ladder', ['Type 1', 'Type 1 Compensated', 'Type 2', 'Type 2 Compensated', 'Type 3', 'Type 3 Compensated']),
+    ('LP OB-Xd 12 dB', ['Standard', 'Pushed']),
+    ('LP OB-Xd 24 dB', ['6 dB', '12 dB', '18 dB', '24 dB', '24 dB (Legacy)']),
+    ('LP K35', ['No Saturation', 'Mild Saturation', 'Moderate Saturation', 'Heavy Saturation', 'Extreme Saturation']),
+    ('HP K35', ['No Saturation', 'Mild Saturation', 'Moderate Saturation', 'Heavy Saturation', 'Extreme Saturation']),
+    ('LP Diode Ladder', ['6 dB', '12 dB', '18 dB', '24 dB']),
+    ('LP Cutoff Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip', '1 Stage OJD', '2 Stages OJD', '3 Stages OJD', '4 Stages OJD']),
+    ('HP Cutoff Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip', '1 Stage OJD', '2 Stages OJD', '3 Stages OJD', '4 Stages OJD']),
+    ('N Cutoff Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip', '1 Stage OJD', '2 Stages OJD', '3 Stages OJD', '4 Stages OJD']),
+    ('BP Cutoff Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip', '1 Stage OJD', '2 Stages OJD', '3 Stages OJD', '4 Stages OJD']),
+    ('HP OB-Xd 12 dB', ['Standard', 'Pushed']),
+    ('N OB-Xd 12 dB', ['Standard', 'Pushed']),
+    ('BP OB-Xd 12 dB', ['Standard', 'Pushed']),
+    ('BP 24 dB', ['Standard', 'Driven', 'Clean']),
+    ('N 24 dB', ['Standard', 'Mild']),
+    ('FX Comb -', ['50% Wet', '100% Wet']),
+    ('FX Allpass', []),
+    ('FX Cutoff Warp AP', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip', '1 Stage OJD', '2 Stages OJD', '3 Stages OJD', '4 Stages OJD']),
+    ('LP Res Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip']),
+    ('HP Res Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip']),
+    ('N Res Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip']),
+    ('BP Res Warp', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip']),
+    ('FX Res Warp AP', ['1 Stage tanh', '2 Stages tanh', '3 Stages tanh', '4 Stages tanh', '1 Stage Soft Clip', '2 Stages Soft Clip', '3 Stages Soft Clip', '4 Stages Soft Clip']),
+    ('MULTI Tri-pole', ['Low->Low->Low First', 'Low->High->Low First', 'High->Low->High First', 'High->High->High First', 'Low->Low->Low Second', 'Low->High->Low Second', 'High->Low->High Second', 'High->High->High Second', 'Low->Low->Low Third', 'Low->High->Low Third', 'High->Low->High Third', 'High->High->High Third']),
+    ('MULTI Fast SVF', ['LP', 'HP', 'BP', 'Notch', 'Peak', 'Allpass', 'Bell', 'Low Shelf', 'High Shelf']),
+    ('MULTI Xpander', ['LP1', 'LP2', 'LP3', 'LP4', 'HP1', 'HP2', 'HP3', 'BP2', 'BP4', 'N2', 'PH3', 'HP2+LP1', 'HP3+LP1', 'N2+LP1', 'PH3+LP1']),
+]
 
 
 def synced_rate(text: str) -> float:
@@ -165,9 +205,15 @@ class Patch:
             mod.set("source_scene", "0")            # global targets (FX) name the scene
         return {"target": target, "source": label, "depth": float(depth), "before": before}
 
-    def set_parameter(self, name: str, value: float | int) -> dict[str, Any]:
+    def set_parameter(self, name: str, value: float | int | str) -> dict[str, Any]:
         param = self.parameter(name)
         before = param.get("value")
+        match = re.fullmatch(r"([ab])_filter([12])_(type|subtype)", name)
+        if match and isinstance(value, str):
+            value = _filter_index(self, match.group(1), match.group(2), match.group(3), value)
+        elif isinstance(value, str):
+            raise ValueError(f"{name}: give a number in the patch's units (names are only "
+                             "understood for filter types and subtypes)")
         if param.get("type") == "0":
             param.set("value", str(int(value)))
         else:
@@ -292,6 +338,28 @@ def _fxp_from_vstpreset(data: bytes) -> bytes:
                 struct.pack(">II", 1, 1) + bytes(28) + struct.pack(">I", len(body))
             return head + body
     raise ValueError("the .vstpreset has no Surge state (Comp chunk)")
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[\s\-_]", "", text.lower()).replace("notch", "n")
+
+
+def _filter_index(patch: "Patch", scene: str, number: str, kind: str, name: str) -> int:
+    if kind == "type":
+        for index, (label, _subs) in enumerate(FILTER_TYPES):
+            if _norm(label) == _norm(name):
+                return index
+        raise ValueError(f"unknown filter type {name!r} — one of: "
+                         + ", ".join(label for label, _s in FILTER_TYPES))
+    type_index = int(float(patch.parameter(f"{scene}_filter{number}_type").get("value", "0")))
+    label, subtypes = FILTER_TYPES[type_index] if 0 <= type_index < len(FILTER_TYPES) \
+        else ("?", [])
+    for index, sub in enumerate(subtypes):
+        if _norm(sub) == _norm(name):
+            return index
+    raise ValueError(f"{label} has no subtype {name!r}"
+                     + (" — one of: " + ", ".join(subtypes) if subtypes else
+                        " (it has none)") + "; set the type first")
 
 
 def _lfo_label(index: int) -> str:

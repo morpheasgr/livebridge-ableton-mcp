@@ -131,3 +131,22 @@ def test_synced_rates_match_the_users_patches():
     assert not any("runs free" in w for w in patch.warnings())
     with pytest.raises(ValueError, match="note length"):
         S.synced_rate("fast")
+
+
+def test_filter_types_and_subtypes_by_name():
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_parameter("a_filter1_type", "LP 24 dB")
+    patch.set_parameter("a_filter1_subtype", "Driven")
+    assert patch.params.find("a_filter1_type").get("value") == "2"
+    assert patch.params.find("a_filter1_subtype").get("value") == "1"
+    patch.set_parameter("a_filter2_type", "Notch 12 dB")           # "N" or "Notch"
+    assert patch.params.find("a_filter2_type").get("value") == "7"
+    patch.set_parameter("b_filter1_type", "multi xpander")
+    assert patch.params.find("b_filter1_type").get("value") == "35"
+    with pytest.raises(ValueError, match="no subtype"):
+        patch.set_parameter("a_filter2_subtype", "Driven")
+    with pytest.raises(ValueError, match="unknown filter type"):
+        patch.set_parameter("a_filter1_type", "Moog")
+    with pytest.raises(ValueError, match="patch's units"):
+        patch.set_parameter("a_filter1_cutoff", "220 Hz")
+    assert len(S.FILTER_TYPES) == 36 and S.FILTER_TYPES[34][0] == "MULTI Fast SVF"
