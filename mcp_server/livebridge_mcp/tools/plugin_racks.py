@@ -21,6 +21,8 @@ expose. Starting sounds: live_plugin_preset_files → preset_file=.
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 import time as _time
 from typing import Any
 
@@ -44,6 +46,44 @@ def _check_format(plugin_format: str | None, cmd: str) -> dict[str, Any] | None:
     if plugin_format is not None and plugin_format not in _FORMATS:
         return tool_error("plugin_format must be 'VST3', 'AU' or 'VST2'", cmd=cmd)
     return None
+
+
+_SURGE_SETTLE_S = 1.5
+_SURGE_MAP = Path(__file__).resolve().parents[3] / "remote_script" / "LiveBridge" / \
+    "plugin_maps" / "surgext_vst3.json"
+
+
+async def _restore_surge_values(bridge: Any, result: dict[str, Any], preset_file: str) -> None:
+    """Surge XT applies a loaded preset after Live has read the exposed parameters, which
+    then keep the template's values: set them again from the preset itself."""
+    from .. import surge
+    try:
+        patch = surge.Patch.load(Path(preset_file).expanduser())
+        shipped = json.loads(_SURGE_MAP.read_text(encoding="utf-8"))
+    except Exception as exc:             # not a Surge patch file (.adv/.adg): keep the warning
+        result["restore_note"] = f"exposed values not restored: {str(exc)[:200]}"
+        return
+    names = [p.get("name") for p in result.get("parameters") or [] if isinstance(p, dict)]
+    values, skipped = surge.host_values(patch, shipped.get("storage_names") or {}, names)
+    if values:
+        await asyncio.sleep(_SURGE_SETTLE_S)          # let Surge finish loading the preset
+        done = await asyncio.to_thread(
+            bridge_call, bridge, "devices.set_parameters",
+            {"device": result["device"], "normalized": True,
+             "values": [{"parameter": n, "value": v, "normalized": True}
+                        for n, v in values.items()]}, _CALL_TIMEOUT)
+        if _is_error(done):
+            result["restore_note"] = "setting the preset's values again failed: " + \
+                str(done.get("error", done))[:300]
+            return
+    result.pop("warning", None)
+    result["restored"] = len(values)
+    if skipped:
+        result["warning"] = (
+            "Surge XT applies a preset after Live reads the exposed parameters; %d were set "
+            "again from the preset, these could not be (keep their template values, set them "
+            "yourself): %s" % (len(values), ", ".join(skipped[:12]) +
+                               (" ..." if len(skipped) > 12 else "")))
 
 
 def register(mcp: Any, bridge: BridgeClient) -> None:
@@ -146,6 +186,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 result["next"] = "call again (same arguments) to continue"
                 return result
             await asyncio.sleep(_POLL_SECONDS)
+        if result.get("warning") and preset_file and result.get("device") and \
+                str(result.get("plugin", "")).lower().replace(" ", "") == "surgext":
+            await _restore_surge_values(bridge, result, preset_file)
         if editor_open is not None and result.get("device"):
             # Live auto-opens plug-in windows on the tick after a load: set it again now — a
             # window is closed only after the plug-in had time to set up its graphics (closing

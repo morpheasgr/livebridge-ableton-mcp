@@ -150,3 +150,50 @@ def test_filter_types_and_subtypes_by_name():
     with pytest.raises(ValueError, match="patch's units"):
         patch.set_parameter("a_filter1_cutoff", "220 Hz")
     assert len(S.FILTER_TYPES) == 36 and S.FILTER_TYPES[34][0] == "MULTI Fast SVF"
+
+
+def test_host_values_match_the_values_measured_in_live():
+    assert S.host_value("a_filter1_cutoff", -12) == pytest.approx(0.369231, abs=1e-6)
+    assert S.host_value("a_filter1_cutoff", 3) == pytest.approx(0.484615, abs=1e-6)
+    assert S.host_value("a_lfo0_rate", 2) == pytest.approx(0.5625)
+    assert S.host_value("a_osc1_pitch", 5) == pytest.approx(0.857143, abs=1e-6)
+    assert S.host_value("a_env1_attack", 0.263034) == pytest.approx(0.636, abs=1e-3)
+    assert S.host_value("a_filter1_type", 2) == pytest.approx(0.061571, abs=1e-6)
+    assert S.host_value("a_osc1_param0", 0.5) is None          # depends on the osc type
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_parameter("a_filter1_cutoff", -12.0)
+    values, skipped = S.host_values(
+        patch, {"A Filter 1 Cutoff": "a_filter1_cutoff", "A Osc 1 Shape": "a_osc1_param0"},
+        ["A Filter 1 Cutoff", "A Osc 1 Shape", "Unknown"])
+    assert values == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6)}
+    assert skipped == ["A Osc 1 Shape", "Unknown"]
+
+
+def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path):
+    import asyncio
+    from livebridge_mcp.tools import plugin_racks as racks
+
+    patch = S.Patch.load(INIT_SAW)
+    patch.set_parameter("a_filter1_cutoff", -12.0)
+    patch.set_parameter("a_filter1_type", "LP 24 dB")
+    preset = tmp_path / "Check.vstpreset"
+    preset.write_bytes(patch.to_vstpreset())
+    calls = []
+
+    def fake_call(bridge, cmd, args, timeout=None):
+        calls.append((cmd, args))
+        return {"count": len(args["values"])}
+
+    monkeypatch.setattr(racks, "bridge_call", fake_call)
+    monkeypatch.setattr(racks, "_SURGE_SETTLE_S", 0)
+    result = {"plugin": "Surge XT", "device": "tracks 0 devices 0 chains 0 devices 0",
+              "warning": "reset", "parameters": [{"name": "A Filter 1 Cutoff"},
+                                                  {"name": "A Filter 1 Type"},
+                                                  {"name": "A Osc 1 Shape"}]}
+    asyncio.run(racks._restore_surge_values(None, result, str(preset)))
+    (cmd, args), = calls
+    sent = {v["parameter"]: v["value"] for v in args["values"]}
+    assert cmd == "devices.set_parameters" and args["normalized"] is True
+    assert sent == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6),
+                    "A Filter 1 Type": pytest.approx(0.061571, abs=1e-6)}
+    assert result["restored"] == 2 and "A Osc 1 Shape" in result["warning"]

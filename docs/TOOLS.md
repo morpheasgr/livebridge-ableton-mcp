@@ -2185,7 +2185,7 @@ Make a big plug-in (Serum 2, any mapped VST3) fully controllable: load it in a g
 | `editor_open` | bool \| null | `null` |
 | `wait_seconds` | float | `30.0` |
 
-Bridge: `plugin_racks.expose`, `plugins.set`
+Bridge: `devices.set_parameters`, `plugin_racks.expose`, `plugins.set`
 
 #### `live_plugin_param_map`
 
@@ -3690,7 +3690,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `devices.randomize` | M | track=null, device=null, parameters=null, seed=null, amount=1.0, include_quantized=true | `live_device_randomize` | Randomize device parameters (optional seed) |
 | `devices.reset_parameters` | M | track=null, device=null, parameters=null | `live_device_reset_parameters` | Reset parameters to their default values |
 | `devices.set_parameter` | M | parameter, value, track=null, device=null, normalized=false | `live_device_set_parameter` | Set one parameter by number, normalized 0..1, value item or display string |
-| `devices.set_parameters` | M | values, track=null, device=null, normalized=false | `live_audio_align`, `live_device_set_parameters`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_sound_load` | Set many parameters atomically (validated first, one undo step) |
+| `devices.set_parameters` | M | values, track=null, device=null, normalized=false | `live_audio_align`, `live_device_set_parameters`, `live_master_auto`, `live_mix_auto`, `live_mix_phase`, `live_mix_unmask`, `live_plugin_expose`, `live_sound_load` | Set many parameters atomically (validated first, one undo step) |
 | `devices.set_properties` | M | values, track=null, device=null | `live_device_properties` | Set class-specific device properties (wavetable, IR, modes, voices ...) |
 | `devices.set_state` | M | track=null, device=null, active=null, name=null, collapsed=null, select=null, compare_b=null, show_chains=null, save_to_compare_slot=false | `live_device_set_state`, `live_mix_auto`, `live_mix_balance` | Turn a device on/off, rename, collapse, select, A/B compare |
 | `eval.python` | M | code="", expr=null, detail="summary", reset=false | `live_eval_python` | Execute Python inside Live (song/app/browser/ctx/Live in scope) |

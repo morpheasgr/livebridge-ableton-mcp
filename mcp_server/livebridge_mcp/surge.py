@@ -340,6 +340,56 @@ def _fxp_from_vstpreset(data: bytes) -> bytes:
     raise ValueError("the .vstpreset has no Surge state (Comp chunk)")
 
 
+# Patch value -> Live's 0..1 value. Floats are linear in the patch's units between these
+# ends (measured in Live by local Claude: display at 0 / 0.5 / 1 of every sound_design control,
+# converted: Hz -> semitones from 440, rates and times -> log2, % -> fraction).
+_FLOAT_RANGES = [
+    (r"[ab]_filter[12]_cutoff", -60.0, 70.0), (r"[ab]_lowcut", -72.0, 15.0),
+    (r"[ab]_filter[12]_resonance", 0.0, 1.0), (r"[ab]_filter[12]_envmod", -96.0, 96.0),
+    (r"[ab]_filter[12]_keytrack", -1.0, 1.0), (r"[ab]_f_balance", -1.0, 1.0),
+    (r"[ab]_feedback", -1.0, 1.0), (r"[ab]_ws_drive", -24.0, 24.0),
+    (r"[ab]_noisecol", -1.0, 1.0), (r"[ab]_fm_depth", -48.0, 24.0),
+    (r"[ab]_osc[123]_pitch", -7.0, 7.0), (r"[ab]_pitch", -7.0, 7.0),
+    (r"[ab]_env[12]_(attack|decay|release)", -8.0, 5.0), (r"[ab]_env[12]_sustain", 0.0, 1.0),
+    (r"[ab]_lfo\d+_rate", -7.0, 9.0), (r"[ab]_lfo\d+_(magnitude|phase)", 0.0, 1.0),
+    (r"[ab]_lfo\d+_deform", -1.0, 1.0), (r"[ab]_portamento", -8.0, 2.0),
+    (r"[ab]_drift", 0.0, 1.0), (r"[ab]_(width|pan)", -1.0, 1.0), (r"volume", -48.0, 0.0),
+]
+_MENUS = [  # (pattern, first value, count)
+    (r"[ab]_filter[12]_type", 0, 36), (r"[ab]_filter[12]_subtype", 0, 16),
+    (r"[ab]_(osc[123]_)?octave", -3, 7), (r"[ab]_lfo\d+_trigmode", 0, 3),
+    (r"[ab]_lfo\d+_unipolar", 0, 2), (r"[ab]_mute_(o[123]|noise)", 0, 2),
+]
+
+
+def host_value(storage_name: str, patch_value: float) -> float | None:
+    """Live's 0..1 value of a patch value, or None when the conversion is not known."""
+    for pattern, low, high in _FLOAT_RANGES:
+        if re.fullmatch(pattern, storage_name):
+            return min(1.0, max(0.0, (float(patch_value) - low) / (high - low)))
+    for pattern, first, count in _MENUS:
+        if re.fullmatch(pattern, storage_name):
+            index = min(count - 1, max(0, int(round(float(patch_value))) - first))
+            return 0.005 + 0.99 * index / (count - 1)
+    return None
+
+
+def host_values(patch: "Patch", storage_names: dict[str, str], names: list[str]
+                ) -> tuple[dict[str, float], list[str]]:
+    """{exposed name: 0..1 value from the patch} and the names that cannot be converted."""
+    values, skipped = {}, []
+    for name in names:
+        key = storage_names.get(name)
+        element = patch.params.find(key) if key else None
+        value = host_value(key, float(element.get("value", "0"))) if element is not None \
+            else None
+        if value is None:
+            skipped.append(name)
+        else:
+            values[name] = round(value, 6)
+    return values, skipped
+
+
 def _norm(text: str) -> str:
     return re.sub(r"[\s\-_]", "", text.lower()).replace("notch", "n")
 
