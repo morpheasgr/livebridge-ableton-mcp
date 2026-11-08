@@ -3,8 +3,8 @@ their ranges in patch units, and the values Surge starts a fresh effect with.
 
 Facts only. The start values and the display at 0 / 0.5 / 1 of every control come from a
 survey in Live by local Claude (Surge XT 1.4.0). Unused controls, which show "-", are written
-as 0. Names come from the Surge XT manual's effect sections, matched to the slots by their
-units; the types in ``VERIFIED`` were read off Surge's own labels in Live.
+as 0. Names are Surge's own labels as Live shows them, read by local Claude (Surge's manual
+helped match them first).
 A range is (low, high) in patch units (Live's 0..1 is linear between them), or ("menu",
 first, count), or None when unknown.
 """
@@ -37,8 +37,8 @@ _WAVES = ("menu", 0, 6)             # Sine, Triangle, Saw, Noise, S&H, Square
 
 # type -> 12 x (name or None, range)
 FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
-    1: [("Time Left", _TIME), ("Time Right", _TIME), ("Feedback", _PCT), ("Crossfeed", _PCT),
-        ("Low Cut", _HZ), ("High Cut", _HZ), ("Mod Rate", _RATE), ("Mod Depth", (0.0, 2.0)),
+    1: [("Left", _TIME), ("Right", _TIME), ("Feedback", _PCT), ("Crossfeed", _PCT),
+        ("Low Cut", _HZ), ("High Cut", _HZ), ("Rate", _RATE), ("Depth", (0.0, 2.0)),
         ("Channel", _BI), (None, None), ("Mix", _PCT), ("Width", _DB24)],          # Delay
     2: [("Pre-Delay", _TIME), ("Room Shape", ("menu", 0, 4)), ("Size", _PCT),
         ("Decay Time", (-4.0, 6.0)), ("HF Damping", _PCT), ("Low Cut", _HZ),
@@ -50,20 +50,20 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
     4: [("Horn Rate", _RATE), ("Doppler", _PCT), ("Tremolo", _PCT), ("Rotor Rate", (0.0, 2.0)),
         ("Drive", _PCT), ("Model", None), ("Width", _DB24), ("Mix", _PCT),
         (None, None), (None, None), (None, None), (None, None)],                   # Rotary
-    5: [("Pre-EQ Gain", _DB48), ("Pre-EQ Freq", _HZ), ("Pre-EQ BW", _OCT),
+    5: [("Pre-EQ Gain", _DB48), ("Pre-EQ Frequency", _HZ), ("Pre-EQ Bandwidth", _OCT),
         ("Pre-EQ High Cut", _HZ), ("Drive", _DB24), ("Feedback", _BI), ("Post-EQ Gain", _DB48),
-        ("Post-EQ Freq", _HZ), ("Post-EQ BW", _OCT), ("Post-EQ High Cut", _HZ),
+        ("Post-EQ Frequency", _HZ), ("Post-EQ Bandwidth", _OCT), ("Post-EQ High Cut", _HZ),
         ("Output Gain", _DB24), ("Model", None)],                                  # Distortion
-    6: [("Band 1 Gain", _DB48), ("Band 1 Freq", _HZ), ("Band 1 BW", _OCT),
-        ("Band 2 Gain", _DB48), ("Band 2 Freq", _HZ), ("Band 2 BW", _OCT),
-        ("Band 3 Gain", _DB48), ("Band 3 Freq", _HZ), ("Band 3 BW", _OCT),
-        ("Output Gain", _DB48), ("Mix", _BI), (None, None)],                       # EQ
+    6: [("Gain 1", _DB48), ("Frequency 1", _HZ), ("Bandwidth 1", _OCT),
+        ("Gain 2", _DB48), ("Frequency 2", _HZ), ("Bandwidth 2", _OCT),
+        ("Gain 3", _DB48), ("Frequency 3", _HZ), ("Bandwidth 3", _OCT),
+        ("Gain", _DB48), ("Mix", _BI), (None, None)],                       # EQ
     7: [("Left", None), ("Right", _BI), ("Time", _TIME), ("Feedback", _PCT), ("Mix", _PCT),
         (None, None), (None, None), (None, None), (None, None), (None, None), (None, None),
         (None, None)],                                                             # Freq Shift
     8: [("Bass", (-12.0, 12.0)), ("Treble", (-12.0, 12.0)), ("Width", _BI), ("Balance", _BI),
-        ("Threshold", (-48.0, 0.0)), ("Attack", _BI), ("Release", _BI),
-        ("Output", (-48.0, 0.0)), ("Side Low Cut", _HZ), (None, None), (None, None),
+        ("Threshold", (-48.0, 0.0)), ("Attack Rate", _BI), ("Release Rate", _BI),
+        ("Gain", (-48.0, 0.0)), ("Side Low Cut", _HZ), (None, None), (None, None),
         (None, None)],                                                             # Conditioner
     9: [("Time", None), ("Rate", _RATE), ("Depth", _PCT), ("Feedback", _PCT), ("Low Cut", _HZ),
         ("High Cut", _HZ), ("Mix", _PCT), ("Width", _DB24), (None, None), (None, None),
@@ -78,23 +78,25 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
          (None, None)],                                                            # Reverb 2
     12: [("Mode", ("menu", 0, 4)), ("Waveform", _WAVES), ("Rate", _RATE), ("Depth", _PCT),
          ("Count", (1.0, 4.0)), ("Base Pitch", (0.0, 127.0)), ("Spacing", (0.0, 12.0)),
-         ("Feedback", _PCT), ("LF Damping", _PCT), ("Width", _DB24), ("Mix", _BI),
+         ("Feedback", _PCT), ("HF Damping", _PCT), ("Width", _DB24), ("Mix", _BI),
          (None, None)],                                                            # Flanger
     13: [("Shape", None), ("Frequency", (0.0, 127.0)), ("Unison Detune", (0.0, 1.0)),
          ("Unison Voices", ("menu", 1, 16)), ("Forward Bias", _PCT), ("Linear Region", _PCT),
          ("Low Cut", _HZ), ("High Cut", _HZ), ("Mix", _PCT), (None, None), (None, None),
          (None, None)],                                                            # Ring Mod
-    14: [("Effect", None)] + [(f"Param {k}", None) for k in range(1, 11)]
+    14: [("FX", None)] + [(f"Param {k}", None) for k in range(10)]
         + [(None, None)],                                                          # Airwindows
     15: [("Drive", _DB24), ("Squash", _PCT), ("Stab", _PCT), ("Asymmetry", _PCT),
          ("Bias", _PCT), ("Comb Frequency", _HZ), ("Comb Separation", None),
          ("Waveform", _WAVES), ("Rate", _RATE), ("Depth", _PCT),
          ("Width", _DB24), ("Output Gain", _DB24)],                                # Neuron
-    16: [(f"Band {k}", _DB24) for k in range(1, 12)] + [("Output Gain", _DB48)],  # Graphic EQ
+    16: [(band, _DB24) for band in ("30 Hz", "60 Hz", "120 Hz", "250 Hz", "500 Hz", "1 kHz",
+                                    "2 kHz", "4 kHz", "8 kHz", "12 kHz", "16 kHz")]
+        + [("Gain", _DB48)],                                                       # Graphic EQ
     17: [("Frequency 1", (_st(60), _st(300))), ("Resonance 1", _PCT), ("Gain 1", _AMP),
          ("Frequency 2", (_st(300), _st(1500))), ("Resonance 2", _PCT), ("Gain 2", _AMP),
          ("Frequency 3", (_st(1500), _st(7500))), ("Resonance 3", _PCT), ("Gain 3", _AMP),
-         ("Mode", ("menu", 0, 4)), ("Output Gain", _DB48), ("Mix", _PCT)],         # Resonator
+         ("Mode", ("menu", 0, 4)), ("Gain", _DB48), ("Mix", _PCT)],         # Resonator
     18: [("Threshold", (-96.0, 0.0)), ("Ratio", (1.0, 20.0)), ("Flip", ("menu", 0, 2)),
          ("Mix", _PCT)] + [(None, None)] * 8,                                      # CHOW
     19: [("Drive", _PCT), ("Tone", _PCT), ("Attack", _PCT), ("Release", _PCT), ("Mix", _PCT)]
@@ -104,8 +106,8 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
          ("Depth 2", _PCT), ("Delay Type", None), ("Clock Rate", (1.5, 100.0)),
          ("Saturation", _PCT), ("Feedback", _PCT), ("Width", _BI), ("Mix", _PCT),
          ("Reconstruction Filter", _HZ)],                                          # Ensemble
-    21: [("Extra Noise", _PCT), ("Center", (_st(0.5), 70.0)), ("Offset 1", (-60.0, 60.0)),
-         ("Offset 2", (-60.0, 60.0)), ("Feedback", _BI), ("Tone", _BI), ("Comb 1", _AMP),
+    21: [("Extra Noise", _PCT), ("Center", (_st(0.5), 70.0)), ("Offset 2", (-60.0, 60.0)),
+         ("Offset 3", (-60.0, 60.0)), ("Feedback", _BI), ("Tone", _BI), ("Comb 1", _AMP),
          ("Comb 2", _AMP), ("Comb 3", _AMP), ("Pan 2", _BI), ("Pan 3", _BI),
          ("Mix", _PCT)],                                                           # Combulator
     22: [("Mode", ("menu", 0, 4)), ("Quality", ("menu", 0, 4)), ("Position", _PCT),
@@ -116,18 +118,18 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
          ("Speed", (1.0, 50.0)), ("Gap", (1.0, 50.0)), ("Spacing", (0.1, 20.0)),
          ("Thickness", (0.1, 50.0)), ("Depth", _PCT), ("Amount", _PCT), ("Variance", _PCT),
          ("Mix", _PCT)],                                                           # Tape
-    24: [("Threshold", (-96.0, 0.0)), ("Speed", _PCT), ("Low Cut", _HZ), ("High Cut", _HZ),
+    24: [("Threshold", (-96.0, 0.0)), ("Speed", _PCT), ("High Cut", _HZ), ("Low Cut", _HZ),
          ("Pitch", (-60.0, 60.0)), ("Ring Modulation", _PCT), ("Width", _BI), ("Mix", _PCT)]
         + [(None, None)] * 4,                                                      # Treemonster
     25: [("Pre Low Cut", _HZ), ("Pre High Cut", _HZ), ("Shape", None), ("Bias", _BI),
          ("Drive", _DB24), ("Post Low Cut", _HZ), ("Post High Cut", _HZ), ("Gain", _DB24),
          ("Mix", _PCT), (None, None), (None, None), (None, None)],                 # Waveshaper
-    26: [("Mode", ("menu", 0, 3)), ("Mid Low Cut", _HZ), ("Mid EQ Gain", _DB24),
-         ("Mid EQ Freq", _HZ), ("Mid High Cut", _HZ), ("Side Low Cut", _HZ),
-         ("Side EQ Gain", _DB24), ("Side EQ Freq", _HZ), ("Side High Cut", _HZ),
+    26: [("Matrix", ("menu", 0, 3)), ("Mid Filter Low Cut", _HZ), ("Mid Filter Gain", _DB24),
+         ("Mid Filter Frequency", _HZ), ("Mid Filter High Cut", _HZ), ("Side Filter Low Cut", _HZ),
+         ("Side Filter Gain", _DB24), ("Side Filter Frequency", _HZ), ("Side Filter High Cut", _HZ),
          ("Mid Gain", (-48.0, 12.0)), ("Side Gain", (-48.0, 12.0)),
          ("Balance", _BI)],                                                        # Mid-Side Tool
-    27: [("Size", _PCT), ("Decay", _PCT), ("Reflections", _PCT), ("Damping", _PCT),
+    27: [("Size", _PCT), ("Decay", _PCT), ("Reflections", _PCT), ("HF Damping", _PCT),
          ("Spin", _PCT), ("Chaos", _PCT), ("Knock", _PCT), ("Mix", _PCT)]
         + [(None, None)] * 4,                                                      # Spring Reverb
     28: [("Input Gain", _DB24), ("Bass Boost", _DB24), ("Bass Distort", _PCT),
@@ -144,14 +146,15 @@ FX_PARAMS: dict[int, list[tuple[str | None, Any]]] = {
          ("Cutoff", _HZ), ("Resonance", _PCT), ("Warp Rate", (-3.0, 4.0)),
          ("Warp Width", _PCT), ("Pitch Depth", _PCT), ("Filter Depth", _PCT),
          ("Low Cut", _HZ), ("Mix", _PCT), (None, None)],                           # Floaty Delay
-    31: [("Delay", (0.0, 1.0)), ("Size", (0.5, 2.0)), ("Param 3", (0.0, 0.9)),
-         ("Param 4", (0.0, 0.5)), ("Param 5", None), ("Gain", (-12.0, 12.0)),
+    31: [("Pre-Delay", (0.0, 1.0)), ("Size", (0.5, 2.0)), ("Start", (0.0, 0.9)),
+         ("Reverse From", (0.0, 0.5)), ("Tilt Center", None), ("Tilt Slope", (-12.0, 12.0)),
          ("Low Cut", _HZ), ("High Cut", _HZ), ("Mix", _PCT), (None, None), (None, None),
          (None, None)],                                                            # Convolution
 }
 
-# Types whose names were read off Surge itself; the others are matched from the manual.
-VERIFIED = {4, 11, 15, 20, 25, 28, 29, 30}
+# Every type's names were read off Surge in Live (its labels' last part, with the section
+# where two controls share it); Airwindows' controls follow the chosen Airwindows effect.
+VERIFIED = set(range(1, 32))                # every type, Surge XT 1.4.0
 
 # The values Surge starts each FX type with (unused controls as 0).
 FX_DEFAULTS: dict[int, list[dict[str, str]]] = {
@@ -605,6 +608,7 @@ _UNIT_EXCEPTIONS: dict[tuple[int, int], str | None] = {
     (17, 2): "amp", (17, 5): "amp", (17, 8): "amp",
     (21, 6): "amp", (21, 7): "amp", (21, 8): "amp",
     (19, 2): None, (19, 3): None, (27, 1): None,          # ms / s shown on a curve
+    (31, 0): None, (31, 4): None,                         # seconds 0..1; tilt center
 }
 
 

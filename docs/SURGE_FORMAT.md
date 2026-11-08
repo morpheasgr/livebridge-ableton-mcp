@@ -92,8 +92,8 @@ file at all; a used one is `fxN_type` (0 Off, 1 Delay ... 31 Convolution: `FX_TY
 by `fxN_p0`..`fxN_p11`, placed after `fx_bypass` in slot order. `fx_disable` is a bit mask of
 disabled slots. What each control is, its range and Surge's start values per type are in
 `mcp_server/livebridge_mcp/surge_fx.py` (survey in Live by local Claude, Surge XT 1.4.0: start
-values and the display at 0 / 0.5 / 1 of every control; names from Surge's manual matched by
-units, five types read off Surge). Unused controls hold leftovers of other types (large integers
+values and the display at 0 / 0.5 / 1 of every control; names are Surge's own labels, read in
+Live by local Claude). Unused controls hold leftovers of other types (large integers
 that are float bit patterns); the writer stores them as 0.
 
 ## Host values

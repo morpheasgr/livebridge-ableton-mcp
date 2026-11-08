@@ -46,7 +46,7 @@ original, worked out from the user's own labelled presets and the Massive manual
 Surge XT: the patch writer (`mcp_server/livebridge_mcp/surge.py`) is original, worked out from
 patch files (Surge itself is GPL-3.0; none of its code was read or copied). The test fixture
 `tests/data/surge/Init Saw.fxp` is Surge's factory template, CC0 by its own metadata. Effect
-control names follow the Surge XT user manual (names only, as facts).
+control names are Surge's labels as Live shows them (names only, as facts).
 
 ### Studied, not copied
 

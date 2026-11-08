@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, VERIFIED, fx_unit
+from .surge_fx import FX_DEFAULTS, FX_PARAMS, FX_SLOTS, SEND_OF_SLOT, fx_unit
 
 PLUGIN_ID = b"cjs3"
 CLASS_ID = "ABCDEF019182FAEB566D624153675854"          # Surge XT's VST3 class id
@@ -315,8 +315,6 @@ class Patch:
                     element.set("value", f"{float(value):.14f}")
                 written[names[k][0] or f"p{k}"] = value
             result["values"] = written
-        if current and current not in VERIFIED and (values or fx_type is not None):
-            result["names"] = "from the Surge manual, matched by units"
         return result
 
     def _new_fx_slot(self, number: int) -> ET.Element:

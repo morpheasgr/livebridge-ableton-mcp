@@ -331,7 +331,7 @@ def test_fx_in_an_empty_slot_starts_from_surges_values():
     again = S.Patch(patch.to_bytes())
     fx = {e["slot"]: e for e in again.effects()}
     assert fx["A3"]["values"]["Decay Time"] == 2.0 and fx["A3"]["values"]["Mix"] == 0.25
-    assert fx["A1"]["type"] == "Delay" and "Time Left" in fx["A1"]["values"]
+    assert fx["A1"]["type"] == "Delay" and "Left" in fx["A1"]["values"]
 
 
 def test_fx_type_change_resets_its_controls_and_names_are_checked():
@@ -392,11 +392,12 @@ def test_fx_values_with_units():
     get = lambda k: float(patch.params.find(f"fx1_p{k}").get("value"))
     assert get(2) == pytest.approx(1.0) and get(0) == pytest.approx(-4.0)
     assert get(9) == pytest.approx(0.3) and get(8) == pytest.approx(3.0)
-    patch.set_fx("A2", "Delay", {"Low Cut": "220 Hz", "High Cut": "1.76 kHz", "Mod Rate": "4 Hz",
-                                 "Mod Depth": "50 cents"})
+    patch.set_fx("A2", "Delay", {"Low Cut": "220 Hz", "High Cut": "1.76 kHz", "Rate": "4 Hz",
+                                 "Depth": "50 cents", "Delay Time - Left": "500 ms"})
     get = lambda k: float(patch.params.find(f"fx2_p{k}").get("value"))
     assert get(4) == pytest.approx(-12.0) and get(5) == pytest.approx(24.0, abs=1e-6)
     assert get(6) == pytest.approx(2.0) and get(7) == pytest.approx(0.5)
+    assert get(0) == pytest.approx(-1.0)                             # Surge's own label
     patch.set_fx("A3", "Resonator", {"Gain 1": "-6 dB", "Gain 2": "-inf dB"})
     assert float(patch.params.find("fx9_p2").get("value")) == pytest.approx(2 ** (-1 / 3))
     assert float(patch.params.find("fx9_p5").get("value")) == 0.0
@@ -436,3 +437,12 @@ def test_restore_warns_with_the_knobs_final_names(tmp_path, monkeypatch):
     asyncio.run(racks._restore_surge_values(None, result, str(preset)))
     assert result["restored"] == 1
     assert "A2 Delay - Type" in result["warning"] and "Param 6" not in result["warning"]
+
+
+def test_fx_names_are_surges_labels():
+    from livebridge_mcp import surge_fx as F
+    assert [n for n, _r in F.FX_PARAMS[24][2:4]] == ["High Cut", "Low Cut"]      # Treemonster
+    assert S.fx_control(21, "Combs - Offset 3") == 3                             # Combulator
+    assert S.fx_control(26, "Mid Filter - Gain") == 2                            # Mid-Side Tool
+    assert S.fx_control(16, "1 kHz") == 5 and S.fx_control(14, "Param 4") == 5   # GEQ, Airwindows
+    assert S.fx_control(31, "Impulse Response - Reverse From") == 3

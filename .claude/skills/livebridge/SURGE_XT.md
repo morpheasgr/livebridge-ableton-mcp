@@ -61,46 +61,59 @@ live_surge_write(name="LB Wet Pad", fx=[
 - **A new type starts from Surge's own values** for it (measured in Surge XT 1.4.0); the
   same type again keeps the slot's values; `"type": "Off"` clears it. `values` alone changes
   the slot's current effect.
-- **Control names** per type are what `live_surge_routings` lists under `effects` (and the
-  error lists when a name is wrong); `"p0"`..`"p11"` always work, and so do Surge's own labels
-  as Live shows them ("Comb - Frequency"). Rotary, Reverb 2, Neuron, Ensemble, Waveshaper,
-  Bonsai, Audio In and Floaty Delay names were read off Surge; the others come from Surge's
-  manual, matched to the controls by their units (the result says `names: from the Surge manual`).
+- **Control names** are Surge's own labels (read in Live by local Claude): what
+  `live_surge_routings` lists under `effects`, the table below, or the label as Live shows it
+  ("FX A1 Delay Time - Left" -> `"Left"` or `"Delay Time - Left"`); `"p0"`..`"p11"` always
+  work, and a wrong name gets the list in the error.
 - **Give values with their unit** — `"2 s"`, `"250 ms"`, `"4 Hz"`, `"1.5 kHz"`, `"30 %"`,
   `"-6 dB"`, `"10 cents"` — and the writer converts them. A bare number is the patch's own
   unit, which is easy to get wrong: Decay Time `2.0` is 2^2 = **4 s**.
 - **Patch units** (bare numbers): Hz controls (low/high cut, EQ freq, filters) in semitones from 440
-  Hz (-60..70), times log2 seconds (Delay `Time Left` -1 = 0.5 s, Reverb 2 `Decay Time` 1 = 2 s,
+  Hz (-60..70), times log2 seconds (Delay `Left` -1 = 0.5 s, Reverb 2 `Decay Time` 1 = 2 s,
   `Pre-Delay` -4 = 62 ms), rates log2 Hz, % as 0..1 (bipolar -1..1), dB as dB, EQ bandwidth in
   octaves, Delay `Width` / Reverb `Width` in dB.
 - **Modulate** an effect with a routing onto `fx<N>_p<k>`: N is the slot in patch order
   (A1=1, A2=2, B1=3, B2=4, S1=5, S2=6, G1=7, G2=8, A3=9, A4=10, B3=11, B4=12, S3=13, S4=14,
   G3=15, G4=16), k the control (Reverb 2 Mix = p9).
-- Not written: Airwindows' effect parameters (they change per Airwindows effect: name them
-  `p1`..), Nimbus' labels change with its mode, Convolution needs an impulse response loaded in
-  Surge.
+- Airwindows' effect is chosen by number (`"FX"`), its controls are `Param 0`-`Param 9`;
+  Convolution needs an impulse response loaded in Surge.
 
-| Type | Controls (p0, p1, ...) |
+| Type | Controls (p0, p1, ...; `-` unused) |
 |---|---|
-| Delay | Time Left, Time Right, Feedback, Crossfeed, Low Cut, High Cut, Mod Rate, Mod Depth, Channel, -, Mix, Width |
+| Delay | Left, Right, Feedback, Crossfeed, Low Cut, High Cut, Rate, Depth, Channel, -, Mix, Width |
 | Reverb 1 | Pre-Delay, Room Shape, Size, Decay Time, HF Damping, Low Cut, Peak Freq, Peak Gain, High Cut, Mix, Width |
-| Reverb 2 | Pre-Delay, Room Size, Decay Time, Diffusion, Buildup, Modulation, LF Damping, HF Damping, Width, Mix |
-| Chorus | Time, Rate, Depth, Feedback, Low Cut, High Cut, Mix, Width |
 | Phaser | Center, Feedback, Sharpness, Rate, Depth, Stereo, Mix, Width, Count, Spread, Waveform, Tone |
-| Flanger | Mode, Waveform, Rate, Depth, Count, Base Pitch, Spacing, Feedback, LF Damping, Width, Mix |
-| Distortion | Pre-EQ Gain/Freq/BW/High Cut, Drive, Feedback, Post-EQ Gain/Freq/BW/High Cut, Output Gain, Model |
-| EQ | Band 1-3 Gain/Freq/BW, Output Gain, Mix |
-| Waveshaper | Pre Low Cut, Pre High Cut, Shape, Bias, Drive, Post Low Cut, Post High Cut, Gain, Mix |
-| Bonsai | Input Gain, Bass Boost, Bass Distort, Bias Filter, Saturation Type, Saturation, Noise Sensitivity, Noise Gain, Dull, Output Gain, Mix |
-| Tape | Drive, Saturation, Bias, Tone, Speed, Gap, Spacing, Thickness, Depth, Amount, Variance, Mix |
 | Rotary | Horn Rate, Doppler, Tremolo, Rotor Rate, Drive, Model, Width, Mix |
+| Distortion | Pre-EQ Gain, Pre-EQ Frequency, Pre-EQ Bandwidth, Pre-EQ High Cut, Drive, Feedback, Post-EQ Gain, Post-EQ Frequency, Post-EQ Bandwidth, Post-EQ High Cut, Output Gain, Model |
+| EQ | Gain 1, Frequency 1, Bandwidth 1, Gain 2, Frequency 2, Bandwidth 2, Gain 3, Frequency 3, Bandwidth 3, Gain, Mix |
+| Freq Shift | Left, Right, Time, Feedback, Mix |
+| Conditioner | Bass, Treble, Width, Balance, Threshold, Attack Rate, Release Rate, Gain, Side Low Cut |
+| Chorus | Time, Rate, Depth, Feedback, Low Cut, High Cut, Mix, Width |
+| Vocoder | Gain, Gate, Env Follow, Q, -, Bands, Min Frequency, Max Frequency, Input, Range, Center, Mix |
+| Reverb 2 | Pre-Delay, Room Size, Decay Time, Diffusion, Buildup, Modulation, LF Damping, HF Damping, Width, Mix |
+| Flanger | Mode, Waveform, Rate, Depth, Count, Base Pitch, Spacing, Feedback, HF Damping, Width, Mix |
+| Ring Mod | Shape, Frequency, Unison Detune, Unison Voices, Forward Bias, Linear Region, Low Cut, High Cut, Mix |
+| Airwindows | FX, Param 0, Param 1, Param 2, Param 3, Param 4, Param 5, Param 6, Param 7, Param 8, Param 9 |
 | Neuron | Drive, Squash, Stab, Asymmetry, Bias, Comb Frequency, Comb Separation, Waveform, Rate, Depth, Width, Output Gain |
+| Graphic EQ | 30 Hz, 60 Hz, 120 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 12 kHz, 16 kHz, Gain |
+| Resonator | Frequency 1, Resonance 1, Gain 1, Frequency 2, Resonance 2, Gain 2, Frequency 3, Resonance 3, Gain 3, Mode, Gain, Mix |
+| CHOW | Threshold, Ratio, Flip, Mix |
+| Exciter | Drive, Tone, Attack, Release, Mix |
 | Ensemble | Anti-Alias Filter, Frequency 1, Depth 1, Frequency 2, Depth 2, Delay Type, Clock Rate, Saturation, Feedback, Width, Mix, Reconstruction Filter |
+| Combulator | Extra Noise, Center, Offset 2, Offset 3, Feedback, Tone, Comb 1, Comb 2, Comb 3, Pan 2, Pan 3, Mix |
+| Nimbus | Mode, Quality, Position, Size, Pitch, Density, Texture, Spread, Freeze, Feedback, Reverb, Mix |
+| Tape | Drive, Saturation, Bias, Tone, Speed, Gap, Spacing, Thickness, Depth, Amount, Variance, Mix |
+| Treemonster | Threshold, Speed, High Cut, Low Cut, Pitch, Ring Modulation, Width, Mix |
+| Waveshaper | Pre Low Cut, Pre High Cut, Shape, Bias, Drive, Post Low Cut, Post High Cut, Gain, Mix |
+| Mid-Side Tool | Matrix, Mid Filter Low Cut, Mid Filter Gain, Mid Filter Frequency, Mid Filter High Cut, Side Filter Low Cut, Side Filter Gain, Side Filter Frequency, Side Filter High Cut, Mid Gain, Side Gain, Balance |
+| Spring Reverb | Size, Decay, Reflections, HF Damping, Spin, Chaos, Knock, Mix |
+| Bonsai | Input Gain, Bass Boost, Bass Distort, Bias Filter, Saturation Type, Saturation, Noise Sensitivity, Noise Gain, Dull, Output Gain, Mix |
+| Audio In | Audio Input Channel, Audio Input Pan, Audio Input Level, Effect Input Channel, Effect Input Pan, Effect Input Level, Scene Input Channel, Scene Input Pan, Scene Input Level, Width, Mix |
+| Floaty Delay | Time, Playrate, Feedback, Cutoff, Resonance, Warp Rate, Warp Width, Pitch Depth, Filter Depth, Low Cut, Mix |
+| Convolution | Pre-Delay, Size, Start, Reverse From, Tilt Center, Tilt Slope, Low Cut, High Cut, Mix |
 
-The rest (Freq Shift, Conditioner, Vocoder, Ring Mod, Graphic EQ, Resonator, CHOW,
-Exciter, Combulator, Nimbus, Treemonster, Mid-Side Tool, Spring Reverb, Audio In,
-Floaty Delay, Convolution) are named the same way: read them from an error or from
-`live_surge_routings` after a dry run.
+Airwindows' Param 0-9 are the chosen Airwindows effect's controls (AD Clip: Boost, Soften,
+Enhance, Mode); Surge relabels them per effect.
 
 ### Routings
 
