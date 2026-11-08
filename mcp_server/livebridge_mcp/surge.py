@@ -224,11 +224,15 @@ class Patch:
     def set_parameter(self, name: str, value: float | int | str) -> dict[str, Any]:
         param = self.parameter(name)
         before = param.get("value")
+        osc = None
         match = re.fullmatch(r"([ab])_filter([12])_(type|subtype)", name)
         if match and isinstance(value, str):
             value = _filter_index(self, match.group(1), match.group(2), match.group(3), value)
         elif isinstance(value, str) and re.fullmatch(r"[ab]_osc[123]_type", name):
             value = _list_index(OSC_TYPES, value, "oscillator type")
+        osc = re.fullmatch(r"([ab]_osc[123])_type", name)
+        if osc and int(float(before or 0)) != int(value):
+            note = self._reset_osc_controls(osc.group(1), int(value))
         elif isinstance(value, str) and re.fullmatch(r"fx\d+_type", name):
             value = _list_index(FX_TYPES, value, "FX type")
         elif isinstance(value, str):
@@ -238,7 +242,24 @@ class Patch:
             param.set("value", str(int(value)))
         else:
             param.set("value", f"{float(value):.14f}")
-        return {"parameter": name, "value": param.get("value"), "before": before}
+        result = {"parameter": name, "value": param.get("value"), "before": before}
+        if osc and int(float(before or 0)) != int(value):
+            result["controls"] = note
+        return result
+
+    def _reset_osc_controls(self, osc: str, osc_type: int) -> str:
+        """Start the oscillator's seven controls from the new type's own init values."""
+        start = OSC_DEFAULTS.get(osc_type)
+        if start is None:
+            return ("kept the previous type's controls (no Surge template for "
+                    f"{OSC_TYPES[osc_type] if 0 <= osc_type < len(OSC_TYPES) else osc_type}): "
+                    "set them in Live or Surge")
+        for k, attrs in enumerate(start):
+            element = self.parameter(f"{osc}_param{k}")
+            for key in list(element.attrib):
+                del element.attrib[key]
+            element.attrib.update(attrs)
+        return f"reset to Surge's {OSC_TYPES[osc_type]} start values"
 
     def set_step_sequence(self, lfo: int, steps: list[float], scene: str = "a",
                           loop: list[int] | None = None, shuffle: float | None = None,
@@ -394,6 +415,109 @@ FX_TYPES = ["Off", "Delay", "Reverb 1", "Phaser", "Rotary", "Distortion", "EQ", 
             "Nimbus", "Tape", "Treemonster", "Waveshaper", "Mid-Side Tool", "Spring Reverb",
             "Bonsai", "Audio In", "Floaty Delay", "Convolution"]
 
+# The seven oscillator controls (param0-6) as Surge's CC0 templates start each oscillator type
+# (Init Saw, Sine, Wavetable, FM2, Modern, Experimental, Paraphonic): a type switch starts
+# from these, so "FM2" means Surge's FM2, not Init Saw's knobs under another label.
+OSC_DEFAULTS: dict[int, list[dict[str, str]]] = {
+    0: [
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.50000000000000', 'extend_range': '1'},
+        {'type': '2', 'value': '0.50000000000000'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.10000000149012', 'extend_range': '0'},
+        {'type': '0', 'value': '1'},
+    ],
+    1: [
+        {'type': '0', 'value': '0'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1', 'deform_type': '0'},
+        {'type': '0', 'value': '1'},
+        {'type': '2', 'value': '-60.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '70.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '0.10000000149012', 'extend_range': '0'},
+        {'type': '0', 'value': '1'},
+    ],
+    2: [
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1', 'deform_type': '1'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.10000000149012', 'extend_range': '0'},
+        {'type': '0', 'value': '1'},
+    ],
+    3: [
+        {'type': '2', 'value': '0.75000000000000'},
+        {'type': '2', 'value': '0.50000000000000'},
+        {'type': '2', 'value': '-60.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '70.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.10000000149012', 'extend_range': '0'},
+        {'type': '0', 'value': '1', 'extend_range': '1'},
+    ],
+    4: [
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '6.01000022888184'},
+        {'type': '2', 'value': '1.00000000000000'},
+        {'type': '2', 'value': '-60.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '70.00000000000000', 'deactivated': '1'},
+    ],
+    5: [
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.50000000000000', 'extend_range': '0'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '16.00000000000000', 'extend_range': '0'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '0'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1', 'deform_type': '0'},
+    ],
+    6: [
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '0', 'value': '1', 'extend_range': '1'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '0', 'value': '1'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '0'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1', 'deform_type': '0'},
+    ],
+    7: [
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1'},
+        {'type': '0', 'value': '1'},
+        {'type': '2', 'value': '-60.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '70.00000000000000', 'deactivated': '1'},
+        {'type': '2', 'value': '0.10000000149012', 'extend_range': '0'},
+        {'type': '0', 'value': '1'},
+    ],
+    8: [
+        {'type': '2', 'value': '1.00000000000000'},
+        {'type': '2', 'value': '0.00000000000000', 'extend_range': '1'},
+        {'type': '2', 'value': '0.00000000000000', 'deform_type': '0'},
+        {'type': '2', 'value': '0.50000000000000'},
+        {'type': '2', 'value': '0.00000000000000'},
+        {'type': '2', 'value': '0.10000000149012', 'extend_range': '0'},
+        {'type': '0', 'value': '1'},
+    ],
+}
+
+# Per oscillator type: each control's range in patch units, ("menu", first, count), or None
+# when unknown — measured in Live by local Claude (display at 0 / 0.5 / 1, Surge XT 1.4.0).
+_VOICES = ("menu", 1, 16)
+OSC_PARAM_RANGES: dict[int, list[Any]] = {
+    0: [(-1, 1), (0, 1), (0, 1), (0, 1), (0, 60), (0, 1), _VOICES],                  # Classic
+    1: [("menu", 0, 32), None, ("menu", 0, 2), (-60, 70), (-60, 70), (0, 1), _VOICES],  # Sine
+    2: [(0, 1), (-1, 1), (0, 1), (0, 60), (-1, 1), (0, 1), _VOICES],                 # Wavetable
+    5: [(0, 1), None, (0, 1), (0, 32), (0, 1), (-69, 61), (-1, 1)],                  # FM3
+    6: [(0, 1), ("menu", 1, 32), (0, 1), ("menu", 1, 32), (-10, 10), (0, 1), (-1, 1)],  # FM2
+    7: [(0, 1), (-60, 60), None, (-60, 70), (-60, 70), (0, 1), _VOICES],             # Window
+    8: [(-1, 1), (-1, 1), (-1, 1), (0, 1), (0, 60), (0, 1), _VOICES],                # Modern
+    9: [None, (0, 1), (0, 1), (0, 1), None, (-1, 1), (-1, 1)],                        # String
+    10: [None, (-1, 1), (-1, 1), (-1, 1), (0, 1), (0, 1), (0, 1)],                    # Twist
+    11: [None, (0, 1), (0, 1), (0, 1), (1, 8), (0, 1), _VOICES],                      # Alias
+}
+
 # Patch value -> Live's 0..1 value. Floats are linear in the patch's units between these
 # ends (measured in Live by local Claude: display at 0 / 0.5 / 1 of every sound_design control,
 # converted: Hz -> semitones from 440, rates and times -> log2, % -> fraction).
@@ -410,6 +534,8 @@ _FLOAT_RANGES = [
     (r"[ab]_drift", 0.0, 1.0), (r"[ab]_(width|pan)", -1.0, 1.0), (r"volume", -48.0, 0.0),
     # levels: 0..1 in the patch, shown as dB on a curve (measured 0.5 = -18 dB, 1 = 0 dB)
     (r"[ab]_level_(o[123]|noise|ring12|ring23)", 0.0, 1.0), (r"[ab]_volume", 0.0, 1.0),
+    # sends: dB = 18 * log2(value), up to +12 dB = 2^(2/3) (measured by local Claude)
+    (r"[ab]_send_fx_[1-4]", 0.0, 2 ** (2 / 3)),
 ]
 _MENUS = [  # (pattern, first value, count)
     (r"[ab]_filter[12]_type", 0, 36), (r"[ab]_filter[12]_subtype", 0, 16),
@@ -419,8 +545,25 @@ _MENUS = [  # (pattern, first value, count)
 ]
 
 
-def host_value(storage_name: str, patch_value: float) -> float | None:
-    """Live's 0..1 value of a patch value, or None when the conversion is not known."""
+def _convert(spec: Any, patch_value: float) -> float | None:
+    if spec is None:
+        return None
+    if spec[0] == "menu":
+        _kind, first, count = spec
+        index = min(count - 1, max(0, int(round(float(patch_value))) - first))
+        return 0.005 + 0.99 * index / (count - 1)
+    low, high = spec
+    return min(1.0, max(0.0, (float(patch_value) - low) / (high - low)))
+
+
+def host_value(storage_name: str, patch_value: float, osc_type: int | None = None
+               ) -> float | None:
+    """Live's 0..1 value of a patch value, or None when the conversion is not known.
+    Oscillator controls (``a_osc1_param0``...) need the oscillator's type."""
+    match = re.fullmatch(r"[ab]_osc[123]_param([0-6])", storage_name)
+    if match:
+        ranges = OSC_PARAM_RANGES.get(osc_type) if osc_type is not None else None
+        return _convert(ranges[int(match.group(1))], patch_value) if ranges else None
     for pattern, low, high in _FLOAT_RANGES:
         if re.fullmatch(pattern, storage_name):
             return min(1.0, max(0.0, (float(patch_value) - low) / (high - low)))
@@ -438,8 +581,13 @@ def host_values(patch: "Patch", storage_names: dict[str, str], names: list[str]
     for name in names:
         key = storage_names.get(name)
         element = patch.params.find(key) if key else None
-        value = host_value(key, float(element.get("value", "0"))) if element is not None \
-            else None
+        osc_type = None
+        match = re.fullmatch(r"([ab]_osc[123])_param\d", key or "")
+        if match:
+            kind = patch.params.find(f"{match.group(1)}_type")
+            osc_type = int(float(kind.get("value", "0"))) if kind is not None else None
+        value = host_value(key, float(element.get("value", "0")), osc_type) \
+            if element is not None else None
         if value is None:
             skipped.append(name)
         else:

@@ -171,8 +171,9 @@ def test_host_values_match_the_values_measured_in_live():
     values, skipped = S.host_values(
         patch, {"A Filter 1 Cutoff": "a_filter1_cutoff", "A Osc 1 Shape": "a_osc1_param0"},
         ["A Filter 1 Cutoff", "A Osc 1 Shape", "Unknown"])
-    assert values == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6)}
-    assert skipped == ["A Osc 1 Shape", "Unknown"]
+    assert values == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6),
+                      "A Osc 1 Shape": 0.5}             # Classic: shape -1..1, value 0
+    assert skipped == ["Unknown"]
 
 
 def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path):
@@ -204,8 +205,9 @@ def test_expose_restores_surge_values_after_the_late_load(monkeypatch, tmp_path)
     sent = {v["parameter"]: v["value"] for v in args["values"]}
     assert cmd == "devices.set_parameters" and args["normalized"] is True
     assert sent == {"A Filter 1 Cutoff": pytest.approx(0.369231, abs=1e-6),
-                    "A Filter 1 Type": pytest.approx(0.061571, abs=1e-6)}
-    assert result["restored"] == 2 and "A Osc 1 Shape" in result["warning"]
+                    "A Filter 1 Type": pytest.approx(0.061571, abs=1e-6),
+                    "A Osc 1 Shape": 0.5}
+    assert result["restored"] == 3 and "warning" not in result
     assert result["parameters"][0]["display"] == "after"         # reported after the restore
     assert result["parameters"][0]["value"] == pytest.approx(0.369231, abs=1e-6)
 
@@ -260,3 +262,28 @@ def test_oscillator_and_fx_types_by_name():
     with pytest.raises(ValueError, match="unknown oscillator type"):
         patch.set_parameter("a_osc1_type", "Supersaw")
     assert len(S.OSC_TYPES) == 12 and len(S.FX_TYPES) == 32
+
+
+def test_switching_the_oscillator_type_starts_from_surges_own_values():
+    patch = S.Patch.load(INIT_SAW)
+    change = patch.set_parameter("a_osc1_type", "FM2")
+    assert "FM2 start values" in change["controls"]
+    p1 = patch.params.find("a_osc1_param1")
+    assert (p1.get("type"), p1.get("value")) == ("0", "1")        # integer ratio, as Init FM2
+    assert patch.params.find("a_osc1_param6").get("type") == "2"
+    patch.set_parameter("a_osc1_param0", 0.4)                     # user values apply afterwards
+    assert patch.params.find("a_osc1_param0").get("value").startswith("0.4")
+    patch.set_parameter("a_osc1_type", "FM2")                     # same type: nothing reset
+    assert patch.params.find("a_osc1_param0").get("value").startswith("0.4")
+    kept = patch.set_parameter("a_osc2_type", "Twist")
+    assert "kept the previous type's controls" in kept["controls"]
+
+
+def test_oscillator_controls_convert_per_type_and_sends():
+    assert S.host_value("a_osc1_param4", 30, osc_type=0) == pytest.approx(0.5)    # Sync 30 st
+    assert S.host_value("a_osc1_param1", 17, osc_type=6) == pytest.approx(0.515968, abs=1e-6)  # C:17 centre
+    assert S.host_value("a_osc1_param3", -60, osc_type=1) == 0.0                 # Sine low cut
+    assert S.host_value("a_osc1_param6", 16, osc_type=0) == pytest.approx(0.995)  # 16 voices
+    assert S.host_value("a_osc1_param0", 0.5, osc_type=9) is None              # String exciter
+    assert S.host_value("a_osc1_param0", 0.5) is None                          # type unknown
+    assert S.host_value("a_send_fx_1", 0.5) == pytest.approx(0.31498, abs=1e-5)

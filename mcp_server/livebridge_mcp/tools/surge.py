@@ -115,7 +115,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 levels 0..1); filter, oscillator and FX types and filter subtypes also by name
                 ("a_osc1_type": "Wavetable", "fx1_type": "Reverb 2"); filter types (LP/HP/BP/N 12 dB and
                 24 dB, LP Vintage Ladder, LP OB-Xd 24 dB, LP K35, LP Diode Ladder, MULTI Fast
-                SVF, FX Comb + ...). Parameters are applied in the order given: type first.
+                SVF, FX Comb + ...). Types are applied first: switching an oscillator's type starts
+                its seven controls from Surge's own start values for that type, then your values
+                for them apply.
             wavetables: [{"osc": 2, "file": ".../Growl.wt", "scene": "a", "window": false}] —
                 embeds a Surge `.wt` wavetable in that oscillator (1-3) and makes it a
                 Wavetable oscillator (Window with "window": true); its position and other
@@ -165,7 +167,8 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 changes.append(patch.set_wavetable(int(entry["osc"]), table.read_bytes(),
                                                    table.stem, scene=entry.get("scene", "a"),
                                                    window=bool(entry.get("window"))))
-            for key, value in parameters.items():
+            ordered = sorted(parameters.items(), key=lambda kv: not kv[0].endswith("_type"))
+            for key, value in ordered:                # types first: they reset their controls
                 changes.append(patch.set_parameter(key, value))
             for entry in step_sequences:
                 if not isinstance(entry, dict) or "lfo" not in entry or "steps" not in entry:
