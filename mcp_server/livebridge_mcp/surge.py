@@ -429,7 +429,8 @@ class Patch:
             silent = "b" if active.get("value") == "0" else "a"
             used = [e["slot"] for e in self.effects() if e["slot"][0].lower() == silent]
             if used:
-                out.append(f"FX {', '.join(used)} sit on scene {silent.upper()}, which does not "
+                verb = "sits" if len(used) == 1 else "sit"
+                out.append(f"FX {', '.join(used)} {verb} on scene {silent.upper()}, which does not "
                            f"play: the patch is in Single scene mode with scene "
                            f"{'AB'[silent == 'a']} active — use the {'AB'[silent == 'a']} "
                            "slots, or G1-G4 for both")

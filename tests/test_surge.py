@@ -372,7 +372,9 @@ def test_fx_warnings_and_host_values():
     patch.set_parameter("a_send_fx_1", 1.0)
     assert "a_send_fx_1" not in " ".join(patch.warnings())
     patch.set_fx("B1", "Combulator")
-    assert "FX B1 sit on scene B, which does not play" in " ".join(patch.warnings())
+    assert "FX B1 sits on scene B, which does not play" in " ".join(patch.warnings())
+    patch.set_fx("B2", "Delay")
+    assert "FX B1, B2 sit on scene B" in " ".join(patch.warnings())
     patch.set_parameter("scenemode", 3)                              # Dual: both scenes play
     assert "does not play" not in " ".join(patch.warnings())
     # Reverb 2 Decay Time: log2 s -4..6; Mix 0..1; FX Delay mod rate log2 Hz -7..9
