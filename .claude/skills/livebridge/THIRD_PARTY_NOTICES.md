@@ -37,7 +37,8 @@ values, procedures) comes from these sources:
 - **ableton_device_vst_wrapper** by xxnoodl (MIT): the approach behind `live_plugin_host_bank`
   — a Max for Live device whose `live.dial` objects are named after the plug-in's parameters
   when the file is written, because Live reads a device's parameter list once, at load
-  (`mcp_server/livebridge_mcp/host_device.py`). Re-implemented, no code copied.
+  (`mcp_server/livebridge_mcp/host_device.py`), and waiting for a plug-in to load by polling
+  vst~ for its parameter count (`lbhost.js`). Re-implemented, no code copied.
 
 `SERUM.md` §1-5 are original to this fork, built on LiveBridge's Serum 2 parameter map. The
 Massive map, guide (`MASSIVE.md`) and patch writer (`mcp_server/livebridge_mcp/massive.py`) are

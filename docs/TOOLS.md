@@ -2078,7 +2078,7 @@ Load a VST3 plug-in with ALL of its parameters reachable — past the 128 that L
 | `track_name` | str \| null | `null` |
 | `file` | str \| null | `null` |
 
-Bridge: `browser.load`
+Bridge: `browser.load`, `tracks.delete`
 
 #### `live_plugin_host_parameters`
 
@@ -3782,7 +3782,7 @@ Every command registered in the Remote Script (`system.commands` returns the sam
 | `system.reload` |  | modules=null, helpers=true, core=false | `live_command_call` (cmd="system.reload" — developer hot reload) | Hot-reload handler (and helper) modules inside Live without a restart |
 | `system.status` |  |  | `live_status` | Server status: clients, queue, config (token redacted) |
 | `tracks.create` | M | type="midi", name=null, index=-1, color=null | `live_tracks_create` | Create a MIDI, audio or return track |
-| `tracks.delete` | M | track | `live_tracks_delete` | Delete a track or return track |
+| `tracks.delete` | M | track | `live_plugin_host_load`, `live_tracks_delete` | Delete a track or return track |
 | `tracks.duplicate` | M | track, name=null | `live_tracks_duplicate` | Duplicate a track (inserted right after it) |
 | `tracks.find` |  | name, limit=20 | `live_tracks_find` | Find tracks by (part of) their name |
 | `tracks.get` |  | track, detail="full" | `live_engine_follow`, `live_engine_unfollow`, `live_tracks_get` | One track in detail (+ freeze and group info) |

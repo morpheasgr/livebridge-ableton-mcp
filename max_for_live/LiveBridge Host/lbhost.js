@@ -32,13 +32,18 @@ try {
 }
 
 const NAME = "LiveBridge Host";
-const VERSION = "0.3.2";
+const VERSION = "0.3.3";
 const PROTOCOL = 1;
 const MAX_LINE = 1024 * 1024;
 const NAMES_OUTLET = 2;
 const VALUES_OUTLET = 3;
 const REPLY_MS = 60;            // how long a vst~ answer may take to arrive
 const LIST_MS = 600;            // "params" on a big plug-in
+// A plug-in reports its parameters only once it has finished loading: Surge XT takes more
+// than the 1.5 s a fixed wait allowed (found by local Claude; the polling idea is from
+// xxnoodl's ableton_device_vst_wrapper, MIT).
+const LOAD_POLL_MS = 300;
+const LOAD_WAIT_MS = Number(process.env.LIVEBRIDGE_HOST_LOAD_WAIT_MS) || 20000;
 const SAMPLES = 33;             // values tried when setting by display text
 const MIDI_RUN = 128;           // the per-CC stand-in parameters VST3 plug-ins add
 const MIDI_NAME = /^(midi\s*)?(cc\s*\d+|cc\b)|pitch\s*bend|after\s*touch|channel\s*pressure/i;
@@ -253,8 +258,10 @@ const fake = {
   loaded: null,
   params: [],
   values: [],
+  readyAt: 0,
   load(file) {
     this.loaded = file;
+    this.readyAt = Date.now() + (Number(process.env.LIVEBRIDGE_HOST_FAKE_SLOW_MS) || 0);
     this.params = ["Cutoff", "Resonance", "Mode"];
     for (let i = 0; i < 130; i++) this.params.push("MIDI CC " + i);
     this.params.push("Volume");
@@ -284,10 +291,15 @@ function fakeAsk(message) {
     if (/\.vstpreset$/i.test(String(rest[0]))) fake.values = fake.values.map(() => 0.25);
     return Promise.resolve([]);
   }
-  if (head === "params") return Promise.resolve(fake.params.map((n) => [NAMES_OUTLET, n]));
+  if (head === "params") {
+    if (Date.now() < fake.readyAt) return Promise.resolve([]);
+    return Promise.resolve(fake.params.map((n) => [NAMES_OUTLET, n]));
+  }
   if (head === "get") {
     const n = Number(rest[0]);
-    if (n === -4) return Promise.resolve([out(-4, fake.params.length)]);
+    if (n === -4) {
+      return Promise.resolve([out(-4, Date.now() < fake.readyAt ? 0 : fake.params.length)]);
+    }
     if (n === -7) return Promise.resolve([out(-7, fake.loaded && /synth/i.test(fake.loaded) ? 1 : 0)]);
     if (n === -1) return Promise.resolve(fake.loaded ? [out(-1, "Fake", "Synth")] : []);
     return Promise.resolve([out(n, fake.values[n - 1], ...fake.text(n - 1).split(" "))]);
@@ -473,14 +485,18 @@ async function load(args) {
   const file = String(args.file || "").trim();
   if (!file) throw { type: "bad_args", message: "load needs file (the VST3 file name)" };
   await ask(["valuemode", 2], 5);
-  quiet(3000);
-  await ask(["plug_vst3", file], 1500);
+  quiet(LOAD_WAIT_MS + 3000);
+  await ask(["plug_vst3", file], 500);
+  await loaded();
   if (args.sub) await ask(["subname", String(args.sub)], 500);
   const isSynth = (await infoValue(-7)) === 1;
   const names = await listNames();
   quietEnds();
   setTimeout(baseline, 400);
-  if (!names.length) throw { type: "not_found", message: `vst~ could not load "${file}"` };
+  if (!names.length) {
+    throw { type: "not_found",
+            message: `vst~ could not load "${file}" (no parameters after ${LOAD_WAIT_MS / 1000} s)` };
+  }
   state.plugin = { file: file, name: String(args.name || args.sub || file), synth: isSynth };
   if (args.class_id) state.plugin.class_id = String(args.class_id);
   writeRegistry();
@@ -489,6 +505,17 @@ async function load(args) {
   if (maxApi && args.rename !== false) maxApi.outlet("context", "rename", state.plugin.name);
   return { plugin: state.plugin, parameters: names.length - hiddenCount(),
            hidden_midi: hiddenCount() };
+}
+
+// Wait until vst~ reports a parameter count (the plug-in has loaded), up to LOAD_WAIT_MS.
+async function loaded() {
+  const end = Date.now() + LOAD_WAIT_MS;
+  for (;;) {
+    const count = await infoValue(-4);
+    if (count && count > 0) return count;
+    if (Date.now() >= end) return 0;
+    await new Promise((resolve) => setTimeout(resolve, LOAD_POLL_MS));
+  }
 }
 
 function hiddenCount() {

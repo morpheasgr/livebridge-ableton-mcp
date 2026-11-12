@@ -171,6 +171,14 @@ def _failure(exc: engine.EngineError, cmd: str) -> dict[str, Any]:
     return tool_error(str(exc), type=kind, cmd=cmd)
 
 
+def _new_track_path(loaded: Any) -> str | None:
+    """The path of the one track browser.load created, if it created exactly one."""
+    tracks = (loaded or {}).get("new_tracks") if isinstance(loaded, dict) else None
+    if isinstance(tracks, list) and len(tracks) == 1 and isinstance(tracks[0], dict):
+        return tracks[0].get("path")
+    return None
+
+
 def _hosts() -> list[dict[str, Any]]:
     return engine.devices(kind="host")
 
@@ -195,6 +203,16 @@ def _host_on(track: str | None) -> dict[str, Any]:
 
 def register(mcp: Any, bridge: BridgeClient) -> None:
     """Register the plug-in host tools on the MCP app."""
+
+    def _cleanup(error: dict[str, Any], loaded: Any) -> dict[str, Any]:
+        """A failed load leaves no empty track behind: remove the one this call created
+        (a retry would otherwise add another)."""
+        path = _new_track_path(loaded)
+        if path:
+            gone = bridge_call(bridge, "tracks.delete", {"track": path})
+            if isinstance(gone, dict) and "error" not in gone:
+                error["error"] = f"{error.get('error', '')} (removed the track it had created)"
+        return error
 
     @mcp.tool()
     def live_plugin_host_load(
@@ -264,8 +282,9 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
             if host is None:
                 time.sleep(0.25)
         if host is None:
-            return tool_error(f"{device_name} was loaded but did not start (Node for Max): "
-                              "check Max for Live, then retry", type="invalid_state", cmd=cmd)
+            return _cleanup(tool_error(f"{device_name} was loaded but did not start (Node for "
+                                       "Max): check Max for Live, then retry",
+                                       type="invalid_state", cmd=cmd), loaded)
         try:
             class_id = plugin_ids.class_for(file, plugin, vst3_folders())
             load = {"file": file, "sub": plugin, "name": plugin}
@@ -273,7 +292,7 @@ def register(mcp: Any, bridge: BridgeClient) -> None:
                 load["class_id"] = class_id
             result = engine.request(host, "load", load, timeout=_LOAD_TIMEOUT)
         except engine.EngineError as exc:
-            return _failure(exc, cmd)
+            return _cleanup(_failure(exc, cmd), loaded)
         result = dict(result or {})
         result["track"] = host.get("track")
         if vst3_path:

@@ -495,3 +495,55 @@ def test_a_restore_burst_is_not_a_touch(engines, monkeypatch):  # noqa: F811
     cleared = call_tool(app, "live_plugin_host_parameters", {"touched": "reset"})
     assert cleared["reset"] is True
     assert call_tool(app, "live_plugin_host_parameters", {"touched": True})["touched"] == 0
+
+
+def test_host_waits_for_a_slow_plugin(engines, monkeypatch):  # noqa: F811
+    # Surge XT reports its parameters only after more than the 1.5 s a fixed wait allowed
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_SLOW_MS", "2000")
+    _process, send, outlets = engines(script=HOST_JS)
+    send("context", "track", "Pad")
+    assert engine.wait_for(lambda: any(d.get("track") == "Pad"
+                                       for d in engine.devices(kind="host")), 5)
+    (host,) = engine.devices(kind="host")
+    loaded = engine.request(host, "load", {"file": "Surge XT", "sub": "Surge XT",
+                                           "name": "Surge XT"}, timeout=30.0)
+    assert loaded["parameters"] == 4 and loaded["plugin"]["name"] == "Surge XT"
+    assert ["context", "rename", "Surge XT"] in [json.loads(l) for l in
+                                                 outlets.read_text().splitlines()]
+
+
+def test_host_gives_up_on_a_plugin_that_never_loads(engines, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE", "1")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_FAKE_SLOW_MS", "60000")
+    monkeypatch.setenv("LIVEBRIDGE_HOST_LOAD_WAIT_MS", "700")
+    _process, send, _outlets = engines(script=HOST_JS)
+    send("context", "track", "Pad")
+    assert engine.wait_for(lambda: any(d.get("track") == "Pad"
+                                       for d in engine.devices(kind="host")), 5)
+    (host,) = engine.devices(kind="host")
+    with pytest.raises(engine.EngineError, match="no parameters after 0.7 s"):
+        engine.request(host, "load", {"file": "Broken", "sub": "Broken", "name": "Broken"},
+                       timeout=10.0)
+
+
+def test_a_failed_load_removes_the_track_it_created(monkeypatch):
+    from fake_bridge import FakeBridge
+    from livebridge_mcp.tools import plugin_host as tool
+    bridge = FakeBridge().start()
+    bridge.set_result("browser.load", {"track": "Surge XT", "inserted": [],
+                                       "new_tracks": [{"name": "Surge XT",
+                                                       "path": "song.tracks[4]"}]})
+    bridge.set_result("tracks.delete", {"deleted": "Surge XT"})
+    monkeypatch.setattr(tool, "find_vst3", lambda name, folders=None:
+                        [{"file": "Surge XT", "name": "Surge XT", "path": "/x/Surge XT.vst3"}])
+    monkeypatch.setattr(tool, "_WAIT_S", 0.3)
+    monkeypatch.setattr(tool, "_hosts", lambda: [])
+    app = create_app(BridgeClient(host=bridge.host, port=bridge.port, timeout=5.0))
+    try:
+        result = call_tool(app, "live_plugin_host_load", {"plugin": "Surge XT"})
+    finally:
+        bridge.stop()
+    assert result["type"] == "invalid_state" and "removed the track" in result["error"]
+    deleted = [r["args"] for r in bridge.requests if r["cmd"] == "tracks.delete"]
+    assert deleted == [{"track": "song.tracks[4]"}]
